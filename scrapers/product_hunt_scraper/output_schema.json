@@ -1,0 +1,22 @@
+{
+  "title": "Product Hunt Scraper Output",
+  "type": "object",
+  "properties": {
+    "products": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "tagline": { "type": "string" },
+          "ph_url": { "type": "string", "description": "Product Hunt product page URL" },
+          "post_id": { "type": "string", "description": "Numeric PH post ID" },
+          "published_at": { "type": "string", "description": "ISO 8601 launch date" },
+          "submitter": { "type": "string", "description": "Name of person who submitted to PH" }
+        }
+      }
+    },
+    "product_count": { "type": "integer" },
+    "errors": { "type": "array", "items": { "type": "string" } }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "title": "LinkedIn Post Research Input",
+  "type": "object",
+  "required": ["keyword"],
+  "properties": {
+    "keyword": {
+      "type": "string",
+      "description": "Search term. Supports hashtags (e.g. '#saas'), phrases, and keywords (e.g. 'hiring SDR')."
+    },
+    "sort": {
+      "type": "string",
+      "description": "Sort order: 'date_posted' (newest first) or 'relevance'.",
+      "default": "date_posted"
+    },
+    "max_posts": {
+      "type": "integer",
+      "description": "Max posts to return. Each post costs $0.005 on Apify free tier.",
+      "default": 20
+    },
+    "date_filter": {
+      "type": ["string", "null"],
+      "description": "Optional date filter string accepted by the actor. Leave null if unsure.",
+      "default": null
+    }
+  }
+}

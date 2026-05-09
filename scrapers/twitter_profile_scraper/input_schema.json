@@ -1,0 +1,26 @@
+{
+  "title": "Twitter Profile Scraper Input",
+  "type": "object",
+  "properties": {
+    "profile_url": {
+      "type": "string",
+      "description": "Full Twitter/X profile URL (e.g. https://twitter.com/paulg or https://x.com/paulg)"
+    },
+    "max_tweets": {
+      "type": "integer",
+      "description": "Maximum number of tweets to return (client-side cap after fetching)",
+      "default": 50
+    },
+    "days_back": {
+      "type": "integer",
+      "description": "Only include tweets from the last N days. Pass 0 to skip date filtering.",
+      "default": 90
+    },
+    "include_retweets": {
+      "type": "boolean",
+      "description": "Whether to include retweets in the output",
+      "default": false
+    }
+  },
+  "required": ["profile_url"]
+}

@@ -1,0 +1,33 @@
+{
+  "title": "Reddit Research Scraper Output",
+  "type": "object",
+  "properties": {
+    "query": { "type": "string" },
+    "subreddit": { "type": ["string", "null"] },
+    "sort": { "type": "string" },
+    "time_filter": { "type": "string" },
+    "posts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "text": { "type": "string", "description": "Post body text. Empty for link posts." },
+          "url": { "type": "string", "description": "Reddit permalink" },
+          "external_url": { "type": "string", "description": "Linked URL for link posts. Empty for text posts." },
+          "author": { "type": "string" },
+          "subreddit": { "type": "string" },
+          "score": { "type": "integer" },
+          "upvote_ratio": { "type": "number" },
+          "num_comments": { "type": "integer" },
+          "created_at": { "type": "string" },
+          "flair": { "type": "string" },
+          "is_self": { "type": "boolean", "description": "True for text posts, false for link posts." }
+        }
+      }
+    },
+    "post_count": { "type": "integer" },
+    "errors": { "type": "array", "items": { "type": "string" } }
+  }
+}

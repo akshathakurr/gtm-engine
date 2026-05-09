@@ -1,0 +1,44 @@
+{
+  "title": "LinkedIn Post Research Output",
+  "type": "object",
+  "properties": {
+    "keyword": { "type": "string" },
+    "sort": { "type": "string" },
+    "posts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "post_id": { "type": "string", "description": "LinkedIn activity ID." },
+          "post_url": { "type": "string", "description": "Full LinkedIn post URL." },
+          "text": { "type": "string", "description": "Post body text." },
+          "author": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "headline": { "type": "string" },
+              "profile_url": { "type": "string" }
+            }
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "reactions": { "type": "integer" },
+              "comments": { "type": "integer" },
+              "shares": { "type": "integer" }
+            }
+          },
+          "posted_at": { "type": "string", "description": "Post date as 'YYYY-MM-DD HH:MM:SS'." },
+          "posted_at_timestamp": { "type": "integer", "description": "Unix timestamp in milliseconds." },
+          "hashtags": { "type": "array", "items": { "type": "string" } },
+          "content_type": { "type": "string", "description": "Media type: image, video, article, or empty." },
+          "is_reshare": { "type": "boolean" },
+          "search_input": { "type": "string" }
+        }
+      }
+    },
+    "post_count": { "type": "integer" },
+    "total_available": { "type": "integer", "description": "Total LinkedIn results for the query (not all are fetched)." },
+    "errors": { "type": "array", "items": { "type": "string" } }
+  }
+}

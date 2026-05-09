@@ -1,0 +1,21 @@
+{
+  "title": "LinkedIn Post Comment Scraper Input",
+  "type": "object",
+  "required": ["post_url"],
+  "properties": {
+    "post_url": {
+      "type": "string",
+      "description": "Full LinkedIn post URL or numeric activity ID. e.g. https://www.linkedin.com/posts/user_activity-1234567890-xxxx"
+    },
+    "max_comments": {
+      "type": "integer",
+      "description": "Max top-level comments to return.",
+      "default": 20
+    },
+    "include_replies": {
+      "type": "boolean",
+      "description": "If true, includes reply comments. Default false — top-level only.",
+      "default": false
+    }
+  }
+}

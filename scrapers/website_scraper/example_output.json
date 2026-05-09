@@ -1,0 +1,21 @@
+{
+  "url": "https://acko.com",
+  "company_name": "ACKO Insurance | Buy Car, Bike, Health, Term & Travel Insurance Online",
+  "meta_description": "Buy Car, Bike, Health, Term & Travel Insurance online on ACKO. Zero commission, cashless claims, and more. Trusted by Millions",
+  "homepage_text": "ACKO Insurance | Buy Car, Bike, Health, Term & Travel Insurance Online Have an award-winning insurer by your side ...",
+  "pages_scraped": ["homepage", "about-us", "careers"],
+  "product_description": "Buy Car, Bike, Health, Term & Travel Insurance online on ACKO. Zero commission, cashless claims, and more. Trusted by Millions",
+  "customers": [],
+  "employee_size_hint": "1200",
+  "founded_year": "2016",
+  "icp_hints": [
+    "family cover medical costs for your family under one policy",
+    "planned treatments"
+  ],
+  "full_text_by_page": {
+    "homepage": "...",
+    "about-us": "Building the insurance experience you always deserved ...",
+    "careers": "ACKO Careers Here to make insurance simpler ..."
+  },
+  "errors": []
+}

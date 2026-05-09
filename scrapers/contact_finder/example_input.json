@@ -1,0 +1,8 @@
+{
+  "mode": "person",
+  "first_name": "Tim",
+  "last_name": "Cook",
+  "domain": "apple.com",
+  "reveal_personal_emails": true,
+  "reveal_phone": false
+}

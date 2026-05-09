@@ -1,0 +1,10 @@
+{
+  "_comment": "Default signal keywords — buying-intent phrases. Override per-project by creating /Context/<project>/signal_keywords.json with the same shape.",
+  "keywords": [
+    "implementing AI in our org",
+    "AI is helping our team",
+    "how we're using AI",
+    "AI transformation",
+    "automating with AI"
+  ]
+}

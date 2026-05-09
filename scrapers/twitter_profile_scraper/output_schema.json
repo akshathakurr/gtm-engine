@@ -1,0 +1,58 @@
+{
+  "title": "Twitter Profile Scraper Output",
+  "type": "object",
+  "properties": {
+    "profile_url": {
+      "type": "string",
+      "description": "Input profile URL"
+    },
+    "profile": {
+      "type": "object",
+      "description": "User profile data",
+      "properties": {
+        "name": {"type": "string"},
+        "screen_name": {"type": "string"},
+        "bio": {"type": "string"},
+        "location": {"type": "string"},
+        "followers_count": {"type": "integer"},
+        "following_count": {"type": "integer"},
+        "tweet_count": {"type": "integer"},
+        "is_verified": {"type": "boolean"},
+        "account_created_at": {"type": "string"},
+        "profile_image_url": {"type": "string"}
+      }
+    },
+    "tweets": {
+      "type": "array",
+      "description": "List of tweets, newest first",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "text": {"type": "string"},
+          "created_at": {"type": "string"},
+          "url": {"type": "string"},
+          "likes": {"type": "integer"},
+          "retweets": {"type": "integer"},
+          "replies": {"type": "integer"},
+          "quotes": {"type": "integer"},
+          "is_retweet": {"type": "boolean"},
+          "is_reply": {"type": "boolean"},
+          "is_quote": {"type": "boolean"},
+          "lang": {"type": "string"},
+          "hashtags": {"type": "array", "items": {"type": "string"}},
+          "mentions": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "tweet_count": {"type": "integer", "description": "Number of tweets returned"},
+    "date_range": {
+      "type": "object",
+      "properties": {
+        "oldest": {"type": "string"},
+        "newest": {"type": "string"}
+      }
+    },
+    "errors": {"type": "array", "items": {"type": "string"}}
+  }
+}

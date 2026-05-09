@@ -1,0 +1,15 @@
+{
+  "days_back": 7,
+  "max_per_profile": 10,
+  "max_per_keyword": 25,
+  "trending_top_n": 30,
+  "icp_sheet": {
+    "id": "TODO_PASTE_ICP_SHEET_ID",
+    "tab": "Sheet1",
+    "url_column": "LinkedIn URL"
+  },
+  "output_sheet": {
+    "id": "TODO_PASTE_OUTPUT_SHEET_ID",
+    "tab": "Comments"
+  }
+}

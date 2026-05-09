@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": {
+    "type": "object",
+    "properties": {
+      "interest_score":  { "type": "integer", "minimum": 0, "maximum": 100 },
+      "related_queries": { "type": "array", "items": { "type": "string" } },
+      "rising_queries":  { "type": "array", "items": { "type": "string" } },
+      "errors":          { "type": "array", "items": { "type": "string" } }
+    },
+    "required": ["interest_score", "related_queries", "rising_queries", "errors"]
+  }
+}

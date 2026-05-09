@@ -1,0 +1,106 @@
+{
+  "title": "LinkedIn Profile Post Scraper Output",
+  "type": "object",
+  "properties": {
+    "profile_url": {
+      "type": "string",
+      "description": "The input profile URL"
+    },
+    "total": {
+      "type": "integer",
+      "description": "Number of posts returned"
+    },
+    "posts": {
+      "type": "array",
+      "description": "Posts ordered newest to oldest",
+      "items": {
+        "type": "object",
+        "properties": {
+          "urn": {
+            "type": "string",
+            "description": "Unique LinkedIn URN for the post — use for deduplication across runs"
+          },
+          "url": {
+            "type": "string",
+            "description": "Direct URL to the post"
+          },
+          "post_type": {
+            "type": "string",
+            "enum": ["regular", "quote"],
+            "description": "regular = original post, quote = repost with added comment"
+          },
+          "posted_at": {
+            "type": "string",
+            "description": "Post date as 'YYYY-MM-DD HH:MM:SS' (UTC)"
+          },
+          "timestamp_ms": {
+            "type": "integer",
+            "description": "Unix timestamp in milliseconds (UTC) — use for precise date comparisons"
+          },
+          "text": {
+            "type": "string",
+            "description": "Full post text content"
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "headline": { "type": "string" },
+              "username": { "type": "string" },
+              "profile_url": { "type": "string" }
+            }
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "total_reactions": { "type": "integer" },
+              "likes": { "type": "integer" },
+              "comments": { "type": "integer" },
+              "reposts": { "type": "integer" }
+            }
+          },
+          "media": {
+            "type": ["object", "null"],
+            "description": "Attached media, or null if none",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "image, images, video, article, document, etc."
+              },
+              "url": { "type": "string" },
+              "thumbnail": { "type": "string", "description": "Video thumbnail URL" },
+              "images": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "url": { "type": "string" },
+                    "width": { "type": "integer" },
+                    "height": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "reshared_post": {
+            "type": ["object", "null"],
+            "description": "The original post being quoted/reshared. Present only when post_type is 'quote' or 'repost'.",
+            "properties": {
+              "urn": { "type": "string" },
+              "url": { "type": "string" },
+              "post_type": { "type": "string" },
+              "posted_at": { "type": "string" },
+              "text": { "type": "string" },
+              "author": { "type": "object" },
+              "media": { "type": ["object", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

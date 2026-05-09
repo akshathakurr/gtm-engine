@@ -1,0 +1,6 @@
+{
+  "profile_url": "https://twitter.com/paulg",
+  "max_tweets": 50,
+  "days_back": 90,
+  "include_retweets": false
+}

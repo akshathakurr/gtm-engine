@@ -1,0 +1,23 @@
+{
+  "title": "Web Search Scraper Output",
+  "type": "object",
+  "properties": {
+    "query": { "type": "string" },
+    "total": { "type": "integer" },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "url": { "type": "string" },
+          "published_date": { "type": "string", "description": "ISO 8601 date" },
+          "author": { "type": "string" },
+          "summary": { "type": "string", "description": "Exa-generated answer to summary_question for this result" },
+          "highlights": { "type": "array", "items": { "type": "string" }, "description": "Key sentences extracted from the page" }
+        }
+      }
+    },
+    "errors": { "type": "array", "items": { "type": "string" } }
+  }
+}

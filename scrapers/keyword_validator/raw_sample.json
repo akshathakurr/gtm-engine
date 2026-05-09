@@ -1,0 +1,30 @@
+{
+  "_note": "Real output captured against pytrends from this machine. Google rate-limited (429) on this run — common with pytrends since it's unofficial. The scraper degrades gracefully: each keyword still gets a structurally-valid entry with the error listed under 'errors'. When the rate-limit clears, interest_score and the query lists populate normally — see example_output.json for that shape.",
+  "AI outbound sales": {
+    "interest_score": 0,
+    "related_queries": [],
+    "rising_queries": [],
+    "errors": [
+      "interest_over_time failed: The request failed: Google returned a response with code 429",
+      "related_queries failed: The request failed: Google returned a response with code 429"
+    ]
+  },
+  "cold email personalization": {
+    "interest_score": 0,
+    "related_queries": [],
+    "rising_queries": [],
+    "errors": [
+      "interest_over_time failed: The request failed: Google returned a response with code 429",
+      "related_queries failed: The request failed: Google returned a response with code 429"
+    ]
+  },
+  "B2B prospecting tools": {
+    "interest_score": 0,
+    "related_queries": [],
+    "rising_queries": [],
+    "errors": [
+      "interest_over_time failed: The request failed: Google returned a response with code 429",
+      "related_queries failed: The request failed: Google returned a response with code 429"
+    ]
+  }
+}

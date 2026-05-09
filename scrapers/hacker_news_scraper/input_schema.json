@@ -1,0 +1,31 @@
+{
+  "title": "Hacker News Scraper Input",
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "string",
+      "description": "Keyword(s) to search. Leave empty to fetch recent stories of the given type.",
+      "default": ""
+    },
+    "story_type": {
+      "type": "string",
+      "description": "Type of story to fetch. One of: story, ask_hn, show_hn, job, poll.",
+      "default": "story"
+    },
+    "sort_by": {
+      "type": "string",
+      "description": "'date' (newest first) or 'relevance' (best match first).",
+      "default": "date"
+    },
+    "days_back": {
+      "type": "integer",
+      "description": "Only include stories from the last N days. 0 = no date filter.",
+      "default": 30
+    },
+    "max_results": {
+      "type": "integer",
+      "description": "Maximum number of stories to return.",
+      "default": 30
+    }
+  }
+}

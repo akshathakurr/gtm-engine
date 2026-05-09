@@ -1,0 +1,42 @@
+{
+  "title": "LinkedIn Job Scraper Output",
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "object",
+      "description": "The resolved search parameters used",
+      "properties": {
+        "keywords": { "type": "string" },
+        "company_name": { "type": "string" },
+        "location": { "type": "string" },
+        "days_back": { "type": "integer" },
+        "url": { "type": "string" }
+      }
+    },
+    "total": {
+      "type": "integer",
+      "description": "Number of jobs returned"
+    },
+    "jobs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "LinkedIn job ID" },
+          "title": { "type": "string", "description": "Job title" },
+          "company_name": { "type": "string" },
+          "company_linkedin_url": { "type": "string" },
+          "location": { "type": "string" },
+          "posted_at": { "type": "string", "description": "ISO 8601 timestamp" },
+          "job_url": { "type": "string", "description": "Direct link to job posting" },
+          "description_html": { "type": "string", "description": "Full job description as HTML" },
+          "benefits": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

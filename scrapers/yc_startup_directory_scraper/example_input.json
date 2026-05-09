@@ -1,0 +1,8 @@
+{
+  "batch": "W25",
+  "industries": ["B2B", "AI"],
+  "locations": null,
+  "status": "Active",
+  "max_companies": 10,
+  "include_founders": false
+}

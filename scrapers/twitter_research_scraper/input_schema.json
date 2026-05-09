@@ -1,0 +1,26 @@
+{
+  "title": "Twitter Research Scraper Input",
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "string",
+      "description": "Search query. Supports Twitter operators: \"from:user\", \"#hashtag\", exact phrases in quotes, AND/OR."
+    },
+    "max_tweets": {
+      "type": "integer",
+      "description": "Maximum number of tweets to return.",
+      "default": 20
+    },
+    "sort_by": {
+      "type": "string",
+      "description": "'Latest' (chronological, newest first) or 'Top' (most engagement first).",
+      "default": "Latest"
+    },
+    "days_back": {
+      "type": "integer",
+      "description": "Only include tweets from the last N days. 0 = no date filter.",
+      "default": 7
+    }
+  },
+  "required": ["query"]
+}

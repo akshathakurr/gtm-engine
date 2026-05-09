@@ -1,0 +1,15 @@
+{
+  "creators": [
+    {"name": "Paul Graham",       "twitter": "paulg",          "notes": "philosophy, essays, founder advice"},
+    {"name": "Sam Altman",        "twitter": "sama",           "notes": "AI, OpenAI, startups"},
+    {"name": "Gabriel Petersson", "twitter": "gabriel1",       "notes": "AI engineering, OpenAI"},
+    {"name": "Dan Koe",           "twitter": "thedankoe",      "notes": "philosophy, creator economy, building"},
+    {"name": "Elad Gil",          "twitter": "eladgil",        "notes": "startups, scaling, AI investing"},
+    {"name": "Sharif Shameem",    "twitter": "sharifshameem",  "notes": "AI building, Lexica, Debuild"},
+    {"name": "Farza Majeed",      "twitter": "farzyness",      "notes": "buildspace, building, founder energy"},
+    {"name": "Karri Saarinen",    "twitter": "karrisaarinen",  "notes": "design, Linear, taste"},
+    {"name": "Deedy Das",         "twitter": "deedydas",       "notes": "engineering, AI, startups"},
+    {"name": "Rahul Vohra",       "twitter": "rahulvohra",     "notes": "Superhuman, product, growth"},
+    {"name": "Aaron Levie",       "twitter": "levie",          "notes": "Box CEO, AI commentary, enterprise"}
+  ]
+}

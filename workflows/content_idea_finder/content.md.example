@@ -1,0 +1,103 @@
+# Content Idea Finder — Questionnaire
+
+This file configures the Content Idea Finder workflow. Copy it to
+`content.md` in this same folder and the workflow will read your
+answers from the `### Answer` blocks.
+
+**On first run**, if a section is empty the workflow will ask you the
+question. If you skip the question, it shows you the **built-in
+defaults** and asks if you'd like to **add to**, **remove from**, or
+**accept** that list — whatever you confirm becomes the saved answer.
+
+**On re-run**, the agent asks per section whether to **keep**,
+**append**, or **replace** the existing answer.
+
+Free-form text is fine where the format allows it. For lists of
+creators / queries, stick to the pipe-delimited format shown — those
+are parsed directly, not by an LLM.
+
+---
+
+## Content Genres
+
+**Question:** What topics do you want content ideas for? These drive
+what trending signals the workflow treats as on-topic. One per line.
+
+**Example answer:**
+```
+Startups
+AI engineering
+B2B SaaS
+RevOps
+```
+
+**If you skip:** workflow uses the built-in default genre list and
+prints it so you can react.
+
+### Answer
+<!-- agent writes here -->
+
+---
+
+## Content Trusted Creators
+
+**Question:** Whose Twitter voices should we mine for context on each
+topic? One per line, format `Name | handle` (no @ symbol).
+
+**Example answer:**
+```
+Paul Graham | paulg
+Jason Lemkin | jasonlk
+Lenny Rachitsky | lennysan
+```
+
+**If you skip:** workflow uses the 11-creator default list in
+`creators.json` (tech / startups / AI). It will print the list and ask
+if you want to add or remove anyone before saving.
+
+### Answer
+<!-- agent writes here -->
+
+---
+
+## Content Trend Queries
+
+**Question:** What Twitter searches surface trending posts in your
+space? One per line, format `bucket | query`. The bucket is just a
+label so you can group queries by genre.
+
+**Example answer:**
+```
+startups | seed funding announcement
+ai | new LLM release
+revops | sales forecasting tool
+```
+
+**If you skip:** workflow uses the 12-query default list in
+`trend_queries.json`. It will print the list and let you add or
+remove before saving.
+
+### Answer
+<!-- agent writes here -->
+
+---
+
+## Content HN Queries
+
+**Question:** What Hacker News topics should we scan? One per line,
+format `bucket | query | story_type | sort_by`. `story_type` is
+`story` or `show_hn` (defaults to `story`). `sort_by` is `relevance`
+or `date` (defaults to `relevance`).
+
+**Example answer:**
+```
+ai_building | AI OR LLM OR agent | story | relevance
+launches | Show HN | show_hn | date
+```
+
+**If you skip:** workflow uses the 4-bucket default list in
+`hn_queries.json`. It will print the list and let you edit before
+saving.
+
+### Answer
+<!-- agent writes here -->

@@ -1,0 +1,9 @@
+{
+  "queries": [
+    {"bucket": "ai_building",  "query": "AI OR LLM OR agent",                                  "story_type": "story",   "sort_by": "relevance"},
+    {"bucket": "startups",     "query": "startup OR founder OR YC",                            "story_type": "story",   "sort_by": "relevance"},
+    {"bucket": "engineering",  "query": "engineering OR \"system design\" OR \"developer tools\"", "story_type": "story",   "sort_by": "relevance"},
+    {"bucket": "showcase",     "query": "",                                                     "story_type": "show_hn", "sort_by": "date"}
+  ],
+  "min_points": 100
+}

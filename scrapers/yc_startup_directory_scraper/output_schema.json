@@ -1,0 +1,51 @@
+{
+  "title": "YC Startup Directory Scraper Output",
+  "type": "object",
+  "properties": {
+    "batch": { "type": ["string", "null"], "description": "Batch filter used" },
+    "filters": {
+      "type": "object",
+      "properties": {
+        "industries": { "type": ["array", "null"] },
+        "locations": { "type": ["array", "null"] },
+        "status": { "type": ["string", "null"] }
+      }
+    },
+    "companies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "slug": { "type": "string", "description": "YC slug used in company URL" },
+          "one_liner": { "type": "string" },
+          "description": { "type": "string" },
+          "website": { "type": "string" },
+          "yc_url": { "type": "string", "description": "URL to YC company page" },
+          "batch": { "type": "string" },
+          "status": { "type": "string", "description": "Active / Inactive / Acquired / Public" },
+          "industries": { "type": "array", "items": { "type": "string" } },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "locations": { "type": "array", "items": { "type": "string" } },
+          "regions": { "type": "array", "items": { "type": "string" } },
+          "team_size": { "type": "integer" },
+          "is_hiring": { "type": "boolean" },
+          "founders": {
+            "type": "array",
+            "description": "Empty unless include_founders=true",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "linkedin_url": { "type": "string" },
+                "bio": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "company_count": { "type": "integer" },
+    "errors": { "type": "array", "items": { "type": "string" } }
+  }
+}

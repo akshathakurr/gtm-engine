@@ -1,0 +1,30 @@
+{
+  "post_url": "https://www.linkedin.com/posts/satyanadella_activity-7302346926123798528-xxxx",
+  "comments": [
+    {
+      "comment_id": "7302375502034411520",
+      "comment_type": "comment",
+      "text": "This is a great point! The convergence of AI and healthcare is something we should all be paying attention to.",
+      "date": "2023-07-20 12:49:01",
+      "is_edited": false,
+      "is_pinned": false,
+      "comment_url": "https://www.linkedin.com/feed/update/urn:li:activity:7302375502034411520",
+      "author": {
+        "name": "John Smith",
+        "headline": "Healthcare Professional | Digital Health Advocate",
+        "profile_url": "https://www.linkedin.com/in/johnsmith/"
+      },
+      "reactions": {
+        "total": 25,
+        "like": 20,
+        "appreciation": 3,
+        "empathy": 2,
+        "praise": 0,
+        "interest": 0
+      },
+      "reply_count": 3
+    }
+  ],
+  "comment_count": 1,
+  "errors": []
+}

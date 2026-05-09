@@ -1,0 +1,29 @@
+{
+  "title": "Review Scraper Output",
+  "type": "object",
+  "properties": {
+    "platform": { "type": "string" },
+    "product_url": { "type": "string" },
+    "overall_rating": { "type": ["number", "null"], "description": "Trustpilot only — overall TrustScore" },
+    "total_review_count": { "type": ["integer", "null"], "description": "Trustpilot only — total reviews on platform" },
+    "ai_summary": { "type": "string", "description": "Trustpilot only — AI-generated review summary" },
+    "reviews": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "reviewer": { "type": "string" },
+          "reviewer_title": { "type": "string", "description": "G2 only — job title / company size" },
+          "rating": { "type": ["integer", "null"], "description": "Star rating 1-5" },
+          "title": { "type": "string", "description": "G2 only — review title" },
+          "text": { "type": "string" },
+          "date": { "type": "string" },
+          "verified": { "type": "boolean" },
+          "incentivized": { "type": "boolean" }
+        }
+      }
+    },
+    "review_count": { "type": "integer" },
+    "errors": { "type": "array", "items": { "type": "string" } }
+  }
+}

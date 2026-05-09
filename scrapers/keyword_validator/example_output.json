@@ -1,0 +1,43 @@
+{
+  "AI outbound sales": {
+    "interest_score": 27,
+    "related_queries": [
+      "ai sales tools",
+      "ai sales agents",
+      "best ai sales tools",
+      "ai outbound sales platform"
+    ],
+    "rising_queries": [
+      "ai sdr",
+      "claude for sales",
+      "ai sales agents 2025"
+    ],
+    "errors": []
+  },
+  "cold email personalization": {
+    "interest_score": 12,
+    "related_queries": [
+      "cold email tips",
+      "cold email tools",
+      "personalized cold email examples"
+    ],
+    "rising_queries": [
+      "ai cold email",
+      "cold email ai"
+    ],
+    "errors": []
+  },
+  "B2B prospecting tools": {
+    "interest_score": 35,
+    "related_queries": [
+      "b2b prospecting",
+      "best b2b prospecting tools",
+      "b2b lead generation tools"
+    ],
+    "rising_queries": [
+      "ai b2b prospecting",
+      "b2b prospecting 2025"
+    ],
+    "errors": []
+  }
+}

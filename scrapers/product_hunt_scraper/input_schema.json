@@ -1,0 +1,16 @@
+{
+  "title": "Product Hunt Scraper Input",
+  "type": "object",
+  "properties": {
+    "max_products": {
+      "type": "integer",
+      "description": "Max products to return. RSS feed hard cap is 50.",
+      "default": 20
+    },
+    "days_back": {
+      "type": "integer",
+      "description": "Only include products launched in the last N days. 0 = no filter.",
+      "default": 1
+    }
+  }
+}

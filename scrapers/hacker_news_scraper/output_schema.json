@@ -1,0 +1,29 @@
+{
+  "title": "Hacker News Scraper Output",
+  "type": "object",
+  "properties": {
+    "query": {"type": "string", "description": "Search keyword used"},
+    "story_type": {"type": "string", "description": "Tag filter used (story, ask_hn, show_hn, etc.)"},
+    "sort_by": {"type": "string", "description": "Sort order used"},
+    "days_back": {"type": "integer", "description": "Date filter applied"},
+    "stories": {
+      "type": "array",
+      "description": "List of HN stories",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "description": "HN story ID"},
+          "title": {"type": "string", "description": "Story title"},
+          "url": {"type": "string", "description": "External article URL (empty for Ask HN posts)"},
+          "hn_url": {"type": "string", "description": "Direct HN discussion link"},
+          "author": {"type": "string", "description": "HN username of submitter"},
+          "created_at": {"type": "string", "description": "ISO 8601 timestamp"},
+          "points": {"type": "integer", "description": "Upvote score"},
+          "num_comments": {"type": "integer", "description": "Number of comments"}
+        }
+      }
+    },
+    "story_count": {"type": "integer", "description": "Number of stories returned"},
+    "errors": {"type": "array", "items": {"type": "string"}}
+  }
+}

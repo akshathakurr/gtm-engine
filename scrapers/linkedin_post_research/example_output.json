@@ -1,0 +1,86 @@
+{
+  "keyword": "context graph",
+  "sort": "date_posted",
+  "posts": [
+    {
+      "post_id": "7448412279097724928",
+      "post_url": "https://www.linkedin.com/posts/deepiq16_aiagents-knowledgegraphs-graphrag-activity-7448412279097724928-oGg7?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGS__VQBT5Mcv-bU11FoicE2FtR-wI59RQY",
+      "text": "Graph RAGs are emerging as a core component of many effective AI agents.\nThey are not infrastructure. They are enterprise IP.\n \nEnterprises have become comfortable outsourcing systems. Data warehouses...",
+      "author": {
+        "name": "DeepIQ",
+        "headline": "21,268 followers",
+        "profile_url": "https://www.linkedin.com/company/deepiq16/posts"
+      },
+      "stats": {
+        "reactions": 3,
+        "comments": 0,
+        "shares": 1
+      },
+      "posted_at": "2026-04-10 18:51:12",
+      "posted_at_timestamp": 1775839872145,
+      "hashtags": [
+        "AIAgents",
+        "KnowledgeGraphs",
+        "GraphRAG",
+        "EnterpriseAI",
+        "AgenticAI",
+        "EnterpriseIP",
+        "GenAI"
+      ],
+      "content_type": "image",
+      "is_reshare": false,
+      "search_input": "context graph"
+    },
+    {
+      "post_id": "7448411015446200320",
+      "post_url": "https://www.linkedin.com/posts/rajshrinivasan_not-all-agent-workflows-are-the-same-activity-7448411015446200320-2x0L?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGS__VQBT5Mcv-bU11FoicE2FtR-wI59RQY",
+      "text": "👉 Not all agent workflows are the same.\n\nWe tend to say “build an agent” as if there’s only one pattern. There isn’t. Over the past few weeks, I’ve been experimenting with a few:\n\n🔹 **Sequential pipel...",
+      "author": {
+        "name": "Raj Shrinivasan",
+        "headline": "AI Engineer & Builder | Agentic Systems · RAG · LangGraph · Azure AI Foundry | From Idea to Production",
+        "profile_url": "https://www.linkedin.com/in/rajshrinivasan?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAABVme-QBEI1MUNEkhJsetyMMMh8XMacH090"
+      },
+      "stats": {
+        "reactions": 1,
+        "comments": 0,
+        "shares": 0
+      },
+      "posted_at": "2026-04-10 18:46:10",
+      "posted_at_timestamp": 1775839570867,
+      "hashtags": [],
+      "content_type": "image",
+      "is_reshare": false,
+      "search_input": "context graph"
+    },
+    {
+      "post_id": "7448410725389320192",
+      "post_url": "https://www.linkedin.com/posts/gengyang_zero-false-positives-ai-agent-finds-real-activity-7448410725389320192-rbIV?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGS__VQBT5Mcv-bU11FoicE2FtR-wI59RQY",
+      "text": "Discovery is becoming abundant. Actionability is still scarce.\n\nI recently joined Cyber Defense TV to talk about one of the biggest problems in application security today: the industry is getting bett...",
+      "author": {
+        "name": "Geng Yang",
+        "headline": "Founder & CEO at ZAST.AI | Autonomous exploit verification for AppSec teams | From findings to proof",
+        "profile_url": "https://www.linkedin.com/in/gengyang?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAEPFr0BHJ67G0g7Txvpawtvq7UHdDzerSg"
+      },
+      "stats": {
+        "reactions": 0,
+        "comments": 0,
+        "shares": 0
+      },
+      "posted_at": "2026-04-10 18:45:01",
+      "posted_at_timestamp": 1775839501712,
+      "hashtags": [
+        "Cybersecurity",
+        "AppSec",
+        "VulnerabilityResearch",
+        "SoftwareSecurity",
+        "AIForSecurity"
+      ],
+      "content_type": "article",
+      "is_reshare": false,
+      "search_input": "context graph"
+    }
+  ],
+  "post_count": 3,
+  "total_available": 263,
+  "errors": []
+}

@@ -1,0 +1,40 @@
+{
+  "title": "LinkedIn Job Scraper Input",
+  "type": "object",
+  "properties": {
+    "keywords": {
+      "type": "string",
+      "description": "Job title or role keywords (e.g. 'software engineer', 'head of sales')"
+    },
+    "company_name": {
+      "type": "string",
+      "description": "Company name to filter jobs (e.g. 'Acme Corp'). Optional — omit for broad keyword search."
+    },
+    "location": {
+      "type": "string",
+      "description": "Location filter (e.g. 'United States', 'San Francisco, CA'). Optional.",
+      "default": "United States"
+    },
+    "days_back": {
+      "type": "integer",
+      "description": "Only return jobs posted in the last N days. Supports 1, 7, or 30. Defaults to 30.",
+      "default": 30,
+      "enum": [1, 7, 30]
+    },
+    "max_jobs": {
+      "type": "integer",
+      "description": "Maximum number of jobs to return. Defaults to 20.",
+      "default": 20,
+      "minimum": 1,
+      "maximum": 200
+    },
+    "linkedin_url": {
+      "type": "string",
+      "description": "Pass a direct LinkedIn job search URL to bypass keyword/company building. If provided, keywords/company/location/days_back are ignored."
+    }
+  },
+  "oneOf": [
+    {"required": ["keywords"]},
+    {"required": ["linkedin_url"]}
+  ]
+}

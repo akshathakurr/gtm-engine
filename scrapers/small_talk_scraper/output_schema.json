@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Small Talk Scraper Output",
+  "type": "object",
+  "required": ["small_talk", "signals", "identity"],
+  "properties": {
+    "small_talk": {
+      "type": "string",
+      "description": "2-3 line summary string consumable directly by the email/LinkedIn outreach workflows"
+    },
+    "signals": {
+      "type": "array",
+      "description": "Top humanizing signals ranked by small-talk-worthiness",
+      "items": {
+        "type": "object",
+        "properties": {
+          "topic":            {"type": "string"},
+          "evidence_quote":   {"type": "string"},
+          "source_url":       {"type": "string"},
+          "source_type":      {"type": "string", "enum": ["twitter", "podcast", "interview", "blog", "reddit", "youtube", "other"]},
+          "timestamp":        {"type": "string"},
+          "confidence":       {"type": "number", "minimum": 0, "maximum": 1},
+          "small_talk_score": {"type": "number", "minimum": 0, "maximum": 10}
+        }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "properties": {
+        "name":               {"type": "string"},
+        "company":            {"type": "string"},
+        "linkedin_url":       {"type": "string"},
+        "twitter_url":        {"type": "string"},
+        "website":            {"type": "string"},
+        "twitter_confidence": {"type": "number"},
+        "twitter_match_reason": {"type": "string"}
+      }
+    }
+  }
+}

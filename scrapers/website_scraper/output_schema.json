@@ -1,0 +1,17 @@
+{
+  "type": "object",
+  "properties": {
+    "url": { "type": "string", "description": "Normalized homepage URL" },
+    "company_name": { "type": ["string", "null"], "description": "Extracted from og:title or <title>" },
+    "meta_description": { "type": ["string", "null"], "description": "From meta description or og:description" },
+    "homepage_text": { "type": ["string", "null"], "description": "Cleaned text from homepage (max 3000 chars)" },
+    "pages_scraped": { "type": "array", "items": { "type": "string" }, "description": "List of page labels scraped" },
+    "product_description": { "type": ["string", "null"], "description": "Best available product/company description" },
+    "customers": { "type": "array", "items": { "type": "string" }, "description": "Customer or company names found on site" },
+    "employee_size_hint": { "type": ["string", "null"], "description": "Headcount mention if found (raw number string)" },
+    "founded_year": { "type": ["string", "null"], "description": "Year founded if found" },
+    "icp_hints": { "type": "array", "items": { "type": "string" }, "description": "Target customer hints found in copy" },
+    "full_text_by_page": { "type": "object", "description": "Raw extracted text per page (label → text)" },
+    "errors": { "type": "array", "items": { "type": "string" }, "description": "Any fetch or parse failures" }
+  }
+}

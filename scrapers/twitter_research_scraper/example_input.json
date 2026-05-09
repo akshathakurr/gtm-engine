@@ -1,0 +1,6 @@
+{
+  "query": "cold email outbound",
+  "max_tweets": 20,
+  "sort_by": "Latest",
+  "days_back": 7
+}

@@ -1,0 +1,35 @@
+{
+  "query": {
+    "keywords": "software engineer",
+    "company_name": "Acme Corp",
+    "location": "United States",
+    "days_back": 30,
+    "url": "https://www.linkedin.com/jobs/search/?keywords=software+engineer+Acme+Corp&location=United+States&f_TPR=r2592000&position=1&pageNum=0"
+  },
+  "total": 2,
+  "jobs": [
+    {
+      "id": "4381062426",
+      "title": "Software Engineer I",
+      "company_name": "Acme Corp",
+      "company_linkedin_url": "https://www.linkedin.com/company/acme-corp",
+      "location": "San Francisco, CA",
+      "posted_at": "2026-03-28T15:22:33.000Z",
+      "job_url": "https://www.linkedin.com/jobs/view/software-engineer-i-at-acme-corp-4381062426",
+      "description_html": "<strong>About the Role</strong><p>We are looking for a Software Engineer...</p>",
+      "benefits": ["Health insurance", "401k"]
+    },
+    {
+      "id": "4381062427",
+      "title": "Senior Software Engineer",
+      "company_name": "Acme Corp",
+      "company_linkedin_url": "https://www.linkedin.com/company/acme-corp",
+      "location": "Remote",
+      "posted_at": "2026-03-25T10:00:00.000Z",
+      "job_url": "https://www.linkedin.com/jobs/view/senior-software-engineer-at-acme-corp-4381062427",
+      "description_html": "<strong>About the Role</strong><p>We are looking for a Senior Software Engineer...</p>",
+      "benefits": []
+    }
+  ],
+  "errors": []
+}

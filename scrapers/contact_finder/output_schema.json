@@ -1,0 +1,87 @@
+{
+  "title": "Contact Finder Output",
+  "type": "object",
+  "oneOf": [
+    {
+      "title": "Person result (mode=person)",
+      "properties": {
+        "query": { "type": "object" },
+        "found": { "type": "boolean" },
+        "person": {
+          "type": ["object", "null"],
+          "properties": {
+            "name": { "type": "string" },
+            "first_name": { "type": "string" },
+            "last_name": { "type": "string" },
+            "email": { "type": "string" },
+            "email_status": { "type": "string", "description": "verified, unverified, bounced, or empty." },
+            "phone": { "type": "string" },
+            "title": { "type": "string" },
+            "seniority": { "type": "string", "description": "founder, c_suite, vp, director, manager, entry, etc." },
+            "departments": { "type": "array", "items": { "type": "string" } },
+            "linkedin_url": { "type": "string" },
+            "twitter_url": { "type": "string" },
+            "photo_url": { "type": "string" },
+            "city": { "type": "string" },
+            "state": { "type": "string" },
+            "country": { "type": "string" },
+            "employment_history": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string" },
+                  "organization": { "type": "string" },
+                  "start_date": { "type": ["string", "null"] },
+                  "end_date": { "type": ["string", "null"] },
+                  "current": { "type": "boolean" }
+                }
+              }
+            },
+            "organization": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "domain": { "type": "string" },
+                "industry": { "type": "string" },
+                "headcount": { "type": ["integer", "null"] },
+                "linkedin_url": { "type": "string" }
+              }
+            }
+          }
+        },
+        "errors": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    {
+      "title": "Company result (mode=company)",
+      "properties": {
+        "domain": { "type": "string" },
+        "found": { "type": "boolean" },
+        "company": {
+          "type": ["object", "null"],
+          "properties": {
+            "name": { "type": "string" },
+            "domain": { "type": "string" },
+            "industry": { "type": "string" },
+            "headcount": { "type": ["integer", "null"] },
+            "founded_year": { "type": ["integer", "null"] },
+            "description": { "type": "string" },
+            "website_url": { "type": "string" },
+            "linkedin_url": { "type": "string" },
+            "twitter_url": { "type": "string" },
+            "city": { "type": "string" },
+            "state": { "type": "string" },
+            "country": { "type": "string" },
+            "total_funding": { "type": "string" },
+            "latest_funding_stage": { "type": "string" },
+            "latest_funding_date": { "type": "string" },
+            "technologies": { "type": "array", "items": { "type": "string" } },
+            "keywords": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "errors": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  ]
+}

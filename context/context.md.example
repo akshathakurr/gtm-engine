@@ -1,0 +1,336 @@
+# Context Questionnaire
+
+This file is a guided interview. Run `/setup-context` (or any agent that
+reads this file) and it will walk you through the questions below,
+writing your answers into the `### Answer` block under each section.
+
+You can also fill it in by hand — workflows read the `### Answer` blocks
+and ignore the question / format / example scaffolding.
+
+**Free-form text is fine.** Workflows pass your answers to an LLM, which
+extracts whatever structure it needs (industries, competitors, ICP
+tiers, etc.). Don't worry about formatting — write like you'd explain
+it to a teammate.
+
+**On re-run:** the agent will ask, section by section, whether to
+**keep** the existing answer, **append** to it, or **replace** it. Your
+call each time.
+
+Copy this file to `context.md` in the same folder. `context.md` is
+gitignored so your real positioning never gets committed.
+
+---
+
+## Product
+
+**Question:** What's the product? Name, one-liner, and website.
+
+**Used by:** every workflow
+
+**Example answer:**
+> Carnival — an AI-native CRM that auto-fills pipeline data from email
+> and calendar so reps stop doing data entry. usecarnival.com.
+
+### Answer
+<!-- agent writes here -->
+
+---
+
+## Who it's for
+
+**Question:** In one or two sentences, who is this product for?
+
+**Used by:** every workflow
+
+**Example answer:**
+> Seed–Series B B2B startups that don't have a RevOps hire yet but
+> already have 3+ AEs and a pipeline they can't keep clean.
+
+### Answer
+<!-- agent writes here -->
+
+---
+
+## Ideal Customer Profile
+
+**Question:** Describe your ICP. What industry / industries do they
+belong to? What size, stage, geography? And how would you split your
+leads into **P0 (must-have)**, **P1 (strong fit)**, and **P2 (worth
+trying)** tiers? Be specific about what bumps a lead up or down a tier.
+
+**Used by:** competitor_analysis · email_outreach · linkedin_outreach · signal_based_lead_outreach · icp_activity_tracker
+
+**Example answer:**
+> B2B SaaS, 20–200 employees, Seed to Series B, US + Western Europe.
+> P0 = post-Series-A B2B SaaS with 5+ AEs, hiring RevOps, currently on
+> HubSpot or Salesforce. P1 = same profile but earlier stage (Seed),
+> or already on a modern CRM (Attio, Folk). P2 = adjacent verticals
+> like dev-tools or fintech where pipeline hygiene still matters but
+> the buying motion is different.
+
+### Answer
+<!-- agent writes here -->
+
+---
+
+## ICP Segments
+
+**Question:** What categories do your ICP companies fall into? The
+email_outreach workflow uses these to fill an `ICP Segment` column —
+Claude assigns each enriched company to one of your segments. Format:
+`Segment Name — short description (size / stage / industry signals
+that define it)`.
+
+**Used by:** email_outreach
+
+**Example answer:**
+> - **Scaling SaaS** — Series A/B B2B SaaS, 50–200 employees, 5+ AEs,
+>   already on HubSpot or Salesforce.
+> - **Early SaaS** — Seed-stage B2B SaaS, 10–50 employees, no RevOps
+>   hire yet.
+> - **AI-native startups** — any stage, building LLM-first products,
+>   CRM is an afterthought.
+
+### Answer
+<!-- agent writes here -->
+
+---
+
+## Right buyers
+
+**Question:** Who are the right buyers inside a target company? One
+sentence on each role — what they care about, what gets them to take a
+meeting. Roles might be founder, head of sales, head of RevOps, head
+of product, etc.
+
+**Used by:** email_outreach · linkedin_outreach
+
+**Example answer:**
+> **Founder/CEO** at Seed-stage: cares about not hiring a RevOps
+> person too early; takes meetings if we save them a hire.
+> **Head of Sales** at Series A/B: cares about forecast accuracy and
+> rep productivity; takes meetings if we have peer logos.
+> **Head of RevOps**: cares about data hygiene and tool consolidation;
+> takes meetings if we replace 2+ tools they already pay for.
+
+### Answer
+<!-- agent writes here -->
+
+---
+
+## Decision-maker titles
+
+**Question:** Which titles have budget authority and can sign a deal
+on their own?
+
+**Used by:** email_outreach · linkedin_outreach
+
+**Example answer:**
+> CEO, Founder, Co-founder, VP Sales, Head of Sales, CRO, VP RevOps,
+> Head of RevOps, COO at sub-50-person companies.
+
+### Answer
+<!-- agent writes here -->
+
+---
+
+## Champion titles
+
+**Question:** Which titles influence the buy but can't sign alone —
+the people who'd pull us into a deal internally?
+
+**Used by:** email_outreach · linkedin_outreach
+
+**Example answer:**
+> RevOps Manager, Sales Operations, Senior AE, Sales Enablement,
+> Head of Growth, Chief of Staff.
+
+### Answer
+<!-- agent writes here -->
+
+---
+
+## Disqualifiers
+
+**Question:** What kind of companies or personas should be excluded
+entirely? Industries you don't sell to, company sizes that don't fit,
+red flags that mean "skip this lead."
+
+**Used by:** every lead-finding workflow
+
+**Example answer:**
+> Skip: agencies, consultancies, sub-5-person companies, anyone
+> regulated (healthcare, banking, gov), companies on a homegrown CRM
+> we can't integrate with, anyone who churned out of a competitor in
+> the last 6 months.
+
+### Answer
+<!-- agent writes here -->
+
+---
+
+## Competitors
+
+**Question:** Who are your direct competitors and what's your edge
+against each one?
+
+**Used by:** competitor_analysis · email_outreach (positioning)
+
+**Example answer:**
+> HubSpot — we win on automation depth (they're a system of record;
+> we're a system of action). Attio — we win on the AI-native data
+> entry; they win on customization. Folk — we win on enterprise
+> readiness; they win on simplicity for solo founders.
+
+### Answer
+<!-- agent writes here -->
+
+---
+
+## Tone of voice
+
+**Question:** How should outreach copy sound? Formal or casual?
+Technical or plain? Long or short? Any words / phrases you want
+banned?
+
+**Used by:** email_outreach · linkedin_outreach · linkedin_comment_helper · blog_builder
+
+**Example answer:**
+> Casual, plain English, short. No "synergy," "leverage," "unlock,"
+> "in this fast-paced world," or any LinkedIn-influencer cadence.
+> Sound like a peer DMing another founder — not a vendor.
+
+### Answer
+<!-- agent writes here -->
+
+---
+
+# Workflow-specific extras
+
+These sections are only needed if you plan to run the matching
+workflow. Skip anything irrelevant.
+
+---
+
+## Blog Goals & Topics
+
+**Question:** Who's the audience for your blog, what tone do you
+want, and what kinds of posts should the workflow generate? Be
+specific — vague answers produce vague posts.
+
+**Used by:** blog_builder
+
+**Example answer:**
+> Audience: engineering managers at Series-A AI companies. Tone:
+> practical, no-fluff, opinionated. Topics: evals, infra costs, team
+> patterns, when to build vs buy. Never thought-leadership puffery,
+> never "5 ways to..." listicles.
+
+### Answer
+<!-- agent writes here -->
+
+---
+
+## Blog Reference Sources
+
+**Question:** Whose blogs do you want this workflow to model after,
+by style or depth? One per line, format `Name | domain.com`.
+
+**Used by:** blog_builder
+
+**Example answer:**
+```
+Anthropic | anthropic.com
+Cursor | cursor.com
+Pylon | usepylon.com
+```
+
+### Answer
+<!-- agent writes here -->
+
+---
+
+## LinkedIn Post Relevance Filter
+
+**Question:** When the workflow scrapes a person's recent LinkedIn
+posts, what makes a post worth keeping vs. throwing out? Be specific —
+vague criteria let too much noise through, or filter too hard and keep
+nothing. Describe the kinds of posts that signal relevance, buying
+intent, or a good conversation starter.
+
+**Used by:** linkedin_outreach
+
+**Example answer:**
+> Keep posts that:
+> - Mention pipeline hygiene, forecasting accuracy, or RevOps hiring
+> - Complain about HubSpot / Salesforce / current CRM
+> - Announce new sales hires (AE #2, first VP Sales, etc.)
+> - Share an opinion or frustration about sales tooling
+> Skip: thought-leadership generic content, motivational posts, posts
+> that are pure reposts of someone else's content.
+
+### Answer
+<!-- agent writes here -->
+
+---
+
+## LinkedIn Comment Genre Keywords
+
+**Question:** What broad topics or genres do you want to comment on
+to build credibility? One per line — these become LinkedIn search
+queries.
+
+**Used by:** linkedin_comment_helper
+
+**Example answer:**
+```
+RevOps
+sales forecasting
+pipeline hygiene
+AI in sales
+```
+
+### Answer
+<!-- agent writes here -->
+
+---
+
+## LinkedIn Comment Signal Keywords
+
+**Question:** What buying-intent or pain-point phrases should we
+search for to find people in active evaluation mode? One per line.
+
+**Used by:** linkedin_comment_helper
+
+**Example answer:**
+```
+implementing AI in our org
+switching CRMs
+scaling sales team
+hiring our first RevOps
+```
+
+### Answer
+<!-- agent writes here -->
+
+---
+
+# Which sections each workflow needs
+
+| Section | Workflows |
+|---|---|
+| Product · Who it's for | every workflow |
+| Ideal Customer Profile | competitor_analysis · email_outreach · linkedin_outreach · signal_based_lead_outreach · icp_activity_tracker |
+| ICP Segments | email_outreach |
+| Right buyers · Decision-maker titles · Champion titles | email_outreach · linkedin_outreach |
+| LinkedIn Post Relevance Filter | linkedin_outreach |
+| Disqualifiers | every lead-finding workflow |
+| Competitors | competitor_analysis · email_outreach |
+| Tone of voice | email_outreach · linkedin_outreach · linkedin_comment_helper · blog_builder |
+| Blog Goals & Topics · Blog Reference Sources | blog_builder |
+| LinkedIn Comment Genre / Signal Keywords | linkedin_comment_helper |
+
+The **content_idea_finder** workflow has its own questionnaire at
+`workflows/content_idea_finder/content.md.example` — its inputs are
+content-strategy decisions, not GTM context, so they live next to the
+workflow.

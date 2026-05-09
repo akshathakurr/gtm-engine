@@ -1,0 +1,84 @@
+{
+  "profile_url": "https://www.linkedin.com/in/satyanadella/",
+  "total": 2,
+  "posts": [
+    {
+      "urn": "urn:li:activity:7445475747680411650",
+      "url": "https://www.linkedin.com/posts/satyanadella_were-bringing-our-growing-mai-model-family-activity-7445475747680411650-T_tO",
+      "post_type": "regular",
+      "posted_at": "2026-04-02 16:22:28",
+      "timestamp_ms": 1775139748497,
+      "text": "We're bringing our growing MAI model family to every developer in Foundry, including \u2026\n \n\u2022 MAI-Transcribe-1, most accurate transcription model in world across 25 languages\n \n\u2022 MAI-Voice-1, natural, expressive speech generation\n\n\u2022 MAI-Image-2, our most capable image model yet\n \nStart building: https://lnkd.in/dPDFeiGw",
+      "author": {
+        "name": "Satya Nadella",
+        "headline": "Chairman and CEO at Microsoft",
+        "username": "satyanadella",
+        "profile_url": "https://www.linkedin.com/in/satyanadella"
+      },
+      "stats": {
+        "total_reactions": 4768,
+        "likes": 4136,
+        "comments": 268,
+        "reposts": 397
+      },
+      "media": {
+        "type": "image",
+        "url": "https://media.licdn.com/dms/image/v2/D4D22AQHDycUbPOUVuw/feedshare-shrink_2048_1536/B4DZ1OktnpJQAk-/0/1775139744114",
+        "images": [
+          {
+            "url": "https://media.licdn.com/dms/image/v2/D4D22AQHDycUbPOUVuw/feedshare-shrink_2048_1536/B4DZ1OktnpJQAk-/0/1775139744114",
+            "width": 1920,
+            "height": 1080
+          }
+        ]
+      },
+      "reshared_post": null
+    },
+    {
+      "urn": "urn:li:ugcPost:7444806162686062592",
+      "url": "https://www.linkedin.com/posts/satyanadella_today-is-the-day-open-to-work-is-officially-activity-7444806163835236352-3xPh",
+      "post_type": "quote",
+      "posted_at": "2026-03-31 20:01:47",
+      "timestamp_ms": 1774980107268,
+      "text": "Excited to see Open to Work from my colleagues Ryan and Aneesh out in the world.",
+      "author": {
+        "name": "Satya Nadella",
+        "headline": "Chairman and CEO at Microsoft",
+        "username": "satyanadella",
+        "profile_url": "https://www.linkedin.com/in/satyanadella"
+      },
+      "stats": {
+        "total_reactions": 1224,
+        "likes": 1038,
+        "comments": 113,
+        "reposts": 41
+      },
+      "media": null,
+      "reshared_post": {
+        "urn": "7444760504234946560",
+        "url": "https://www.linkedin.com/posts/ryanroslansky_today-is-the-day-open-to-work-is-officially-activity-7444760504234946560-TZld",
+        "post_type": "regular",
+        "posted_at": "2026-03-31 17:00:21",
+        "text": "Today is the day - Open to Work is officially available!",
+        "author": {
+          "name": "Ryan Roslansky",
+          "headline": "CEO at LinkedIn",
+          "username": "ryanroslansky",
+          "profile_url": "https://www.linkedin.com/in/ryanroslansky"
+        },
+        "media": {
+          "type": "images",
+          "url": "https://media.licdn.com/dms/image/v2/D5622AQHoe-JvWMyScA/feedshare-shrink_2048_1536/B56Z1AxSt0IMAg-/0/1774908157607",
+          "images": [
+            {
+              "url": "https://media.licdn.com/dms/image/v2/D5622AQHoe-JvWMyScA/feedshare-shrink_2048_1536/B56Z1AxSt0IMAg-/0/1774908157607",
+              "width": 2048,
+              "height": 1365
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "errors": []
+}

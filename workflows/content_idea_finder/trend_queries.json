@@ -1,0 +1,17 @@
+{
+  "queries": [
+    {"bucket": "startups",     "query": "seed funding announcement"},
+    {"bucket": "startups",     "query": "YC W26 OR YC S26"},
+    {"bucket": "startups",     "query": "founder lessons"},
+    {"bucket": "engineering",  "query": "system design"},
+    {"bucket": "engineering",  "query": "developer tools launch"},
+    {"bucket": "engineering",  "query": "open source"},
+    {"bucket": "ai_building",  "query": "AI agents"},
+    {"bucket": "ai_building",  "query": "LLM evals"},
+    {"bucket": "ai_building",  "query": "vibe coding"},
+    {"bucket": "ai_building",  "query": "prompt engineering"},
+    {"bucket": "philosophy",   "query": "taste in software"},
+    {"bucket": "philosophy",   "query": "building in public"}
+  ],
+  "min_likes": 100
+}

@@ -1,0 +1,134 @@
+{
+  "products": [
+    {
+      "name": "Drift",
+      "tagline": "For people who want less",
+      "ph_url": "https://www.producthunt.com/products/drift-journal-that-lets-go",
+      "post_id": "1120270",
+      "published_at": "2026-04-09T21:45:37-07:00",
+      "submitter": "Young Cho"
+    },
+    {
+      "name": "Crowdcast 3.0",
+      "tagline": "Run every type of event without switching tools",
+      "ph_url": "https://www.producthunt.com/products/crowdcast",
+      "post_id": "1120280",
+      "published_at": "2026-04-09T22:07:06-07:00",
+      "submitter": "Sai"
+    },
+    {
+      "name": "Nocta Pro",
+      "tagline": "Turn raw screenshots into launch-ready visuals in seconds.",
+      "ph_url": "https://www.producthunt.com/products/nocta-pro-2",
+      "post_id": "1119910",
+      "published_at": "2026-04-09T09:12:38-07:00",
+      "submitter": "Carlos Mendes"
+    },
+    {
+      "name": "LoveCapsule",
+      "tagline": "Your child’s memories, stored in your Google Drive—forever.",
+      "ph_url": "https://www.producthunt.com/products/lovecapsule",
+      "post_id": "1119921",
+      "published_at": "2026-04-09T09:35:08-07:00",
+      "submitter": "Joseph Nolan"
+    },
+    {
+      "name": "Avatar V by HeyGen",
+      "tagline": "The most advanced AI avatar model in the world",
+      "ph_url": "https://www.producthunt.com/products/heygen",
+      "post_id": "1119974",
+      "published_at": "2026-04-09T10:54:54-07:00",
+      "submitter": "Holly Xiao"
+    },
+    {
+      "name": "Claude Advisor tool",
+      "tagline": "Pair Opus as advisor with Sonnet or Haiku as executor",
+      "ph_url": "https://www.producthunt.com/products/claude",
+      "post_id": "1120099",
+      "published_at": "2026-04-09T14:37:25-07:00",
+      "submitter": "Rohan Chaubey"
+    },
+    {
+      "name": "Matcha",
+      "tagline": "Open Source IPad Note Taking App",
+      "ph_url": "https://www.producthunt.com/products/matcha-4",
+      "post_id": "1119991",
+      "published_at": "2026-04-09T11:24:11-07:00",
+      "submitter": "Forrest "
+    },
+    {
+      "name": "Complexity Indicator",
+      "tagline": "Know when your code becomes unmaintainable",
+      "ph_url": "https://www.producthunt.com/products/complexity-indicator",
+      "post_id": "1120065",
+      "published_at": "2026-04-09T13:13:46-07:00",
+      "submitter": "Vedant Patel"
+    },
+    {
+      "name": "HN Tokenmaxxing",
+      "tagline": "The leaderboard for AI-powered developers",
+      "ph_url": "https://www.producthunt.com/products/hn-tokenmaxxing",
+      "post_id": "1120167",
+      "published_at": "2026-04-09T17:22:24-07:00",
+      "submitter": "Daniel Delattre"
+    },
+    {
+      "name": "MiniMax CLI",
+      "tagline": "Give your AI agents native multimodal capabilities",
+      "ph_url": "https://www.producthunt.com/products/minimax",
+      "post_id": "1120258",
+      "published_at": "2026-04-09T21:20:39-07:00",
+      "submitter": "Zac Zuo"
+    },
+    {
+      "name": "Orbit Money",
+      "tagline": "Track every API and tool you pay for in one place",
+      "ph_url": "https://www.producthunt.com/products/orbit-money",
+      "post_id": "1119805",
+      "published_at": "2026-04-09T06:38:35-07:00",
+      "submitter": "Miles"
+    },
+    {
+      "name": "PromptEditor",
+      "tagline": "Markdown Sidebar for AI Prompts",
+      "ph_url": "https://www.producthunt.com/products/prompteditor",
+      "post_id": "1119806",
+      "published_at": "2026-04-09T06:39:28-07:00",
+      "submitter": "Tiziano Mattia Bagnato"
+    },
+    {
+      "name": "Waypoint-1.5",
+      "tagline": "Real-time generative worlds on everyday GPUs",
+      "ph_url": "https://www.producthunt.com/products/waypoint-1-5",
+      "post_id": "1120293",
+      "published_at": "2026-04-09T22:47:38-07:00",
+      "submitter": "Zac Zuo"
+    },
+    {
+      "name": "Minty",
+      "tagline": "AI companion for building a clear career path",
+      "ph_url": "https://www.producthunt.com/products/outtalent",
+      "post_id": "1119796",
+      "published_at": "2026-04-09T06:27:30-07:00",
+      "submitter": "Timur Turatbekov"
+    },
+    {
+      "name": "Perplexity Finance",
+      "tagline": "See your full financial life, bank to brokerage in one place",
+      "ph_url": "https://www.producthunt.com/products/perplexity-ai",
+      "post_id": "1119928",
+      "published_at": "2026-04-09T09:42:06-07:00",
+      "submitter": "Rohan Chaubey"
+    },
+    {
+      "name": "Airlinkee",
+      "tagline": "Share all your services and get discovered by clients",
+      "ph_url": "https://www.producthunt.com/products/airlinkee-your-professional-link-page",
+      "post_id": "1120070",
+      "published_at": "2026-04-09T13:28:24-07:00",
+      "submitter": "WONSUK CHOI"
+    }
+  ],
+  "product_count": 16,
+  "errors": []
+}

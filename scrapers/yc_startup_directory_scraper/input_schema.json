@@ -1,0 +1,39 @@
+{
+  "title": "YC Startup Directory Scraper Input",
+  "type": "object",
+  "properties": {
+    "batch": {
+      "type": ["string", "null"],
+      "description": "YC batch code e.g. 'W24', 'S23', 'W25'. Null = all batches (slow).",
+      "default": null,
+      "examples": ["W25", "S24", "W24"]
+    },
+    "industries": {
+      "type": ["array", "null"],
+      "items": { "type": "string" },
+      "description": "Filter by industry (client-side, partial match). e.g. ['B2B', 'AI', 'Healthcare']. Null = no filter.",
+      "default": null
+    },
+    "locations": {
+      "type": ["array", "null"],
+      "items": { "type": "string" },
+      "description": "Filter by location string (client-side, partial match). e.g. ['San Francisco', 'New York']. Null = no filter.",
+      "default": null
+    },
+    "status": {
+      "type": ["string", "null"],
+      "description": "Filter by company status. One of: 'Active', 'Inactive', 'Acquired', 'Public'. Null = all.",
+      "default": null
+    },
+    "max_companies": {
+      "type": "integer",
+      "description": "Max companies to return after filtering.",
+      "default": 50
+    },
+    "include_founders": {
+      "type": "boolean",
+      "description": "If true, fetches founder name, LinkedIn URL, and bio for each company via Jina Reader. Adds ~5-15s depending on company count.",
+      "default": false
+    }
+  }
+}

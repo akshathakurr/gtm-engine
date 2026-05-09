@@ -1,0 +1,18 @@
+{
+  "title": "Contact Finder Input",
+  "type": "object",
+  "properties": {
+    "mode": {
+      "type": "string",
+      "description": "'person' to find contact info for a specific person. 'company' to enrich a company by domain.",
+      "default": "person"
+    },
+    "first_name": { "type": "string", "description": "Person's first name. Used with last_name + domain/organization_name." },
+    "last_name": { "type": "string", "description": "Person's last name." },
+    "domain": { "type": "string", "description": "Employer domain e.g. 'acme.com' (no www or @). Preferred over organization_name." },
+    "organization_name": { "type": "string", "description": "Employer name e.g. 'Acme Corp'. Use domain if possible." },
+    "linkedin_url": { "type": "string", "description": "LinkedIn profile URL. Overrides name+domain if provided." },
+    "reveal_personal_emails": { "type": "boolean", "default": true, "description": "Include personal email addresses." },
+    "reveal_phone": { "type": "boolean", "default": false, "description": "Include phone numbers. Costs extra credits." }
+  }
+}

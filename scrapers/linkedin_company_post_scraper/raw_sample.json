@@ -1,0 +1,33 @@
+[
+  {
+    "activity_urn": "7447507829911056384",
+    "full_urn": "urn:li:activity:7447455996010004480",
+    "post_url": "https://www.linkedin.com/posts/sarah-friar_3m-people-are-now-using-codex-every-week-activity-7447455996010004480-vsYO?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGRcdJMB1mKykUlBV3BXU2S1RXX9oearzPg",
+    "text": "3M people are now using Codex every week, up from 2M just last month.\nThat pace of growth says something important: software creation is changing fast. Codex is helping developers move faster, but it’s also making it possible for many more people to build. Agents are no longer just writing snippets of code. They’re taking on real work, handling longer-running tasks, and giving builders more leverage from idea to implementation.\n\nTo celebrate this milestone, we’re resetting Codex rate limits today so builders can keep building. And we’ll do it again for every additional 1M weekly users until we reach 10M.\n\nThis is one of the advantages of OpenAI’s long-term investment in compute: we can be more generous with builders, and pass that capacity on to the people creating with our tools.\n\nHuge kudos to Thibault Sottiaux and the incredible Codex team at OpenAI.\n\nLet’s go build!",
+    "posted_at": {
+      "relative": "1d",
+      "is_edited": false,
+      "date": "2026-04-08 06:57:14",
+      "timestamp": 1775624234655
+    },
+    "post_language_code": "en",
+    "post_type": "repost",
+    "author": {
+      "name": "Sarah Friar",
+      "company_url": "https://www.linkedin.com/in/sarah-friar?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAADgJCoBRsbjab0VxrIp_ohQlgMVypXBA60"
+    },
+    "stats": {
+      "total_reactions": 1265,
+      "like": 1024,
+      "support": 7,
+      "love": 120,
+      "insight": 10,
+      "celebrate": 104,
+      "comments": 95,
+      "reposts": 62
+    },
+    "media": {},
+    "document": null,
+    "source_company": "openai"
+  }
+]

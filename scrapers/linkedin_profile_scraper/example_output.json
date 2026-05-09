@@ -1,0 +1,51 @@
+{
+  "total": 1,
+  "profiles": [
+    {
+      "url": "https://www.linkedin.com/in/satyanadella/",
+      "full_name": "Satya Nadella",
+      "headline": "Chairman and CEO at Microsoft",
+      "about": "Hit Refresh is the story of my journey, and the extraordinary transformation that occurred at Microsoft...",
+      "location": "Seattle, Washington, United States",
+      "current_company": {
+        "name": "Microsoft",
+        "title": "Chairman and CEO"
+      },
+      "work_history": [
+        {
+          "title": "Chairman and CEO",
+          "company": "Microsoft",
+          "location": "Redmond, Washington",
+          "start_date": "2014-02",
+          "end_date": null,
+          "description": "Leading Microsoft's transformation to a mobile-first, cloud-first world."
+        },
+        {
+          "title": "Executive Vice President, Cloud and Enterprise",
+          "company": "Microsoft",
+          "location": "Redmond, Washington",
+          "start_date": "2011-01",
+          "end_date": "2014-02",
+          "description": ""
+        }
+      ],
+      "education": [
+        {
+          "school": "University of Chicago Booth School of Business",
+          "degree": "Master of Business Administration",
+          "field_of_study": "Business Administration",
+          "start_date": "1995",
+          "end_date": "1997"
+        },
+        {
+          "school": "Manipal Institute of Technology",
+          "degree": "Bachelor of Engineering",
+          "field_of_study": "Electrical Engineering",
+          "start_date": "1985",
+          "end_date": "1988"
+        }
+      ]
+    }
+  ],
+  "errors": []
+}

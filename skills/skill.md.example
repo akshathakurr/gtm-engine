@@ -1,0 +1,36 @@
+# Personalisation Hook
+
+## Purpose
+Given a lead's recent LinkedIn posts and small-talk signals, produce 1-2
+talking points an SDR can use to open a personalised message.
+
+## Inputs
+- `name` — lead's full name
+- `company` — lead's company
+- `position` — lead's title
+- `matching_posts` — list of `{url, text, posted_at}` from their recent feed
+- `small_talk` — dict of optional signals (recent job change, podcast appearance, etc.)
+- `icp_context` — the full `context.md` content
+
+## Output format
+JSON object:
+```json
+{
+  "hooks": "1-2 sentence talking point referencing something specific the lead said or did",
+  "errors": []
+}
+```
+
+## Instructions
+You are writing a hook for a cold outreach message. The hook must:
+- Reference something **specific** the lead said or did (a post, a hire, a launch).
+- Be 1-2 sentences max.
+- Sound human, not like a sales template — no "I noticed you...", no "Hope this finds you well".
+- Be relevant to what we sell (see `icp_context` above for what we do).
+
+If the lead's posts don't give you anything substantive, return:
+```json
+{"hooks": "", "errors": ["no usable signal in recent posts"]}
+```
+
+Do not invent quotes. Do not paraphrase posts in a way that changes meaning.

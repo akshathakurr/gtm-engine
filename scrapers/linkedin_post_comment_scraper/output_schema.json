@@ -1,0 +1,44 @@
+{
+  "title": "LinkedIn Post Comment Scraper Output",
+  "type": "object",
+  "properties": {
+    "post_url": { "type": "string" },
+    "comments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "comment_id": { "type": "string" },
+          "comment_type": { "type": "string", "description": "'comment' or 'reply'" },
+          "text": { "type": "string" },
+          "date": { "type": "string" },
+          "is_edited": { "type": "boolean" },
+          "is_pinned": { "type": "boolean" },
+          "comment_url": { "type": "string" },
+          "author": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "headline": { "type": "string" },
+              "profile_url": { "type": "string" }
+            }
+          },
+          "reactions": {
+            "type": "object",
+            "properties": {
+              "total": { "type": "integer" },
+              "like": { "type": "integer" },
+              "appreciation": { "type": "integer" },
+              "empathy": { "type": "integer" },
+              "praise": { "type": "integer" },
+              "interest": { "type": "integer" }
+            }
+          },
+          "reply_count": { "type": "integer" }
+        }
+      }
+    },
+    "comment_count": { "type": "integer" },
+    "errors": { "type": "array", "items": { "type": "string" } }
+  }
+}

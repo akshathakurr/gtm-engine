@@ -1,0 +1,12 @@
+{
+  "_comment": "Default genre keywords for the 'trending' source. Override per-project by creating /Context/<project>/genre_keywords.json with the same shape.",
+  "keywords": [
+    "B2B SaaS",
+    "GTM",
+    "sales leadership",
+    "AI strategy",
+    "founder lessons",
+    "product-led growth",
+    "revenue operations"
+  ]
+}

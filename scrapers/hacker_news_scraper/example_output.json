@@ -1,0 +1,110 @@
+{
+  "query": "AI sales",
+  "story_type": "story",
+  "sort_by": "date",
+  "days_back": 30,
+  "stories": [
+    {
+      "id": "47704147",
+      "title": "Show HN: HushScribe – Self-contained local meeting transcription for macOS",
+      "url": "https://github.com/drcursor/HushScribe",
+      "hn_url": "https://news.ycombinator.com/item?id=47704147",
+      "author": "drcursor",
+      "created_at": "2026-04-09T14:22:23Z",
+      "points": 2,
+      "num_comments": 0
+    },
+    {
+      "id": "47702704",
+      "title": "Show HN: Improv Playground – practice improv solo with AI scene partners",
+      "url": "https://alpha.improv-playground.com/",
+      "hn_url": "https://news.ycombinator.com/item?id=47702704",
+      "author": "chipcleary",
+      "created_at": "2026-04-09T12:17:20Z",
+      "points": 1,
+      "num_comments": 0
+    },
+    {
+      "id": "47701711",
+      "title": "Show HN: Obsidian AI Copilot – Bring Claude Code, OpenCode, etc. into Obsidian",
+      "url": "https://github.com/spencermarx/obsidian-ai",
+      "hn_url": "https://news.ycombinator.com/item?id=47701711",
+      "author": "mrxdev",
+      "created_at": "2026-04-09T10:23:43Z",
+      "points": 1,
+      "num_comments": 0
+    },
+    {
+      "id": "47688116",
+      "title": "Show HN: I built an open protocol for Agent-to-agent commercial negotiation",
+      "url": "https://a2cn.io/",
+      "hn_url": "https://news.ycombinator.com/item?id=47688116",
+      "author": "cmagorr1",
+      "created_at": "2026-04-08T10:23:58Z",
+      "points": 3,
+      "num_comments": 0
+    },
+    {
+      "id": "47632626",
+      "title": "Show HN: EU Compliance SaaS for Sale ($4K Each) – CBAM, AI Act, Public Tenders",
+      "url": "",
+      "hn_url": "https://news.ycombinator.com/item?id=47632626",
+      "author": "AIA_PROOF",
+      "created_at": "2026-04-03T21:36:00Z",
+      "points": 1,
+      "num_comments": 0
+    },
+    {
+      "id": "47613768",
+      "title": "Maki the efficient AI coder – Rust TUI (saves 40% tokens and low RAM)",
+      "url": "https://maki.sh",
+      "hn_url": "https://news.ycombinator.com/item?id=47613768",
+      "author": "tontinton",
+      "created_at": "2026-04-02T12:50:18Z",
+      "points": 5,
+      "num_comments": 1
+    },
+    {
+      "id": "47608155",
+      "title": "ZomboCom stolen by a hacker, sold, now replaced with AI-generated makeover",
+      "url": "https://old.reddit.com/r/oldinternet/comments/1raiz8v/zombocom_was_stolen_by_hacker_put_up_for_sale_and/",
+      "hn_url": "https://news.ycombinator.com/item?id=47608155",
+      "author": "bananaboy",
+      "created_at": "2026-04-01T23:45:03Z",
+      "points": 76,
+      "num_comments": 37
+    },
+    {
+      "id": "47600569",
+      "title": "Show HN: EU RegTech SaaS for sale – CBAM, AI Act, French tenders ($5K each)",
+      "url": "",
+      "hn_url": "https://news.ycombinator.com/item?id=47600569",
+      "author": "AIA_PROOF",
+      "created_at": "2026-04-01T13:27:22Z",
+      "points": 2,
+      "num_comments": 0
+    },
+    {
+      "id": "47592445",
+      "title": "Nexus – Agent-native ops platform for ecommerce MCP, self-registration, no demos",
+      "url": "",
+      "hn_url": "https://news.ycombinator.com/item?id=47592445",
+      "author": "karimsherif",
+      "created_at": "2026-03-31T19:45:27Z",
+      "points": 3,
+      "num_comments": 0
+    },
+    {
+      "id": "47580155",
+      "title": "Veethi – We replaced 5 sales tools with one AI chat for founder-led outbound",
+      "url": "https://veethi.so",
+      "hn_url": "https://news.ycombinator.com/item?id=47580155",
+      "author": "raghavarunalabs",
+      "created_at": "2026-03-30T21:50:46Z",
+      "points": 1,
+      "num_comments": 0
+    }
+  ],
+  "story_count": 10,
+  "errors": []
+}

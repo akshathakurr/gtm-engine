@@ -1,0 +1,959 @@
+"""
+Blog Builder Workflow — research ideas, fill metadata, draft posts.
+
+Modes:
+  daily  — discover N blog ideas based on YOUR topics + reference companies, append to sheet
+  idea   — pick up rows where Blog Idea is set + Keywords empty; research & fill metadata
+  write  — take a researched row by number, write the full draft, save to a Google Doc
+
+Requires three sections in `context/context.md`:
+  ## Project              — what your project / company does (one paragraph)
+  ## Blog Goals & Topics  — what audience / tone / topics you want blogs about
+  ## Blog Reference Sources — companies whose blogs to model after (Name | domain)
+
+If any of these is empty/missing, the workflow prompts you interactively at
+the start of every run and (with your permission) appends your answers back
+to context.md so you aren't re-asked. Use --auto to error out instead of
+prompting.
+
+Usage:
+  python -m workflows.blog_builder.workflow --mode daily \\
+      --sheet-id SHEET_ID --num-ideas 3
+  python -m workflows.blog_builder.workflow --mode idea \\
+      --sheet-id SHEET_ID
+  python -m workflows.blog_builder.workflow --mode write \\
+      --sheet-id SHEET_ID --row 2 --blogs-folder-id DRIVE_FOLDER_ID
+
+Flags:
+  --validate-keywords   sanity-check LLM-generated keywords against Google
+                        Trends interest scores via scrapers/keyword_validator
+  --auto                run non-interactively; abort if context.md is missing
+                        any required section
+"""
+
+import os
+import re
+import sys
+import json
+import subprocess
+import argparse
+from datetime import datetime, timedelta
+from typing import Optional, List, Dict
+
+import anthropic
+from exa_py import Exa
+
+from config import CLAUDE_MODEL, CONTEXT_DIR
+
+try:
+    from scrapers.keyword_validator.scraper import validate_keywords as _validate_keywords  # type: ignore
+    _KW_VALIDATOR_AVAILABLE = True
+except Exception:
+    _validate_keywords = None  # type: ignore
+    _KW_VALIDATOR_AVAILABLE = False
+
+
+# ---------------------------------------------------------------------------
+# Sheet schema (fixed — the workflow owns this)
+# ---------------------------------------------------------------------------
+
+SHEET_HEADERS = [
+    "Blog Idea",        # A - 0
+    "Why this Blog?",   # B - 1   (LLM rationale)
+    "Project Name",     # C - 2   (optional — populated from CLI / left blank)
+    "Reference",        # D - 3   (URLs of inspiration posts)
+    "Talking Points",   # E - 4
+    "Main Content",     # F - 5   (Google Doc URL after write mode)
+    "SEO Target",       # G - 6
+    "Keywords",         # H - 7
+    "Keyword Score",    # I - 8   (only filled when --validate-keywords is used)
+    "Assets",           # J - 9
+    "Status",           # K - 10
+    "Posting Date",     # L - 11
+]
+NUM_COLS = len(SHEET_HEADERS)
+# Column index helpers (used throughout — keep these and SHEET_HEADERS in sync)
+COL_IDEA, COL_WHY, COL_PROJECT, COL_REFERENCE  = 0, 1, 2, 3
+COL_TALKING, COL_MAIN, COL_SEO, COL_KEYWORDS   = 4, 5, 6, 7
+COL_KW_SCORE, COL_ASSETS, COL_STATUS, COL_DATE = 8, 9, 10, 11
+
+STATUS_IDEA      = "Idea"
+STATUS_DRAFT     = "Draft Ready"
+STATUS_ASSET     = "Need Asset"
+STATUS_LAUNCH    = "Ready to launch"
+STATUS_PUBLISHED = "Published - live"
+_TERMINAL_STATUSES = {STATUS_DRAFT.lower(), STATUS_ASSET.lower(),
+                      STATUS_LAUNCH.lower(), STATUS_PUBLISHED.lower()}
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def col_letter(idx: int) -> str:
+    result = ""
+    while True:
+        result = chr(ord("A") + idx % 26) + result
+        idx = idx // 26 - 1
+        if idx < 0:
+            break
+    return result
+
+
+def _strip_json_fence(text: str) -> str:
+    text = text.strip()
+    if text.startswith("```"):
+        lines = text.split("\n")
+        text = "\n".join(lines[1:-1]).strip()
+    return text
+
+
+def pad_row(row: List[str], n: int) -> List[str]:
+    return list(row) + [""] * max(0, n - len(row))
+
+
+def _to_str(v) -> str:
+    if isinstance(v, list):
+        return "\n".join(str(x) for x in v)
+    return str(v) if v else ""
+
+
+# ---------------------------------------------------------------------------
+# Project context — load + parse + interactive backfill
+# ---------------------------------------------------------------------------
+
+# Filename inside CONTEXT_DIR where workflow writes user answers back.
+_CONTEXT_FILE = "context.md"
+
+REQUIRED_SECTIONS = [
+    {
+        "key": "project",
+        "header": "Project",
+        "prompt": "What is your project / company? (one paragraph — what it does, who it's for, what problem it solves)",
+    },
+    {
+        "key": "goals",
+        "header": "Blog Goals & Topics",
+        "prompt": "What blogs do you want? Who's the audience, what tone, what topics matter to your buyers? Be specific — the more concrete, the less generic the output.",
+    },
+    {
+        "key": "references",
+        "header": "Blog Reference Sources",
+        "prompt": "Any companies whose blogs you'd like to model after? Format: 'Name | domain.com' per line. Press Enter to skip (we'll search broadly).",
+        "multiline": True,
+    },
+]
+
+
+def load_all_context() -> str:
+    """Concatenate every .md in context/ (excluding *.example). For LLM grounding."""
+    if not os.path.isdir(CONTEXT_DIR):
+        return ""
+    parts = []
+    for fname in sorted(os.listdir(CONTEXT_DIR)):
+        if fname.endswith(".md") and ".example" not in fname:
+            with open(os.path.join(CONTEXT_DIR, fname)) as f:
+                content = f.read().strip()
+            if content:
+                parts.append(f"=== {fname} ===\n{content}")
+    return "\n\n".join(parts)
+
+
+def _read_context_file() -> str:
+    path = os.path.join(CONTEXT_DIR, _CONTEXT_FILE)
+    if not os.path.exists(path):
+        return ""
+    with open(path) as f:
+        return f.read()
+
+
+def _append_to_context_file(section_header: str, body: str) -> None:
+    path = os.path.join(CONTEXT_DIR, _CONTEXT_FILE)
+    body = body.strip()
+    if not body:
+        return
+    block = f"\n\n## {section_header}\n{body}\n"
+    if os.path.exists(path):
+        with open(path, "a") as f:
+            f.write(block)
+    else:
+        # Create a minimal context.md if one doesn't exist yet
+        with open(path, "w") as f:
+            f.write("# Context\n" + block)
+
+
+def _section_body(text: str, header: str) -> str:
+    """Return the body under a `## Header` section, stripping placeholders."""
+    if not text:
+        return ""
+    pattern = rf"(?ms)^##\s+{re.escape(header)}\s*$\n(.*?)(?=^##\s+|\Z)"
+    m = re.search(pattern, text)
+    if not m:
+        return ""
+    section = m.group(1)
+    ans = re.search(r"(?ms)^###\s+Answer\s*$\n(.*?)(?=^###\s+|\Z)", section)
+    body = ans.group(1) if ans else section
+    body = "\n".join(ln for ln in body.splitlines() if not ln.strip().startswith("<!--")).strip()
+    if body.lower() in ("(fill this in)", "(none)", "(skip)"):
+        return ""
+    return body
+
+
+def parse_reference_sources(text: str) -> List[Dict[str, str]]:
+    """
+    Parse the 'Blog Reference Sources' section. Each non-empty line is
+    'Name | domain.com'. Lines without '|' are treated as name-only.
+    """
+    body = _section_body(text, "Blog Reference Sources")
+    out: List[Dict[str, str]] = []
+    for line in body.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or line.startswith("(") or line.startswith("-"):
+            continue
+        if "|" in line:
+            name, domain = [x.strip() for x in line.split("|", 1)]
+            out.append({"name": name, "domain": domain})
+        else:
+            out.append({"name": line, "domain": ""})
+    return out
+
+
+def _read_multiline_input(prompt_text: str) -> str:
+    """Read multi-line user input until a blank line."""
+    print(prompt_text)
+    print("(End with an empty line.)")
+    lines: List[str] = []
+    while True:
+        try:
+            line = input()
+        except EOFError:
+            break
+        if not line.strip():
+            break
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def ensure_context_complete(auto: bool) -> Dict[str, str]:
+    """
+    Walk REQUIRED_SECTIONS. For each missing/empty section:
+      - if --auto, error out
+      - else prompt the user, then offer to append their answer to context.md
+
+    Returns {key: body} for all required sections (filled or freshly captured).
+    """
+    text = _read_context_file()
+    captured: Dict[str, str] = {}
+    missing: List[Dict[str, str]] = []
+
+    for spec in REQUIRED_SECTIONS:
+        body = _section_body(text, spec["header"])
+        if body:
+            captured[spec["key"]] = body
+        else:
+            missing.append(spec)
+
+    if not missing:
+        return captured
+
+    if auto:
+        names = ", ".join(s["header"] for s in missing)
+        print(f"\nERROR: --auto specified but context/context.md is missing required section(s): {names}")
+        print("Add them to context/context.md and re-run, or drop --auto to be prompted.")
+        sys.exit(2)
+
+    print("\n" + "=" * 70)
+    print(" Setup — your context.md is missing some sections we need")
+    print("=" * 70)
+    print("Answer the prompts below. With your permission we'll append the")
+    print("answers to context/context.md so you aren't re-asked next run.\n")
+
+    answers: Dict[str, str] = {}
+    for spec in missing:
+        print(f"[{spec['header']}]")
+        print(spec["prompt"])
+        if spec.get("multiline"):
+            ans = _read_multiline_input("> ")
+        else:
+            ans = input("> ").strip()
+        print()
+        answers[spec["key"]] = ans
+        captured[spec["key"]] = ans
+
+    if any(v.strip() for v in answers.values()):
+        choice = input("Save these answers to context/context.md? [Y/n] ").strip().lower()
+        if choice in ("", "y", "yes"):
+            for spec in missing:
+                v = answers.get(spec["key"], "").strip()
+                if v:
+                    _append_to_context_file(spec["header"], v)
+            print(f"Saved to {os.path.join(CONTEXT_DIR, _CONTEXT_FILE)}.\n")
+        else:
+            print("Not saved — the answers will be used for this run only.\n")
+
+    return captured
+
+
+# ---------------------------------------------------------------------------
+# Google Sheets helpers
+# ---------------------------------------------------------------------------
+
+def gws_read_sheet(sheet_id: str, sheet_name: str) -> List[List[str]]:
+    result = subprocess.run(
+        ["gws", "sheets", "spreadsheets", "values", "get",
+         "--params", json.dumps({"spreadsheetId": sheet_id, "range": sheet_name})],
+        capture_output=True, text=True, check=True,
+    )
+    return json.loads(result.stdout).get("values", [])
+
+
+def gws_append_rows(sheet_id: str, sheet_name: str, rows: List[List[str]]) -> None:
+    result = subprocess.run(
+        ["gws", "sheets", "spreadsheets", "values", "append",
+         "--params", json.dumps({
+             "spreadsheetId": sheet_id, "range": sheet_name,
+             "valueInputOption": "USER_ENTERED", "insertDataOption": "INSERT_ROWS",
+         }),
+         "--json", json.dumps({"values": rows}, ensure_ascii=False)],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        print(f"gws append error:\nstdout: {result.stdout[:500]}\nstderr: {result.stderr[:500]}")
+        result.check_returncode()
+
+
+def gws_update_row(sheet_id: str, sheet_name: str, row_idx: int, values: List[str]) -> None:
+    last_col = col_letter(len(values) - 1)
+    range_str = f"{sheet_name}!A{row_idx}:{last_col}{row_idx}"
+    subprocess.run(
+        ["gws", "sheets", "spreadsheets", "values", "update",
+         "--params", json.dumps({
+             "spreadsheetId": sheet_id, "range": range_str,
+             "valueInputOption": "USER_ENTERED",
+         }),
+         "--json", json.dumps({"values": [values]})],
+        capture_output=True, text=True, check=True,
+    )
+
+
+def ensure_headers(sheet_id: str, sheet_name: str) -> None:
+    rows = gws_read_sheet(sheet_id, sheet_name)
+    if not rows:
+        gws_append_rows(sheet_id, sheet_name, [SHEET_HEADERS])
+        return
+    if rows[0] == SHEET_HEADERS:
+        return
+    # If there are existing data rows under a different header, don't rewrite
+    # the header — that would silently misalign the existing rows. Print a
+    # heads-up; new rows will append with the workflow's column order, and
+    # the user can reconcile schemas manually.
+    if len(rows) > 1:
+        print(f"  Note: '{sheet_name}' has data rows under a different header schema. "
+              f"Keeping existing header; new rows append with the workflow's column order "
+              f"(may not align with existing labels).")
+        return
+    gws_update_row(sheet_id, sheet_name, 1, SHEET_HEADERS)
+
+
+# ---------------------------------------------------------------------------
+# Exa research
+# ---------------------------------------------------------------------------
+
+def fetch_reference_posts(
+    exa_client: Exa,
+    references: List[Dict[str, str]],
+    topic_hint: str,
+    lookback_days: int = 90,
+    num_per_company: int = 3,
+) -> List[Dict]:
+    posts: List[Dict] = []
+    cutoff = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    for ref in references:
+        domain = (ref.get("domain") or "").strip()
+        name   = ref.get("name") or domain or "?"
+        if not domain:
+            print(f"  {name}: skipped (no domain)")
+            continue
+        try:
+            results = exa_client.search_and_contents(
+                topic_hint,
+                include_domains=[domain],
+                num_results=num_per_company,
+                text=True,
+                highlights=True,
+                start_published_date=cutoff,
+            )
+            for r in results.results:
+                posts.append({
+                    "company":        name,
+                    "title":          r.title or "",
+                    "url":            r.url or "",
+                    "text":           (r.text or "")[:600],
+                    "published_date": r.published_date or "",
+                })
+            print(f"  {name}: {len(results.results)} post(s)")
+        except Exception as e:
+            print(f"  {name}: skipped ({e})")
+
+    return posts
+
+
+def fetch_topic_posts(
+    exa_client: Exa,
+    queries: List[str],
+    num_per_query: int = 5,
+    lookback_days: int = 60,
+) -> List[Dict]:
+    posts: List[Dict] = []
+    cutoff = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    for q in queries:
+        try:
+            results = exa_client.search_and_contents(
+                q,
+                num_results=num_per_query,
+                text=True,
+                start_published_date=cutoff,
+            )
+            for r in results.results:
+                posts.append({
+                    "source":         "topic",
+                    "query":          q,
+                    "title":          r.title or "",
+                    "url":            r.url or "",
+                    "text":           (r.text or "")[:500],
+                    "published_date": r.published_date or "",
+                })
+        except Exception as e:
+            print(f"  Topic '{q[:50]}': skipped ({e})")
+
+    return posts
+
+
+# ---------------------------------------------------------------------------
+# Topic queries — derived from the user's "Blog Goals & Topics" section
+# ---------------------------------------------------------------------------
+
+def derive_topic_queries(
+    project_text: str,
+    goals_text: str,
+    client: anthropic.Anthropic,
+    max_queries: int = 5,
+) -> List[str]:
+    """
+    Convert the user's free-text Blog Goals into concrete search queries.
+    Falls back to splitting goals_text into lines if Claude is unavailable.
+    """
+    if not goals_text.strip():
+        return []
+    prompt = f"""Convert these blog goals into {max_queries} concrete web search queries that would surface recent articles relevant to the goals.
+
+Project:
+{project_text or "(not specified)"}
+
+Blog Goals:
+{goals_text}
+
+Return a JSON array of {max_queries} query strings — each one a phrase someone would type into Google to find recent industry posts on these topics. No explanations.
+Return only valid JSON."""
+    try:
+        resp = client.messages.create(
+            model=CLAUDE_MODEL, max_tokens=400,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return json.loads(_strip_json_fence(resp.content[0].text))[:max_queries]
+    except Exception as e:
+        print(f"  Falling back from LLM topic derivation: {e}")
+        # crude fallback — one query per non-empty line
+        lines = [l.strip("-• ").strip() for l in goals_text.splitlines() if l.strip()]
+        return lines[:max_queries]
+
+
+# ---------------------------------------------------------------------------
+# Claude prompts
+# ---------------------------------------------------------------------------
+
+def generate_daily_ideas(
+    ref_posts: List[Dict],
+    topic_posts: List[Dict],
+    full_context: str,
+    num_ideas: int,
+    client: anthropic.Anthropic,
+) -> List[Dict]:
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    ref_block = "\n".join(
+        f"[{p['company']}] {p['title']}\n{p['text'][:300]}\nURL: {p['url']}"
+        for p in ref_posts[:40]
+    ) or "(no reference posts available)"
+    topic_block = "\n".join(
+        f"[{p['query']}] {p['title']}\n{p['text'][:300]}\nURL: {p['url']}"
+        for p in topic_posts[:20]
+    ) or "(no recent topic posts found)"
+    ctx_block = (
+        f"=== PROJECT CONTEXT ===\n{full_context}"
+        if full_context.strip()
+        else "(No project context found — output may be generic.)"
+    )
+
+    prompt = f"""You are a B2B SaaS content strategist with deep SEO expertise.
+Today: {today}
+
+{ctx_block}
+
+=== REFERENCE COMPANY BLOGS (recent posts — use for inspiration and gap analysis) ===
+{ref_block}
+
+=== RECENT POSTS ON THE USER'S TOPICS ===
+{topic_block}
+
+Task: Generate exactly {num_ideas} blog post ideas tailored to the project and goals above.
+
+What makes a great blog:
+- Targets keywords real buyers search (not vanity keywords)
+- Teaches something genuinely useful — not marketing fluff
+- Has a differentiated angle not already well-covered above
+- Builds the company's credibility with their target audience
+
+For each idea return:
+- blog_idea:      a clear, compelling post title
+- talking_points: array of 4-6 specific points to cover (concrete, not generic)
+- keywords:       array of 5-8 SEO keywords (mix of head terms and long-tail buyer-intent queries)
+- seo_target:    the ONE primary keyword this post should rank for
+- assets:        what visuals/diagrams/screenshots would make this post better (1-2 ideas)
+- posting_date:  suggested publish date (YYYY-MM-DD), space them ~1 week apart from {today}
+- references:    array of up to 3 reference URLs above that inspired or are relevant
+- why:           a SHORT 2-line rationale (max ~25 words total) — why this will rank AND who it's for. Punchy, no filler, no preamble.
+
+Return a JSON array of exactly {num_ideas} objects with these exact keys.
+Return only valid JSON, no explanation."""
+
+    resp = client.messages.create(
+        model=CLAUDE_MODEL, max_tokens=4000,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return json.loads(_strip_json_fence(resp.content[0].text))
+
+
+def research_specific_idea(
+    idea: str,
+    ref_posts: List[Dict],
+    full_context: str,
+    client: anthropic.Anthropic,
+) -> Dict:
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    ref_block = "\n".join(
+        f"[{p.get('company', p.get('source', ''))}] {p['title']}\n{p['text'][:400]}\nURL: {p['url']}"
+        for p in ref_posts[:25]
+    ) or "(no reference posts available)"
+    ctx_block = (
+        f"=== PROJECT CONTEXT ===\n{full_context}"
+        if full_context.strip()
+        else "(No project context found — output may be generic.)"
+    )
+
+    prompt = f"""You are a B2B SaaS content strategist with deep SEO expertise.
+Today: {today}
+
+{ctx_block}
+
+Blog idea to research: "{idea}"
+
+=== RELATED REFERENCE POSTS ===
+{ref_block}
+
+Produce research metadata for this blog post:
+- talking_points: array of 4-6 specific, concrete points to cover
+- keywords:       array of 5-8 SEO keywords (mix of head + long-tail buyer-intent)
+- seo_target:    the ONE primary keyword this post should rank for
+- assets:        what visuals/diagrams/screenshots would strengthen the post (1-2 ideas)
+- posting_date:  suggested publish date (YYYY-MM-DD), 1-2 weeks from today
+- references:    array of up to 3 URLs from the reference posts above
+- why:           a SHORT 2-line rationale (max ~25 words total) — why this will rank AND who it's for. Punchy, no filler, no preamble.
+
+Return a single JSON object with these exact keys. Return only valid JSON, no explanation."""
+
+    resp = client.messages.create(
+        model=CLAUDE_MODEL, max_tokens=1500,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return json.loads(_strip_json_fence(resp.content[0].text))
+
+
+def write_blog_post(
+    idea: str,
+    talking_points: str,
+    keywords: str,
+    seo_target: str,
+    full_context: str,
+    client: anthropic.Anthropic,
+) -> str:
+    ctx_block = (
+        f"=== PROJECT CONTEXT ===\n{full_context}"
+        if full_context.strip()
+        else "(No project context found — output may be generic.)"
+    )
+
+    prompt = f"""You are a B2B SaaS content writer. Write a complete, publish-ready blog post.
+
+{ctx_block}
+
+Blog title: {idea}
+Primary SEO keyword: {seo_target}
+All keywords to include naturally: {keywords}
+
+Key points to cover:
+{talking_points}
+
+Requirements:
+- 1200–1800 words
+- Clear H2/H3 structure
+- Intro that opens with a specific pain point or surprising insight (never "In today's fast-paced world")
+- Include the primary SEO keyword in: the title, the first paragraph, at least one H2, and the conclusion
+- Use concrete examples, real numbers, and specific scenarios
+- Write like a smart founder explaining something valuable — no corporate-speak, no fluff
+- End with a CTA that naturally connects to the project's product
+- Format as clean markdown
+
+Write the full blog post now."""
+
+    resp = client.messages.create(
+        model=CLAUDE_MODEL, max_tokens=6000,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return resp.content[0].text
+
+
+# ---------------------------------------------------------------------------
+# Keyword validation
+# ---------------------------------------------------------------------------
+
+def validate_idea_keywords(idea: Dict) -> Dict[str, int]:
+    """Run the keyword_validator scraper on this idea's keywords. Returns {kw: score}."""
+    if not _KW_VALIDATOR_AVAILABLE:
+        print("  --validate-keywords requested but pytrends not installed — skipping.")
+        return {}
+    kws = idea.get("keywords") or []
+    if not kws:
+        return {}
+    print(f"  Validating {len(kws)} keyword(s) via Google Trends...")
+    result = _validate_keywords(keywords=kws, geo="", timeframe="today 12-m")
+    return {kw: data.get("interest_score", 0) for kw, data in result.items()}
+
+
+def format_keyword_scores(scores: Dict[str, int]) -> str:
+    if not scores:
+        return ""
+    return "\n".join(f"{kw}: {s}/100" for kw, s in sorted(scores.items(), key=lambda x: -x[1]))
+
+
+# ---------------------------------------------------------------------------
+# Mode: daily
+# ---------------------------------------------------------------------------
+
+def run_daily(
+    args: argparse.Namespace,
+    client: anthropic.Anthropic,
+    exa_client: Exa,
+) -> None:
+    print(f"\n=== Blog Builder | mode=daily | ideas={args.num_ideas} ===\n")
+
+    sections     = ensure_context_complete(args.auto)
+    full_context = load_all_context()
+    references   = parse_reference_sources(_read_context_file())
+    if args.reference_companies:
+        # CLI override — comma-separated "Name|domain" entries
+        references = []
+        for entry in args.reference_companies.split(","):
+            parts = [p.strip() for p in entry.split("|")]
+            if len(parts) == 2:
+                references.append({"name": parts[0], "domain": parts[1]})
+
+    if not references:
+        print("  No reference companies configured — proceeding without per-company filtering.")
+    else:
+        print(f"  Reference companies ({len(references)}): " +
+              ", ".join(r["name"] for r in references))
+
+    print("\n--- Deriving topic search queries from your goals ---")
+    topic_queries = derive_topic_queries(
+        sections.get("project", ""),
+        sections.get("goals", ""),
+        client,
+    )
+    if topic_queries:
+        for q in topic_queries:
+            print(f"  · {q}")
+    else:
+        print("  (none — Blog Goals & Topics empty; skipping topic search)")
+
+    print("\n--- Fetching reference company posts ---")
+    if references:
+        # Use the user's goals as the topic hint if available
+        topic_hint = (sections.get("goals") or "").strip().splitlines()
+        topic_hint = topic_hint[0] if topic_hint else "B2B SaaS strategy"
+        ref_posts = fetch_reference_posts(
+            exa_client, references,
+            topic_hint=topic_hint,
+            lookback_days=90,
+            num_per_company=3,
+        )
+    else:
+        ref_posts = []
+    print(f"Total reference posts: {len(ref_posts)}")
+
+    print("\n--- Fetching topic-driven posts ---")
+    topic_posts = fetch_topic_posts(exa_client, topic_queries) if topic_queries else []
+    print(f"Total topic posts: {len(topic_posts)}")
+
+    print("\n--- Generating ideas with Claude ---")
+    ideas = generate_daily_ideas(ref_posts, topic_posts, full_context, args.num_ideas, client)
+    print(f"Generated {len(ideas)} idea(s)")
+
+    ensure_headers(args.sheet_id, args.sheet_name)
+
+    rows: List[List[str]] = []
+    for idea in ideas:
+        kw_scores: Dict[str, int] = {}
+        if args.validate_keywords:
+            kw_scores = validate_idea_keywords(idea)
+
+        row = [""] * NUM_COLS
+        row[COL_IDEA]      = _to_str(idea.get("blog_idea", ""))
+        row[COL_WHY]       = _to_str(idea.get("why", ""))
+        row[COL_PROJECT]   = args.project_name or ""
+        row[COL_REFERENCE] = _to_str(idea.get("references", []))
+        row[COL_TALKING]   = "\n".join(f"• {pt}" for pt in (idea.get("talking_points") or []))
+        row[COL_MAIN]      = ""
+        row[COL_SEO]       = _to_str(idea.get("seo_target", ""))
+        row[COL_KEYWORDS]  = ", ".join(idea.get("keywords") or [])
+        row[COL_KW_SCORE]  = format_keyword_scores(kw_scores)
+        row[COL_ASSETS]    = _to_str(idea.get("assets", ""))
+        row[COL_STATUS]    = STATUS_IDEA
+        row[COL_DATE]      = _to_str(idea.get("posting_date", ""))
+        rows.append(row)
+
+    gws_append_rows(args.sheet_id, args.sheet_name, rows)
+
+    print(f"\n✓ Added {len(rows)} row(s) to '{args.sheet_name}':")
+    for r in rows:
+        print(f"  • {r[COL_IDEA]}")
+        print(f"    SEO target: {r[COL_SEO]}  |  Post date: {r[COL_DATE]}")
+
+
+# ---------------------------------------------------------------------------
+# Mode: idea
+# ---------------------------------------------------------------------------
+
+def run_idea(
+    args: argparse.Namespace,
+    client: anthropic.Anthropic,
+    exa_client: Exa,
+) -> None:
+    print("\n=== Blog Builder | mode=idea ===\n")
+
+    sections     = ensure_context_complete(args.auto)
+    full_context = load_all_context()
+    references   = parse_reference_sources(_read_context_file())
+    if args.reference_companies:
+        references = []
+        for entry in args.reference_companies.split(","):
+            parts = [p.strip() for p in entry.split("|")]
+            if len(parts) == 2:
+                references.append({"name": parts[0], "domain": parts[1]})
+
+    all_rows = gws_read_sheet(args.sheet_id, args.sheet_name)
+    if not all_rows:
+        print("Sheet is empty.")
+        return
+
+    data_rows = all_rows[1:]
+    pending: List[tuple] = []
+
+    for i, row in enumerate(data_rows, start=2):
+        r = pad_row(row, NUM_COLS)
+        idea_text = r[COL_IDEA].strip()
+        keywords  = r[COL_KEYWORDS].strip()
+        status    = r[COL_STATUS].strip().lower()
+
+        if idea_text and not keywords and status not in _TERMINAL_STATUSES:
+            pending.append((i, r, idea_text))
+
+    if not pending:
+        print("No pending rows (need: Blog Idea set, Keywords empty, Status not terminal).")
+        return
+
+    print(f"Found {len(pending)} pending row(s).\n")
+
+    for row_idx, row_data, idea in pending:
+        print(f"Row {row_idx}: '{idea}'")
+
+        print("  Fetching research from references and topic searches...")
+        ref_posts = (fetch_reference_posts(exa_client, references, topic_hint=idea,
+                                           lookback_days=120, num_per_company=2)
+                     if references else [])
+        topic_posts = fetch_topic_posts(exa_client, [idea, f"{idea} B2B SaaS"], num_per_query=4)
+
+        meta = research_specific_idea(idea, ref_posts + topic_posts, full_context, client)
+
+        kw_scores: Dict[str, int] = {}
+        if args.validate_keywords:
+            kw_scores = validate_idea_keywords(meta)
+
+        updated = list(row_data)
+        updated[COL_WHY]       = _to_str(meta.get("why", ""))
+        updated[COL_REFERENCE] = "\n".join(meta.get("references", []))
+        updated[COL_TALKING]   = "\n".join(f"• {pt}" for pt in meta.get("talking_points", []))
+        updated[COL_SEO]       = meta.get("seo_target", "")
+        updated[COL_KEYWORDS]  = ", ".join(meta.get("keywords", []))
+        updated[COL_KW_SCORE]  = format_keyword_scores(kw_scores)
+        updated[COL_ASSETS]    = _to_str(meta.get("assets", ""))
+        updated[COL_STATUS]    = STATUS_IDEA
+        updated[COL_DATE]      = meta.get("posting_date", "")
+        if args.project_name and not updated[COL_PROJECT].strip():
+            updated[COL_PROJECT] = args.project_name
+
+        gws_update_row(args.sheet_id, args.sheet_name, row_idx, updated)
+        print(f"  ✓ Updated — SEO target: {meta.get('seo_target', '')}  |  Post date: {meta.get('posting_date', '')}\n")
+
+
+# ---------------------------------------------------------------------------
+# Mode: write
+# ---------------------------------------------------------------------------
+
+def create_blog_doc(
+    blogs_folder_id: Optional[str],
+    title: str,
+    seo_target: str,
+    keywords: str,
+    content: str,
+) -> str:
+    """Create a Google Doc; if blogs_folder_id given, move it there. Returns edit URL."""
+    result = subprocess.run(
+        ["gws", "docs", "documents", "create",
+         "--json", json.dumps({"title": title})],
+        capture_output=True, text=True, check=True,
+    )
+    doc_id = json.loads(result.stdout)["documentId"]
+
+    if blogs_folder_id:
+        subprocess.run(
+            ["gws", "drive", "files", "update",
+             "--params", json.dumps({
+                 "fileId": doc_id,
+                 "addParents": blogs_folder_id,
+                 "removeParents": "root",
+             }),
+             "--json", "{}"],
+            capture_output=True, text=True, check=True,
+        )
+
+    full_text = (
+        f"SEO Target: {seo_target}\n"
+        f"Keywords: {keywords}\n"
+        f"{'─' * 60}\n\n"
+        f"{content}"
+    )
+    subprocess.run(
+        ["gws", "docs", "documents", "batchUpdate",
+         "--params", json.dumps({"documentId": doc_id}),
+         "--json", json.dumps({
+             "requests": [{
+                 "insertText": {"location": {"index": 1}, "text": full_text}
+             }]
+         })],
+        capture_output=True, text=True, check=True,
+    )
+    return f"https://docs.google.com/document/d/{doc_id}/edit"
+
+
+def run_write(
+    args: argparse.Namespace,
+    client: anthropic.Anthropic,
+) -> None:
+    print(f"\n=== Blog Builder | mode=write | row={args.row} ===\n")
+
+    ensure_context_complete(args.auto)
+    full_context = load_all_context()
+
+    all_rows = gws_read_sheet(args.sheet_id, args.sheet_name)
+    if args.row < 2 or args.row > len(all_rows):
+        print(f"Row {args.row} is out of range (sheet has {len(all_rows)} rows).")
+        return
+
+    row         = pad_row(all_rows[args.row - 1], NUM_COLS)
+    idea        = row[COL_IDEA].strip()
+    talking_pts = row[COL_TALKING].strip()
+    seo_target  = row[COL_SEO].strip()
+    keywords    = row[COL_KEYWORDS].strip()
+
+    if not idea:
+        print("Row has no Blog Idea.")
+        return
+
+    print(f"Writing: '{idea}'")
+    print(f"SEO target: {seo_target}\n")
+
+    draft = write_blog_post(idea, talking_pts, keywords, seo_target, full_context, client)
+
+    print("Creating Google Doc...")
+    doc_url = create_blog_doc(args.blogs_folder_id, idea, seo_target, keywords, draft)
+    print(f"Doc created: {doc_url}")
+
+    row[COL_MAIN]   = doc_url
+    row[COL_STATUS] = STATUS_DRAFT
+    gws_update_row(args.sheet_id, args.sheet_name, args.row, row)
+    print("Sheet updated — Status: Draft Ready, Main Content: Doc URL")
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Blog Builder Workflow")
+    parser.add_argument("--mode", choices=["daily", "idea", "write"], required=True)
+    parser.add_argument("--sheet-id",   required=True,
+                        help="Google Sheet ID (from the URL).")
+    parser.add_argument("--sheet-name", default="Blogs",
+                        help="Sheet tab name. Default: Blogs")
+    parser.add_argument("--num-ideas",  type=int, default=3,
+                        help="(daily mode) Number of ideas to generate. Default: 3")
+    parser.add_argument("--row",        type=int, default=None,
+                        help="(write mode) Sheet row number to draft.")
+    parser.add_argument("--blogs-folder-id", default=None,
+                        help="(write mode) Drive folder ID to place the new doc in. "
+                             "If omitted, the doc is created in your root Drive.")
+    parser.add_argument("--reference-companies", default=None,
+                        help="Override Blog Reference Sources for this run only. "
+                             "Format: 'Name1|domain1.com,Name2|domain2.com'")
+    parser.add_argument("--project-name", default=None,
+                        help="Project Name to write into column C of new rows "
+                             "(useful when one sheet tracks blogs across multiple projects).")
+    parser.add_argument("--validate-keywords", action="store_true",
+                        help="Sanity-check LLM keywords against Google Trends "
+                             "(requires pytrends).")
+    parser.add_argument("--auto", action="store_true",
+                        help="Run non-interactively. Errors out instead of prompting "
+                             "if context.md is missing required sections.")
+    args = parser.parse_args()
+
+    if args.mode == "write" and not args.row:
+        print("ERROR: --row is required for write mode")
+        sys.exit(1)
+
+    client     = anthropic.Anthropic()
+    exa_client = Exa(api_key=os.environ["EXA_API_KEY"])
+
+    if args.mode == "daily":
+        run_daily(args, client, exa_client)
+    elif args.mode == "idea":
+        run_idea(args, client, exa_client)
+    elif args.mode == "write":
+        run_write(args, client)
+
+
+if __name__ == "__main__":
+    main()

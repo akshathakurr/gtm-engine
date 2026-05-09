@@ -1,0 +1,54 @@
+{
+  "company_url": "https://www.linkedin.com/company/anthropic/",
+  "total": 2,
+  "posts": [
+    {
+      "urn": "urn:li:activity:7310000000000000001",
+      "url": "https://www.linkedin.com/feed/update/urn:li:activity:7310000000000000001/",
+      "post_type": "regular",
+      "posted_at": "2026-04-08 14:23:00",
+      "timestamp_ms": 1744121780000,
+      "text": "We\u2019re excited to announce Claude 4 \u2014 our most capable model yet...",
+      "author": {
+        "name": "Anthropic",
+        "username": "anthropic",
+        "url": "https://www.linkedin.com/company/anthropic/"
+      },
+      "stats": {
+        "total_reactions": 1840,
+        "likes": 1602,
+        "comments": 187,
+        "reposts": 214
+      },
+      "media": {
+        "type": "image",
+        "url": "https://media.licdn.com/dms/image/example.jpg",
+        "thumbnail": null,
+        "images": []
+      },
+      "reshared_post": null
+    },
+    {
+      "urn": "urn:li:activity:7310000000000000002",
+      "url": "https://www.linkedin.com/feed/update/urn:li:activity:7310000000000000002/",
+      "post_type": "regular",
+      "posted_at": "2026-04-05 09:10:00",
+      "timestamp_ms": 1743843000000,
+      "text": "Safety and helpfulness are not in conflict. Here\u2019s how we think about building AI responsibly...",
+      "author": {
+        "name": "Anthropic",
+        "username": "anthropic",
+        "url": "https://www.linkedin.com/company/anthropic/"
+      },
+      "stats": {
+        "total_reactions": 920,
+        "likes": 811,
+        "comments": 74,
+        "reposts": 98
+      },
+      "media": null,
+      "reshared_post": null
+    }
+  ],
+  "errors": []
+}

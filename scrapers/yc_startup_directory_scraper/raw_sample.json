@@ -1,0 +1,591 @@
+{
+  "companies": [
+    {
+      "id": 30237,
+      "name": "Trim",
+      "slug": "trim",
+      "website": "https://trimresearch.com",
+      "smallLogoUrl": "https://bookface-images.s3.amazonaws.com/small_logos/3c14d4cdb1c005950196ad5a9f92aef664fca60a.png",
+      "oneLiner": "A foundation model for physics.",
+      "longDescription": "Trim is building a general intelligence AI model that can simulate real-world physical systems evolving over time. For example, given the starting position of waves on a beach, the model generates how those waves move forward in time.",
+      "teamSize": 3,
+      "url": "https://www.ycombinator.com/companies/trim",
+      "batch": "W25",
+      "tags": [
+        "Artificial Intelligence"
+      ],
+      "status": "Active",
+      "industries": [
+        "B2B",
+        "Engineering, Product and Design"
+      ],
+      "regions": [
+        "United States of America",
+        "America / Canada"
+      ],
+      "locations": [
+        "San Francisco, CA, USA"
+      ],
+      "badges": []
+    },
+    {
+      "id": 30224,
+      "name": "Maritime Fusion",
+      "slug": "maritime-fusion",
+      "website": "https://maritimefusion.com",
+      "smallLogoUrl": "https://bookface-images.s3.amazonaws.com/small_logos/2af0192d25e843e5333e635fa35115413fbca155.png",
+      "oneLiner": "Fusion reactors for ships",
+      "longDescription": "Maritime Fusion is building fusion reactors for ships and off grid energy markets. En route on this endeavor we\u2019re commercializing High Temperature Superconducting (HTS) cable technology for power distribution while advancing the physics basis of our HTS tokamak to decarbonize global shipping. \r\n\r\nBreakeven fusion is coming soon, but the first-of-a-kind (FOAK) reactors will be costly, high maintenance, and have low capacity factors, leading to 5\u201310x higher electricity cost on the grid. Maritime Fusion is pursuing the most widely accepted approach to fusion, the tokamak, but specifically designed for the marine environment where the challenges that arise between breakeven and a commercially viable energy source are alleviated. The market we're targeting requires 15x less power, lower up-time, and costs the same as alternative fuels but without any emissions. Since fusion does not use highly radioactive fuels or materials \u2013 unlike fission \u2013 we sidestep the vast majority of regulatory challenges and safety risks associated with nuclear energy. Our team brings over a decade of industry and research experience in plasma physics, nuclear engineering, and electrical engineering with backgrounds at SpaceX, Tesla, Columbia University, and University of Pennsylvania.",
+      "teamSize": 6,
+      "url": "https://www.ycombinator.com/companies/maritime-fusion",
+      "batch": "W25",
+      "tags": [
+        "Fusion Energy",
+        "Hard Tech",
+        "Energy"
+      ],
+      "status": "Active",
+      "industries": [
+        "Industrials",
+        "Energy"
+      ],
+      "regions": [],
+      "locations": [],
+      "badges": [
+        "isHiring"
+      ]
+    },
+    {
+      "id": 30279,
+      "name": "Bystreet",
+      "slug": "bystreet",
+      "website": "http://www.bystreet.com",
+      "smallLogoUrl": "https://bookface-images.s3.amazonaws.com/small_logos/efdf6ee9c7e7982e5c4b3241aed41a34d139d93c.png",
+      "oneLiner": "Your key to the hotel market. ",
+      "longDescription": "Bystreet is an AI deal sourcing platform for development teams at hotel brands, operators, and vendors targeting the CALA market.",
+      "teamSize": 4,
+      "url": "https://www.ycombinator.com/companies/bystreet",
+      "batch": "W25",
+      "tags": [
+        "SaaS",
+        "B2B",
+        "Proptech"
+      ],
+      "status": "Active",
+      "industries": [
+        "B2B"
+      ],
+      "regions": [
+        "United States of America",
+        "America / Canada",
+        "Remote",
+        "Partly Remote"
+      ],
+      "locations": [
+        "San Francisco, CA, USA"
+      ],
+      "badges": []
+    },
+    {
+      "id": 30256,
+      "name": "PAX Markets",
+      "slug": "pax-markets",
+      "website": "https://pax.markets/",
+      "smallLogoUrl": "https://bookface-images.s3.amazonaws.com/small_logos/05c8cff591b86d49ecb387cae532233ca6d248ee.png",
+      "oneLiner": "More \ud835\udefc, less latency: exchange and HFT on one chip.",
+      "longDescription": "PAX is a new crypto CEX that delivers more \ud835\udefc with its in-silicon exchange and HFT technology. The PAX exchange integrated on-chip \u03bb API provides deterministic nanosecond tick-to-trade latency. HFT \u03bb traders experience non-adverse counterparty selection by pairing with free-tier traders who access PAX using our zero-cost & always rebated legacy API.\r\n\r\nUsing our patented technology, PAX is building a new generation of exchange co-lo facilities that unite HFT with exchange and monetizing by vertically integrating exchange and platform technology as one.",
+      "teamSize": 6,
+      "url": "https://www.ycombinator.com/companies/pax-markets",
+      "batch": "W25",
+      "tags": [],
+      "status": "Active",
+      "industries": [
+        "Fintech",
+        "Banking and Exchange"
+      ],
+      "regions": [
+        "United States of America",
+        "America / Canada"
+      ],
+      "locations": [
+        "Redwood City, CA, USA"
+      ],
+      "badges": [
+        "isHiring"
+      ]
+    },
+    {
+      "id": 30277,
+      "name": "ReJot",
+      "slug": "rejot",
+      "website": "https://rejot.dev",
+      "smallLogoUrl": "https://bookface-images.s3.amazonaws.com/small_logos/f75ba97279846098d21850986cc1298a5b21d9a0.png",
+      "oneLiner": "We turn complex API integrations into drop\u2011in full\u2011stack libraries ",
+      "longDescription": "ReJot is building Fragno to let API companies go from simply exposing an API to offering drop-in integrations that work out of the box.\r\n\r\nFragno is an open\u2011source framework for packaging backend endpoints, data storage patterns, and frontend utilities into reusable building blocks. API providers ship full integrations, not just low\u2011level SDKs and docs.\r\n\r\nCustomers configure rather than write code, so integrations are both much faster to launch and far more consistent across customers.",
+      "teamSize": 2,
+      "url": "https://www.ycombinator.com/companies/rejot",
+      "batch": "W25",
+      "tags": [
+        "Developer Tools",
+        "API",
+        "Infrastructure",
+        "Databases"
+      ],
+      "status": "Active",
+      "industries": [
+        "B2B",
+        "Engineering, Product and Design"
+      ],
+      "regions": [
+        "Netherlands",
+        "Europe"
+      ],
+      "locations": [
+        "Amsterdam, Netherlands"
+      ],
+      "badges": []
+    },
+    {
+      "id": 30348,
+      "name": "SAMMY Labs",
+      "slug": "sammy-labs",
+      "website": "https://www.sammylabs.com",
+      "smallLogoUrl": "https://bookface-images.s3.amazonaws.com/small_logos/9bdb570c43e3c58161a904790b035ac6647153c9.png",
+      "oneLiner": "SAMMY Labs, the knowledge layer for your people and AI",
+      "longDescription": "At SAMMY, we do knowledge. Not \u201cfind me every time [thing] was mentioned,\u201d but real knowledge. A compliance or legal update comes in \u2014 where does it apply, how does it affect our processes, and what should we do next?A process changes \u2014 which related processes need updating? Update them for me.\r\n\r\nWe\u2019re trusted by some of the largest companies in the world to power their knowledge, because without knowledge, AI is just a bull**** exacerbator.",
+      "teamSize": 10,
+      "url": "https://www.ycombinator.com/companies/sammy-labs",
+      "batch": "W25",
+      "tags": [],
+      "status": "Active",
+      "industries": [
+        "B2B"
+      ],
+      "regions": [],
+      "locations": [],
+      "badges": [
+        "isHiring"
+      ]
+    },
+    {
+      "id": 30337,
+      "name": "Paratus Health",
+      "slug": "paratus-health",
+      "website": "https://paratushealth.com/",
+      "smallLogoUrl": "https://bookface-images.s3.amazonaws.com/small_logos/fcaf4d4e89631a63bee94c1af531a630ac0f1858.png",
+      "oneLiner": "Medical Voice Agents for Patient Management",
+      "longDescription": "Paratus Health is the AI operations layer for outpatient clinics. We build autonomous agents that don\u2019t just assist staff - they replace them, fully handling front desk calls, patient intake, insurance verification, documentation, and billing prep. Everything is deeply integrated into EHRs like Epic and Athena, eliminating the need for fragmented tools and manual work.\r\nNo toggling between systems. No busywork. Just one intelligent system running your clinical operations - faster, smarter, and more profitably than ever before.",
+      "teamSize": 6,
+      "url": "https://www.ycombinator.com/companies/paratus-health",
+      "batch": "W25",
+      "tags": [
+        "Digital Health",
+        "Healthcare IT",
+        "AI Assistant"
+      ],
+      "status": "Active",
+      "industries": [
+        "Healthcare",
+        "Healthcare IT"
+      ],
+      "regions": [
+        "United States of America",
+        "America / Canada"
+      ],
+      "locations": [
+        "Menlo Park, CA, USA"
+      ],
+      "badges": [
+        "highlightLatinx",
+        "isHiring"
+      ]
+    },
+    {
+      "id": 30325,
+      "name": "Roark",
+      "slug": "roark",
+      "website": "https://roark.ai",
+      "smallLogoUrl": "https://bookface-images.s3.amazonaws.com/small_logos/7eeed88cf20d9f39f503ec2708b6bf85e2e7e652.png",
+      "oneLiner": "Test, monitor, and improve your voice agents",
+      "longDescription": "Roark helps teams test, monitor, and improve their voice agents.\r\n\r\nVoice AI is exploding, but reliability is still the #1 challenge. Teams spend hours manually testing agents and still miss failures. In the last 6 months, Roark has processed over 10M minutes of calls, powering monitoring and simulation for teams across the Voice AI ecosystem (including YC companies).\r\n\r\nWe close that gap by combining:\r\n\r\n \ud83d\udcca Monitoring & Evaluation - 40+ built-in metrics (latency, instruction-follow, sentiment, etc.), custom dashboards, alerts, and the ability to define your own. Up to 15 speakers with automatic speaker identification.\r\n \ud83c\udfad Simulations & Personas - end-to-end phone/WebSocket simulations for inbound and outbound agents, with configurable personas (accents, languages, speech & behavior profiles). Define tests as conversations with a graph-based approach, so you can easily branch into edge cases and variants.\r\n \ud83d\udd01 Full lifecycle loop - failed calls automatically become repeatable tests, so every failure makes your agent stronger.\r\n\r\nRoark is the missing QA layer for Voice AI - helping teams ship agents they can trust.",
+      "teamSize": 3,
+      "url": "https://www.ycombinator.com/companies/roark",
+      "batch": "W25",
+      "tags": [
+        "Analytics",
+        "AI",
+        "Conversational AI"
+      ],
+      "status": "Active",
+      "industries": [
+        "B2B",
+        "Analytics"
+      ],
+      "regions": [
+        "United States of America",
+        "America / Canada"
+      ],
+      "locations": [
+        "San Francisco, CA, USA"
+      ],
+      "badges": []
+    },
+    {
+      "id": 30322,
+      "name": "Spott",
+      "slug": "spott",
+      "website": "https://spott.io",
+      "smallLogoUrl": "https://bookface-images.s3.amazonaws.com/small_logos/5f49530f7f80f640f3de8119e00764c7ea777491.png",
+      "oneLiner": "AI-native ATS/CRM for recruiting firms",
+      "longDescription": "Spott is the first AI-native ATS/CRM for recruiting & staffing firms. We built Spott because existing recruitment platforms require extensive manual work, are clunky to use, rely on fragmented add-ons, and are not designed for AI adoption.\r\n\r\nSpott combines everything recruiting firms need, from a full ATS & CRM to AI agents across the entire workflow, into one AI-native solution. It enables recruiters to focus on what matters most and close more placements.",
+      "teamSize": 25,
+      "url": "https://www.ycombinator.com/companies/spott",
+      "batch": "W25",
+      "tags": [
+        "Artificial Intelligence",
+        "SaaS",
+        "B2B",
+        "HR Tech",
+        "Enterprise Software"
+      ],
+      "status": "Active",
+      "industries": [
+        "B2B",
+        "Recruiting and Talent"
+      ],
+      "regions": [],
+      "locations": [],
+      "badges": [
+        "isHiring"
+      ]
+    },
+    {
+      "id": 30316,
+      "name": "Reditus Space",
+      "slug": "reditus-space",
+      "website": "https://www.reditus.space/",
+      "smallLogoUrl": "https://bookface-images.s3.amazonaws.com/small_logos/f567bf243e624ac80b841cec50ec05ef7e87c1ac.png",
+      "oneLiner": "Reusable Satellites for zero-g manufacturing",
+      "longDescription": "We are making reusable satellites for zero-g manufacturing. \r\nOur first full orbital recovery mission is set to launch in April 2026.",
+      "teamSize": 20,
+      "url": "https://www.ycombinator.com/companies/reditus-space",
+      "batch": "W25",
+      "tags": [
+        "Hard Tech",
+        "Manufacturing",
+        "Aerospace"
+      ],
+      "status": "Active",
+      "industries": [
+        "Industrials",
+        "Aviation and Space"
+      ],
+      "regions": [
+        "United States of America",
+        "America / Canada"
+      ],
+      "locations": [
+        "Atlanta, GA, USA"
+      ],
+      "badges": [
+        "highlightLatinx",
+        "isHiring"
+      ]
+    },
+    {
+      "id": 30302,
+      "name": "Misprint",
+      "slug": "misprint",
+      "website": "https://www.misprint.com",
+      "smallLogoUrl": "https://bookface-images.s3.amazonaws.com/small_logos/8a1c3f9a7b61db8b3dcf3a8453340dd7f22bb529.png",
+      "oneLiner": "Misprint is building Robinhood for Pokemon cards",
+      "longDescription": "Misprint is an all-in-one marketplace that solves the biggest pain point in the collectibles world: opaque pricing. Collectors, investors, and hobbyists currently rely on scattered data from auction houses, online forums, and reseller platforms, making it difficult to know the true value of their items. Misprint streamlines the process by combining accurate pricing analytics with a seamless buy/sell marketplace, making it easier than ever to understand and monetize collectible assets.\r\n\r\nExisting marketplaces lack robust, real-time analytics because accurate valuations require deep expertise in both the collectibles domain and advanced pricing algorithms. Misprint\u2019s unique blend of insider trading card knowledge and machine learning allows us to fill this gap.\r\n\r\nBuilding these pricing models requires extensive data infrastructure, deep domain expertise, and cutting-edge ML. Recent surges in the trading card market show that collectors crave transparent valuations.\r\n\r\nThe global collectibles market is worth tens of billions of dollars. Eva has experienced the scale of this industry firsthand, generating $500k ARR within three months of taking her Pokemon card-selling side hustle full-time. With additional segments like sports cards, comics, and emerging collectible categories, the growth runway is immense.\r\n\r\nCo-founders Eva and Jon have been best friends since Exeter, combining finance expertise, a passion for collectibles, and mathematical rigor. By merging Goldman Sachs-level financial analytics with top-tier mathematical talent, Misprint is uniquely positioned to become the go-to platform for fair, transparent pricing in the collectibles space.",
+      "teamSize": 5,
+      "url": "https://www.ycombinator.com/companies/misprint",
+      "batch": "W25",
+      "tags": [
+        "Marketplace",
+        "Consumer"
+      ],
+      "status": "Active",
+      "industries": [
+        "Consumer"
+      ],
+      "regions": [
+        "United States of America",
+        "America / Canada"
+      ],
+      "locations": [
+        "New York, NY, USA"
+      ],
+      "badges": [
+        "highlightWomen",
+        "isHiring"
+      ]
+    },
+    {
+      "id": 30299,
+      "name": "Miyagi Labs",
+      "slug": "miyagi-labs",
+      "website": "https://miyagilabs.ai",
+      "smallLogoUrl": "https://bookface-images.s3.amazonaws.com/small_logos/e5465f36b202134eec8628c9e4cf35661e125dbd.png",
+      "oneLiner": "AI tutors for exam prep",
+      "longDescription": "Miyagi Labs is an AI-powered exam prep platform that helps students ace tests like the SAT and ACT through our AI tutor, personalized study plans, thousands of practice questions, and realistic practice exams.\r\n\r\nWe\u2019re building the platform we wish we had when studying for exams. No more running out of practice questions. Track your progress as your rating in different exam categories increases, and know exactly what you need to practice most.\r\n\r\nWe envision a world where students anywhere can come to Miyagi to ace their exams and receive personalized, world-class AI tutoring designed to unlock their full potential.",
+      "teamSize": 2,
+      "url": "https://www.ycombinator.com/companies/miyagi-labs",
+      "batch": "W25",
+      "tags": [],
+      "status": "Active",
+      "industries": [
+        "Education"
+      ],
+      "regions": [],
+      "locations": [],
+      "badges": [
+        "highlightBlack",
+        "isHiring"
+      ]
+    },
+    {
+      "id": 30288,
+      "name": "Harper",
+      "slug": "harper",
+      "website": "https://www.harperinsure.com/",
+      "smallLogoUrl": "https://bookface-images.s3.amazonaws.com/small_logos/48f09dfa8b59f8e987b3a43c44b0adcd865fe145.png",
+      "oneLiner": "AI-native commercial insurance brokerage",
+      "longDescription": "At Harper, we are building a fully autonomous commercial insurance brokerage powered by AI. Our initial focus is on mid-sized businesses with complex insurance needs, but our vision is to eventually serve every business in the country.\r\n\r\nBy leveraging AI to automate key workflows in the insurance process, we efficiently secure optimal coverage for each client's unique requirements at competitive prices and with rapid turnaround. Our AI system learns from the expertise of our brokers, accumulating not just knowledge but also the specific workflows, data, and capabilities that pave the way to full autonomy.",
+      "teamSize": 25,
+      "url": "https://www.ycombinator.com/companies/harper",
+      "batch": "W25",
+      "tags": [
+        "Fintech",
+        "Insurance",
+        "AI"
+      ],
+      "status": "Active",
+      "industries": [
+        "Fintech",
+        "Insurance"
+      ],
+      "regions": [
+        "United States of America",
+        "America / Canada"
+      ],
+      "locations": [
+        "San Francisco, CA, USA"
+      ],
+      "badges": [
+        "highlightBlack",
+        "isHiring"
+      ]
+    },
+    {
+      "id": 30286,
+      "name": "Nitrode",
+      "slug": "nitrode",
+      "website": "https://www.nitrode.com",
+      "smallLogoUrl": "https://bookface-images.s3.amazonaws.com/small_logos/514545bed169ad1eb626571d7e0d77375b33f656.png",
+      "oneLiner": "Data for reasoning agents in dynamic environments",
+      "longDescription": "Nitrode builds high-quality game data to train and evaluate LLMs and agents on spatial and temporal reasoning. Today\u2019s models are trained on static text and images, but struggle to understand how the world evolves over time. We create small, fully specified game environments that generate ground-truth data on state, transitions, and hidden dynamics. This enables AI systems to move beyond simple pattern matching, incorporating memory, causality, and multi-step reasoning to create more reliable agents in dynamic environments.",
+      "teamSize": 4,
+      "url": "https://www.ycombinator.com/companies/nitrode",
+      "batch": "W25",
+      "tags": [
+        "Artificial Intelligence",
+        "Machine Learning",
+        "B2B",
+        "Data Engineering"
+      ],
+      "status": "Active",
+      "industries": [
+        "B2B"
+      ],
+      "regions": [
+        "United States of America",
+        "America / Canada"
+      ],
+      "locations": [
+        "San Francisco, CA, USA"
+      ],
+      "badges": []
+    },
+    {
+      "id": 30240,
+      "name": "Bezel",
+      "slug": "bezel",
+      "website": "https://www.trybezel.com/",
+      "smallLogoUrl": "https://bookface-images.s3.amazonaws.com/small_logos/6fff4fb87d06a4a76e786b38906a07e576147ff8.png",
+      "oneLiner": "Digital AI humans that model clothes for e-commerce brands.",
+      "longDescription": "Bezel helps fashion brands create virtual photo/video shoots with AI. \r\n\r\nUpload images of clothes, select the human you want to model it, and Bezel generates pictures and videos that rival a full studio production. \r\n\r\nEvery detail of the clothing is rendered flawlessly. Try it for yourself.",
+      "teamSize": 1,
+      "url": "https://www.ycombinator.com/companies/bezel",
+      "batch": "W25",
+      "tags": [
+        "Generative AI",
+        "Machine Learning",
+        "Marketing"
+      ],
+      "status": "Active",
+      "industries": [
+        "B2B"
+      ],
+      "regions": [
+        "United States of America",
+        "America / Canada"
+      ],
+      "locations": [
+        "New York, NY, USA"
+      ],
+      "badges": []
+    },
+    {
+      "id": 30207,
+      "name": "Promptless",
+      "slug": "promptless",
+      "website": "https://promptless.ai/",
+      "smallLogoUrl": "https://bookface-images.s3.amazonaws.com/small_logos/3b841846a6a116e07034a08b5b57b9bfb7b3d183.png",
+      "oneLiner": "An AI teammate that automatically updates your customer-facing docs",
+      "longDescription": "Docs are integral to a great customer experience, but managing them is a challenging, multi-team effort. The most successful companies recognize that fantastic docs drive adoption and bad ones cause customers to churn. Promptless is used by fast-growing startups and Fortune 500 enterprises alike to automatically update docs based on feature releases, support tickets, internal Slack conversations, and more.\r\n\r\nPromptless is designed to be flexible\u2014it can integrate with any docs platform, be triggered automatically from many workflows, and can pull in context from any internal knowledge source.\r\n\r\nWith Promptless, documentation becomes a strategic advantage for growth, not a bottleneck or a liability. ",
+      "teamSize": 5,
+      "url": "https://www.ycombinator.com/companies/promptless",
+      "batch": "W25",
+      "tags": [
+        "Artificial Intelligence",
+        "Developer Tools",
+        "Generative AI",
+        "SaaS",
+        "B2B"
+      ],
+      "status": "Active",
+      "industries": [
+        "B2B",
+        "Engineering, Product and Design"
+      ],
+      "regions": [
+        "United States of America",
+        "America / Canada"
+      ],
+      "locations": [
+        "San Francisco, CA, USA"
+      ],
+      "badges": [
+        "highlightWomen",
+        "isHiring"
+      ]
+    },
+    {
+      "id": 30193,
+      "name": "Bud",
+      "slug": "bud",
+      "website": "https://bud.app/",
+      "smallLogoUrl": "https://bookface-images.s3.amazonaws.com/small_logos/9c0b85f56636e8a80ba9bd882196276f48d39b24.png",
+      "oneLiner": "Agent with a computer",
+      "longDescription": "Bud is an agent with a computer. You can use it from web, text, or telegram. Bud can build & code, fully use a browser, do professional work (research, slides, docs, excel), use skills, and run completely autonomously.\r\n ",
+      "teamSize": 6,
+      "url": "https://www.ycombinator.com/companies/bud",
+      "batch": "W25",
+      "tags": [],
+      "status": "Active",
+      "industries": [
+        "B2B"
+      ],
+      "regions": [],
+      "locations": [],
+      "badges": [
+        "isHiring"
+      ]
+    },
+    {
+      "id": 30176,
+      "name": "Outship",
+      "slug": "outship",
+      "website": "https://outship.ai",
+      "smallLogoUrl": "https://bookface-images.s3.amazonaws.com/small_logos/500ff8202faf0a9f25c1a4ee0f51ff6e2499c9b6.png",
+      "oneLiner": "Hire amazing engineers by seeing how they use AI",
+      "longDescription": "Software engineering is being rewritten in real time, and hiring is getting pulled along for the ride. \r\n\r\nWith tools like Claude Code and Cursor, being able to ship is the new baseline. The signal for finding extraordinary engineers is the process: how candidates break down work, steer the agent, make tradeoffs, and recover when things break. \r\n\r\nOutship is a recruiting tool that allows you to capture and analyze that process alongside the final code so you can hire with confidence.\r\n\r\nCandidates work in a cloud workspace that's ready to code. We handle the environment setup and secret management to give you a level testing ground.",
+      "teamSize": 3,
+      "url": "https://www.ycombinator.com/companies/outship",
+      "batch": "W25",
+      "tags": [
+        "Artificial Intelligence",
+        "B2B",
+        "Recruiting"
+      ],
+      "status": "Active",
+      "industries": [
+        "B2B",
+        "Recruiting and Talent"
+      ],
+      "regions": [
+        "United States of America",
+        "America / Canada"
+      ],
+      "locations": [
+        "San Francisco, CA, USA"
+      ],
+      "badges": [
+        "highlightWomen"
+      ]
+    },
+    {
+      "id": 29790,
+      "name": "YouShift",
+      "slug": "youshift",
+      "website": "https://www.you-shift.com/",
+      "smallLogoUrl": "https://bookface-images.s3.amazonaws.com/small_logos/5a22f1efd256331a2e5ea299a5c6ecd931817254.png",
+      "oneLiner": "The OS for hospital workforce management",
+      "longDescription": "YouShift uses AI to automate hospital shift scheduling, replacing legacy software and eliminating the need for full-time schedulers. And scheduling is just the beginning \u2014 we're building the future of healthcare workforce management.",
+      "teamSize": 5,
+      "url": "https://www.ycombinator.com/companies/youshift",
+      "batch": "W25",
+      "tags": [
+        "Health Tech",
+        "Healthcare",
+        "HR Tech",
+        "Operations",
+        "AI"
+      ],
+      "status": "Active",
+      "industries": [
+        "B2B",
+        "Human Resources"
+      ],
+      "regions": [
+        "United States of America",
+        "America / Canada",
+        "Remote",
+        "Partly Remote"
+      ],
+      "locations": [
+        "New York, NY, USA"
+      ],
+      "badges": [
+        "highlightLatinx",
+        "highlightWomen",
+        "isHiring"
+      ]
+    },
+    {
+      "id": 28922,
+      "name": "Egress Health",
+      "slug": "egress-health",
+      "website": "https://tryegress.com",
+      "smallLogoUrl": "https://bookface-images.s3.amazonaws.com/small_logos/392ff7d64717e95c1b8ca23af91934ffec643fbf.png",
+      "oneLiner": "Automated revenue cycle management, starting with dentists",
+      "longDescription": "Egress Health builds AI agents to automate revenue cycle management, starting with dental offices. Our workflows span eligibility checks, claims scrubbing, payment posting, and denial management. On average, our customers eliminate 1-2 full time employees and collect 5-15% more revenue each month. Interested in learning more? Shoot us a note at founders@tryegress.com",
+      "teamSize": 2,
+      "url": "https://www.ycombinator.com/companies/egress-health",
+      "batch": "W25",
+      "tags": [],
+      "status": "Acquired",
+      "industries": [
+        "Healthcare"
+      ],
+      "regions": [],
+      "locations": [],
+      "badges": []
+    }
+  ],
+  "page": 1,
+  "totalPages": 2
+}

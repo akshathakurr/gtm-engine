@@ -1,0 +1,69 @@
+{
+  "_note": "Person output shown below is the expected structure once upgraded to a paid Apollo plan. Company output works on free plan.",
+  "person_example": {
+    "query": {
+      "first_name": "Tim",
+      "last_name": "Cook",
+      "domain": "apple.com"
+    },
+    "found": true,
+    "person": {
+      "name": "Tim Cook",
+      "first_name": "Tim",
+      "last_name": "Cook",
+      "email": "tim.cook@apple.com",
+      "email_status": "verified",
+      "phone": "",
+      "title": "CEO",
+      "seniority": "c_suite",
+      "departments": ["executive"],
+      "linkedin_url": "https://www.linkedin.com/in/timcook",
+      "twitter_url": "https://twitter.com/tim_cook",
+      "photo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/...",
+      "city": "Cupertino",
+      "state": "California",
+      "country": "United States",
+      "employment_history": [
+        {
+          "title": "CEO",
+          "organization": "Apple",
+          "start_date": "2011-08-01",
+          "end_date": null,
+          "current": true
+        }
+      ],
+      "organization": {
+        "name": "Apple",
+        "domain": "apple.com",
+        "industry": "consumer electronics",
+        "headcount": 164000,
+        "linkedin_url": "https://www.linkedin.com/company/apple"
+      }
+    },
+    "errors": []
+  },
+  "company_example": {
+    "domain": "notion.so",
+    "found": true,
+    "company": {
+      "name": "Notion Labs, Inc.",
+      "domain": "notion.so",
+      "industry": "software",
+      "headcount": 500,
+      "founded_year": 2012,
+      "description": "Notion is a California-based collaborative workspace platform that provides solutions such as document processing and knowledge management for businesses.",
+      "website_url": "http://www.notion.so",
+      "linkedin_url": "https://www.linkedin.com/company/notionhq",
+      "twitter_url": "https://twitter.com/NotionHQ",
+      "city": "San Francisco",
+      "state": "California",
+      "country": "United States",
+      "total_funding": "613.2M",
+      "latest_funding_stage": "Other",
+      "latest_funding_date": "2026-01-01T00:00:00.000+00:00",
+      "technologies": ["Cloudflare DNS", "Customer.IO", "GitHub Hosting", "Marketo", "Zendesk"],
+      "keywords": ["b2b", "services"]
+    },
+    "errors": []
+  }
+}

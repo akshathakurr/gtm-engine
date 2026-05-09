@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Small Talk Scraper Input",
+  "type": "object",
+  "required": ["name"],
+  "properties": {
+    "name":         {"type": "string", "description": "Full name of the prospect"},
+    "company":      {"type": "string", "description": "Company name (helps disambiguate identity)"},
+    "profile_url":  {"type": "string", "description": "LinkedIn profile URL (optional)"},
+    "twitter_url":  {"type": "string", "description": "Twitter/X profile URL (optional — resolved from search if absent)"},
+    "website":      {"type": "string", "description": "Personal website (optional)"},
+    "max_signals":  {"type": "integer", "default": 3, "description": "Max small-talk signals to return"},
+    "max_tweets":   {"type": "integer", "default": 60, "description": "Recent tweets to pull for analysis"},
+    "days_back":    {"type": "integer", "default": 180, "description": "Twitter time window in days"},
+    "num_queries":  {"type": "integer", "default": 5, "description": "Targeted web search queries to generate"},
+    "skip_twitter": {"type": "boolean", "default": false, "description": "Skip Twitter scraping (saves Apify cost)"}
+  }
+}

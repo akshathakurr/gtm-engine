@@ -1,0 +1,7 @@
+{
+  "query": "AI sales",
+  "story_type": "story",
+  "sort_by": "date",
+  "days_back": 30,
+  "max_results": 10
+}

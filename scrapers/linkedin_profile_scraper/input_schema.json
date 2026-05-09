@@ -1,0 +1,20 @@
+{
+  "title": "LinkedIn Profile Scraper Input",
+  "type": "object",
+  "properties": {
+    "profile_urls": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "List of LinkedIn profile URLs to scrape (e.g. https://linkedin.com/in/username)"
+    },
+    "max_profiles": {
+      "type": "integer",
+      "default": 10,
+      "minimum": 1,
+      "maximum": 1000,
+      "description": "Maximum number of profiles to process"
+    }
+  },
+  "required": ["profile_urls"]
+}

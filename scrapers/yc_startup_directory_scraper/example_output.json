@@ -1,0 +1,291 @@
+{
+  "batch": "W25",
+  "filters": {
+    "industries": [
+      "B2B",
+      "AI"
+    ],
+    "locations": null,
+    "status": "Active"
+  },
+  "companies": [
+    {
+      "name": "Trim",
+      "slug": "trim",
+      "one_liner": "A foundation model for physics.",
+      "description": "Trim is building a general intelligence AI model that can simulate real-world physical systems evolving over time. For example, given the starting position of waves on a beach, the model generates how those waves move forward in time.",
+      "website": "https://trimresearch.com",
+      "yc_url": "https://www.ycombinator.com/companies/trim",
+      "batch": "W25",
+      "status": "Active",
+      "industries": [
+        "B2B",
+        "Engineering, Product and Design"
+      ],
+      "tags": [
+        "Artificial Intelligence"
+      ],
+      "locations": [
+        "San Francisco, CA, USA"
+      ],
+      "regions": [
+        "United States of America",
+        "America / Canada"
+      ],
+      "team_size": 3,
+      "is_hiring": false,
+      "founders": []
+    },
+    {
+      "name": "Bystreet",
+      "slug": "bystreet",
+      "one_liner": "Your key to the hotel market. ",
+      "description": "Bystreet is an AI deal sourcing platform for development teams at hotel brands, operators, and vendors targeting the CALA market.",
+      "website": "http://www.bystreet.com",
+      "yc_url": "https://www.ycombinator.com/companies/bystreet",
+      "batch": "W25",
+      "status": "Active",
+      "industries": [
+        "B2B"
+      ],
+      "tags": [
+        "SaaS",
+        "B2B",
+        "Proptech"
+      ],
+      "locations": [
+        "San Francisco, CA, USA"
+      ],
+      "regions": [
+        "United States of America",
+        "America / Canada",
+        "Remote",
+        "Partly Remote"
+      ],
+      "team_size": 4,
+      "is_hiring": false,
+      "founders": []
+    },
+    {
+      "name": "ReJot",
+      "slug": "rejot",
+      "one_liner": "We turn complex API integrations into drop‑in full‑stack libraries ",
+      "description": "ReJot is building Fragno to let API companies go from simply exposing an API to offering drop-in integrations that work out of the box.\r\n\r\nFragno is an open‑source framework for packaging backend endpoints, data storage patterns, and frontend utilities into reusable building blocks. API providers ship full integrations, not just low‑level SDKs and docs.\r\n\r\nCustomers configure rather than write code, so integrations are both much faster to launch and far more consistent across customers.",
+      "website": "https://rejot.dev",
+      "yc_url": "https://www.ycombinator.com/companies/rejot",
+      "batch": "W25",
+      "status": "Active",
+      "industries": [
+        "B2B",
+        "Engineering, Product and Design"
+      ],
+      "tags": [
+        "Developer Tools",
+        "API",
+        "Infrastructure",
+        "Databases"
+      ],
+      "locations": [
+        "Amsterdam, Netherlands"
+      ],
+      "regions": [
+        "Netherlands",
+        "Europe"
+      ],
+      "team_size": 2,
+      "is_hiring": false,
+      "founders": []
+    },
+    {
+      "name": "SAMMY Labs",
+      "slug": "sammy-labs",
+      "one_liner": "SAMMY Labs, the knowledge layer for your people and AI",
+      "description": "At SAMMY, we do knowledge. Not “find me every time [thing] was mentioned,” but real knowledge. A compliance or legal update comes in — where does it apply, how does it affect our processes, and what should we do next?A process changes — which related processes need updating? Update them for me.\r\n\r\nWe’re trusted by some of the largest companies in the world to power their knowledge, because without knowledge, AI is just a bull**** exacerbator.",
+      "website": "https://www.sammylabs.com",
+      "yc_url": "https://www.ycombinator.com/companies/sammy-labs",
+      "batch": "W25",
+      "status": "Active",
+      "industries": [
+        "B2B"
+      ],
+      "tags": [],
+      "locations": [],
+      "regions": [],
+      "team_size": 10,
+      "is_hiring": true,
+      "founders": []
+    },
+    {
+      "name": "Paratus Health",
+      "slug": "paratus-health",
+      "one_liner": "Medical Voice Agents for Patient Management",
+      "description": "Paratus Health is the AI operations layer for outpatient clinics. We build autonomous agents that don’t just assist staff - they replace them, fully handling front desk calls, patient intake, insurance verification, documentation, and billing prep. Everything is deeply integrated into EHRs like Epic and Athena, eliminating the need for fragmented tools and manual work.\r\nNo toggling between systems. No busywork. Just one intelligent system running your clinical operations - faster, smarter, and more profitably than ever before.",
+      "website": "https://paratushealth.com/",
+      "yc_url": "https://www.ycombinator.com/companies/paratus-health",
+      "batch": "W25",
+      "status": "Active",
+      "industries": [
+        "Healthcare",
+        "Healthcare IT"
+      ],
+      "tags": [
+        "Digital Health",
+        "Healthcare IT",
+        "AI Assistant"
+      ],
+      "locations": [
+        "Menlo Park, CA, USA"
+      ],
+      "regions": [
+        "United States of America",
+        "America / Canada"
+      ],
+      "team_size": 6,
+      "is_hiring": true,
+      "founders": []
+    },
+    {
+      "name": "Roark",
+      "slug": "roark",
+      "one_liner": "Test, monitor, and improve your voice agents",
+      "description": "Roark helps teams test, monitor, and improve their voice agents.\r\n\r\nVoice AI is exploding, but reliability is still the #1 challenge. Teams spend hours manually testing agents and still miss failures. In the last 6 months, Roark has processed over 10M minutes of calls, powering monitoring and simulation for teams across the Voice AI ecosystem (including YC companies).\r\n\r\nWe close that gap by combining:\r\n\r\n 📊 Monitoring & Evaluation - 40+ built-in metrics (latency, instruction-follow, sentiment, etc.), custom dashboards, alerts, and the ability to define your own. Up to 15 speakers with automatic speaker identification.\r\n 🎭 Simulations & Personas - end-to-end phone/WebSocket simulations for inbound and outbound agents, with configurable personas (accents, languages, speech & behavior profiles). Define tests as conversations with a graph-based approach, so you can easily branch into edge cases and variants.\r\n 🔁 Full lifecycle loop - failed calls automatically become repeatable tests, so every failure makes your agent stronger.\r\n\r\nRoark is the missing QA layer for Voice AI - helping teams ship agents they can trust.",
+      "website": "https://roark.ai",
+      "yc_url": "https://www.ycombinator.com/companies/roark",
+      "batch": "W25",
+      "status": "Active",
+      "industries": [
+        "B2B",
+        "Analytics"
+      ],
+      "tags": [
+        "Analytics",
+        "AI",
+        "Conversational AI"
+      ],
+      "locations": [
+        "San Francisco, CA, USA"
+      ],
+      "regions": [
+        "United States of America",
+        "America / Canada"
+      ],
+      "team_size": 3,
+      "is_hiring": false,
+      "founders": []
+    },
+    {
+      "name": "Spott",
+      "slug": "spott",
+      "one_liner": "AI-native ATS/CRM for recruiting firms",
+      "description": "Spott is the first AI-native ATS/CRM for recruiting & staffing firms. We built Spott because existing recruitment platforms require extensive manual work, are clunky to use, rely on fragmented add-ons, and are not designed for AI adoption.\r\n\r\nSpott combines everything recruiting firms need, from a full ATS & CRM to AI agents across the entire workflow, into one AI-native solution. It enables recruiters to focus on what matters most and close more placements.",
+      "website": "https://spott.io",
+      "yc_url": "https://www.ycombinator.com/companies/spott",
+      "batch": "W25",
+      "status": "Active",
+      "industries": [
+        "B2B",
+        "Recruiting and Talent"
+      ],
+      "tags": [
+        "Artificial Intelligence",
+        "SaaS",
+        "B2B",
+        "HR Tech",
+        "Enterprise Software"
+      ],
+      "locations": [],
+      "regions": [],
+      "team_size": 25,
+      "is_hiring": true,
+      "founders": []
+    },
+    {
+      "name": "Harper",
+      "slug": "harper",
+      "one_liner": "AI-native commercial insurance brokerage",
+      "description": "At Harper, we are building a fully autonomous commercial insurance brokerage powered by AI. Our initial focus is on mid-sized businesses with complex insurance needs, but our vision is to eventually serve every business in the country.\r\n\r\nBy leveraging AI to automate key workflows in the insurance process, we efficiently secure optimal coverage for each client's unique requirements at competitive prices and with rapid turnaround. Our AI system learns from the expertise of our brokers, accumulating not just knowledge but also the specific workflows, data, and capabilities that pave the way to full autonomy.",
+      "website": "https://www.harperinsure.com/",
+      "yc_url": "https://www.ycombinator.com/companies/harper",
+      "batch": "W25",
+      "status": "Active",
+      "industries": [
+        "Fintech",
+        "Insurance"
+      ],
+      "tags": [
+        "Fintech",
+        "Insurance",
+        "AI"
+      ],
+      "locations": [
+        "San Francisco, CA, USA"
+      ],
+      "regions": [
+        "United States of America",
+        "America / Canada"
+      ],
+      "team_size": 25,
+      "is_hiring": true,
+      "founders": []
+    },
+    {
+      "name": "Nitrode",
+      "slug": "nitrode",
+      "one_liner": "Data for reasoning agents in dynamic environments",
+      "description": "Nitrode builds high-quality game data to train and evaluate LLMs and agents on spatial and temporal reasoning. Today’s models are trained on static text and images, but struggle to understand how the world evolves over time. We create small, fully specified game environments that generate ground-truth data on state, transitions, and hidden dynamics. This enables AI systems to move beyond simple pattern matching, incorporating memory, causality, and multi-step reasoning to create more reliable agents in dynamic environments.",
+      "website": "https://www.nitrode.com",
+      "yc_url": "https://www.ycombinator.com/companies/nitrode",
+      "batch": "W25",
+      "status": "Active",
+      "industries": [
+        "B2B"
+      ],
+      "tags": [
+        "Artificial Intelligence",
+        "Machine Learning",
+        "B2B",
+        "Data Engineering"
+      ],
+      "locations": [
+        "San Francisco, CA, USA"
+      ],
+      "regions": [
+        "United States of America",
+        "America / Canada"
+      ],
+      "team_size": 4,
+      "is_hiring": false,
+      "founders": []
+    },
+    {
+      "name": "Bezel",
+      "slug": "bezel",
+      "one_liner": "Digital AI humans that model clothes for e-commerce brands.",
+      "description": "Bezel helps fashion brands create virtual photo/video shoots with AI. \r\n\r\nUpload images of clothes, select the human you want to model it, and Bezel generates pictures and videos that rival a full studio production. \r\n\r\nEvery detail of the clothing is rendered flawlessly. Try it for yourself.",
+      "website": "https://www.trybezel.com/",
+      "yc_url": "https://www.ycombinator.com/companies/bezel",
+      "batch": "W25",
+      "status": "Active",
+      "industries": [
+        "B2B"
+      ],
+      "tags": [
+        "Generative AI",
+        "Machine Learning",
+        "Marketing"
+      ],
+      "locations": [
+        "New York, NY, USA"
+      ],
+      "regions": [
+        "United States of America",
+        "America / Canada"
+      ],
+      "team_size": 1,
+      "is_hiring": false,
+      "founders": []
+    }
+  ],
+  "company_count": 10,
+  "errors": []
+}

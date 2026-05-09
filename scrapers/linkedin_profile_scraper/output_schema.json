@@ -1,0 +1,67 @@
+{
+  "title": "LinkedIn Profile Scraper Output",
+  "type": "object",
+  "properties": {
+    "total": {
+      "type": "integer",
+      "description": "Total number of profiles successfully scraped"
+    },
+    "profiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string" },
+          "full_name": { "type": "string" },
+          "headline": { "type": "string", "description": "Current title/position as shown on profile" },
+          "about": { "type": "string", "description": "About/summary section" },
+          "location": { "type": "string" },
+          "current_company": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "title": { "type": "string" }
+            }
+          },
+          "work_history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": { "type": "string" },
+                "company": { "type": "string" },
+                "location": { "type": "string" },
+                "start_date": { "type": "string" },
+                "end_date": { "type": "string", "description": "null if current role" },
+                "description": { "type": "string" }
+              }
+            }
+          },
+          "education": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "school": { "type": "string" },
+                "degree": { "type": "string" },
+                "field_of_study": { "type": "string" },
+                "start_date": { "type": "string" },
+                "end_date": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    }
+  }
+}

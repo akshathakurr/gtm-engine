@@ -1,0 +1,10 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["keywords"],
+  "properties": {
+    "keywords":  { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "geo":       { "type": "string", "default": "", "description": "ISO country code (e.g. 'US', 'IN') or '' for worldwide" },
+    "timeframe": { "type": "string", "default": "today 12-m", "description": "pytrends timeframe — 'today 12-m', 'today 5-y', 'now 7-d', etc." }
+  }
+}

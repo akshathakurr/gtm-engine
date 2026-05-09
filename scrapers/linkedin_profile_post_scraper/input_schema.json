@@ -1,0 +1,29 @@
+{
+  "title": "LinkedIn Profile Post Scraper Input",
+  "type": "object",
+  "properties": {
+    "profile_url": {
+      "type": "string",
+      "description": "LinkedIn profile URL (e.g. https://www.linkedin.com/in/username/)"
+    },
+    "max_posts": {
+      "type": "integer",
+      "default": 15,
+      "minimum": 1,
+      "maximum": 500,
+      "description": "Maximum number of posts to return. Defaults to 10. Always applies — even when a date filter is set."
+    },
+    "days_back": {
+      "type": "integer",
+      "default": 90,
+      "minimum": 1,
+      "description": "Return only posts from the last N days. Defaults to 60. Set to null to remove the date limit."
+    },
+    "since_date": {
+      "type": "string",
+      "format": "date",
+      "description": "If set (YYYY-MM-DD), return only posts on or after this date. Ignored when days_back is also provided."
+    }
+  },
+  "required": ["profile_url"]
+}

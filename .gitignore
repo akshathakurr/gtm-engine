@@ -1,0 +1,35 @@
+# Secrets
+.env
+.env.local
+
+# User context — keep .example committed, ignore the rest
+context/*.md
+!context/*.md.example
+
+# User skills — same pattern
+skills/*.md
+!skills/*.md.example
+
+# Workflow outputs
+outputs/
+workflows/*/outputs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude Code local state
+.claude/

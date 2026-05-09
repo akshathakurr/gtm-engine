@@ -1,0 +1,21 @@
+{
+  "title": "Review Scraper Input",
+  "type": "object",
+  "required": ["platform", "product_url"],
+  "properties": {
+    "platform": {
+      "type": "string",
+      "description": "Review platform. One of: 'g2', 'trustpilot'. Capterra is not supported (Cloudflare blocked).",
+      "enum": ["g2", "trustpilot"]
+    },
+    "product_url": {
+      "type": "string",
+      "description": "Direct URL to the product's review page.\n  G2: https://www.g2.com/products/{slug}/reviews\n  Trustpilot: https://www.trustpilot.com/review/{domain}"
+    },
+    "max_reviews": {
+      "type": "integer",
+      "description": "Max reviews to return.",
+      "default": 20
+    }
+  }
+}

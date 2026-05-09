@@ -1,0 +1,31 @@
+{
+  "title": "Reddit Research Scraper Input",
+  "type": "object",
+  "required": ["query"],
+  "properties": {
+    "query": {
+      "type": "string",
+      "description": "Search query. Supports Reddit operators: site:, author:, subreddit:, OR, -exclude."
+    },
+    "subreddit": {
+      "type": ["string", "null"],
+      "description": "Scope to a specific subreddit e.g. 'SaaS', 'entrepreneur'. Null = all of Reddit.",
+      "default": null
+    },
+    "sort": {
+      "type": "string",
+      "description": "Sort order: 'new', 'top', 'relevance', 'hot', 'comments'.",
+      "default": "new"
+    },
+    "time_filter": {
+      "type": "string",
+      "description": "Time window: 'hour', 'day', 'week', 'month', 'year', 'all'.",
+      "default": "week"
+    },
+    "max_posts": {
+      "type": "integer",
+      "description": "Max posts to return.",
+      "default": 25
+    }
+  }
+}
