@@ -77,8 +77,8 @@ Requires the `gws` CLI installed and authed (`gws auth login` once).
 | **6** | Find email | outreach batch | Apollo Contact Finder → email. Skips rows where email is already filled. |
 | **7** | Small Talk | outreach batch | Humanizing/conversational signals (hobbies, fandoms, quirks) — top 2-3 as 1-line bullets with source. Identity-verified per evidence; returns empty rather than wrong-person. |
 | **8** | Scrape posts | outreach batch with a LinkedIn URL | Apify pulls each lead's recent posts (default 15 / 90 days). Claude filters by ICP relevance criteria from `context.md`. Writes matching post URLs (newline-separated). |
-| **9** | Personalisation hooks | outreach batch | Talking points an SDR can hang an email on. **Stub today** (skips until `skills/personalisation_hook` exists). |
-| **10** | Email copy | outreach batch | Final personalised email. **Stub today** (skips until `skills/email_copy_writer` exists). |
+| **9** | Personalisation hooks | outreach batch | Talking points an SDR can hang an email on. Surfaces 2-3 one-line angles (small talk, matching posts, company signals). See `skills/personalisation_hook`. |
+| **10** | Email copy | outreach batch | Final personalised cold email (subject + body + PS). Signal extraction → drafting → self-review → auto-repair if needed. See `skills/email_copy_writer`. |
 
 ---
 
@@ -235,7 +235,7 @@ cost while qualifying a fresh list.
 
 ## Known limitations
 
-- **Steps 9, 10 are stubs.** `skills/personalisation_hook` and `skills/email_copy_writer` aren't built yet. Steps gate gracefully but you can't actually produce email copy until they exist. Step 7 (Small Talk) is built.
+- **All steps are live.** Steps 9 (`personalisation_hook`) and 10 (`email_copy_writer`) are both built. Step 10 runs a 3-call pipeline: signal extraction → email drafting with self-review committed to JSON → auto-repair pass if any check fails.
 - **No `--rows` flag yet.** The whole sheet/CSV is processed every run. Idempotency: enrichment + buyer + emails skip already-filled rows; scoring re-runs unconditionally.
 - **No retries.** If Anthropic 429s or Apify throttles mid-run, the script crashes. Anything already written is durable in the Sheet/CSV.
 - **`workflow_ops.py` is Sheets-only.** CSV support is in `workflow.py` only.

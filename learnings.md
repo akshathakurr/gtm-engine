@@ -41,6 +41,28 @@ Every scraper folder must have these 7 files before it's considered done:
 
 ---
 
+## Skill Build Patterns
+
+**Skills are folders, not single files.**
+`skills/<name>/skill.py` + `__init__.py` + `README.md`. Workflow imports `from skills.<name> import skill`. The `skills/README.md` used to say single `.md` file — that was wrong and has been corrected.
+
+**Only encode rules the user explicitly stated.**
+Easy to add extra style/tone constraints that feel sensible but weren't asked for (e.g. "never start with I"). These silently change behavior in ways the user didn't expect. If a rule feels like an improvement, ask first rather than baking it in. Let the user's own examples guide tone — don't layer extra constraints on top.
+
+**Force self-review into the JSON, don't just ask for it.**
+Telling a model "self-review before outputting" doesn't reliably work — the model claims it did without actually changing anything. Committing answers into a structured `review` field changes behavior: the model has to decide on concrete values ("no" / "yes" / empty list) and that act of commitment makes the check real. Gate on the field values in Python so violations are surfaced to the caller.
+
+**Auto-repair pattern: one extra call, only when needed.**
+If self-review flags violations, send the draft back once with the specific issues listed and ask for a fix. Cap at one retry to keep cost bounded. After repair, re-audit and log anything still failing as `unresolved: ...` — don't silently swallow persistent issues.
+
+**Signal extraction as a separate call.**
+When a skill needs to find the best angle from a pile of data, extract the signal in its own call before writing the copy. This separates "what to say" from "how to say it" and produces better results than asking one call to do both. The signal call is cheap (max_tokens=500); the writing call can then focus on execution.
+
+**Empty-over-padding applies to skills too.**
+Same rule as scrapers: if input signal is weak, return empty + error rather than generic output. A lean company-level email with an error flag beats a fake-personalised one. The caller decides whether to retry, skip, or surface the gap.
+
+---
+
 ## GWS (Google Workspace CLI)
 
 - Installed at `~/.npm-global/bin/gws`
@@ -360,6 +382,87 @@ Parsing rules:
 
 Don't make users edit JSON inside `context.md` — they'll bracket-mismatch and rage-quit. A one-line-per-record format is forgiving, diff-friendly, and trivially regenerated when you save back from a multiline prompt.
 
+### 19. Questionnaire-as-interface: don't build a setup skill, write a good context.md.example
+
+When you need to interview a user for context, the temptation is to build a `/setup-context` skill or CLI wizard. Don't. Claude Code already runs an interview if the file it's reading is shaped like one.
+
+The file becomes the interface:
+
+```markdown
+## Product
+**Question:** What's the product? Name, one-liner, website.
+**Used by:** every workflow
+**Example answer:**
+> Carnival — AI-native CRM that auto-fills pipeline data. usecarnival.com.
+
+### Answer
+<!-- agent writes here -->
+```
+
+The user copies `context.md.example` to `context.md`, opens it in Claude Code, says "help me get started," and Claude Code reads the questions, asks them conversationally, and writes answers into the `### Answer` blocks. Zero skill code, zero wizard, zero CLI.
+
+Workflows then parse only the `### Answer` body and ignore the scaffolding (Question / Used by / Example). One regex change to `_section_body()` gets you there:
+
+```python
+section = re.search(rf"(?ms)^##\s+{re.escape(header)}\s*$\n(.*?)(?=^##\s+|\Z)", text).group(1)
+ans = re.search(r"(?ms)^###\s+Answer\s*$\n(.*?)(?=^###\s+|\Z)", section)
+body = ans.group(1) if ans else section  # fallback keeps legacy context files working
+```
+
+The fallback is critical — it makes the new shape backwards-compatible with any context file written before the `### Answer` convention existed.
+
+Key insight: the existing tool (Claude Code) is the wizard. Stop building wizards on top of wizards.
+
+### 20. CLAUDE.md is dual-audience: onboarding script + dev rules in one file
+
+Most repos use `CLAUDE.md` purely for developer rules (folder structure, conventions). For an OSS GTM tool whose users are *non-technical*, `CLAUDE.md` does a second job: it's the **onboarding script** that tells Claude Code how to behave when a founder/marketer/sales lead opens the repo.
+
+Structure:
+
+```markdown
+## When a user opens this repo
+[onboarding instructions — greet, offer tour vs setup, walk through context.md,
+ run a workflow, narrate progress in plain English]
+
+### Language rules
+- Never say: LLM, context window, Apify actor, venv, regex, CLI, repo
+- Do say: Claude, the file we use to remember things, the scraper, first-time setup
+
+## Developer notes (for forking / extending)
+[folder structure, scraper rules, workflow rules — original dev content]
+```
+
+The user-facing section comes first because Claude Code reads top-to-bottom and the most likely visitor is a non-technical user, not a forker. The dev section gets a "When the user is technical, drop the hand-holding" escape hatch.
+
+Why one file and not two: `CLAUDE.md` auto-loads. `CONTRIBUTING.md` doesn't. Splitting them means the onboarding instructions are also live for forkers (a feature, not a bug — they should still be able to demo the user flow), while dev rules stay readable for end users who scroll past.
+
+### 21. Backwards-compatible parser changes: legacy fallback in the regex
+
+When changing the shape of a config file that already has users, never make the new shape mandatory. Build the parser to look for the new shape first and fall back to the old shape if the new markers aren't there:
+
+```python
+ans = re.search(r"^###\s+Answer\s*$\n(.*?)", section)
+body = ans.group(1) if ans else section  # legacy: read the section directly
+```
+
+One line. No migration script, no version flag, no breakage. Both shapes coexist in the same parser indefinitely. When you eventually drop legacy support (years later, if ever), you remove the fallback in one commit.
+
+This applies to `_section_body()` for context.md, but the pattern generalizes: any time you're adding a new wrapper / sub-header / marker to an existing file format, the fallback line is the cheapest forward-compat insurance you'll ever write.
+
+### 22. README tone for OSS launch: lowercase, opinionated, concrete
+
+What works in a sea of generic GTM repos: a README that sounds like a founder talking, not a corporate landing page. Concrete rules:
+
+- **Lowercase headings.** "what it does" beats "What It Does" beats "## Capabilities Overview." Signals casual / hacker, not enterprise.
+- **One-line pitch up top, bolded thesis underneath.** "Your GTM team is a folder of python scripts" + "**this is the sales/marketing/content stack you actually own.**" The reader gets the angle in 10 seconds.
+- **A table with concrete outputs** — not features. "what you get back" matters more than "what it does." "Google sheet of leads + drafted messages" beats "AI-powered lead generation."
+- **Real numbers.** "$1–5 per workflow run" beats "cost-effective." Ranges with units.
+- **A "why this exists" section that names the enemy.** Subscription SaaS that owns your data, $200/seat/month, can't take any of it with you. People remember the villain.
+- **Banned phrases:** "leverage," "unlock," "synergy," "powered by AI," "in this fast-paced world," "thought leadership," "transform your," "supercharge."
+- **No install commands or flag tables on the front page.** Those go in workflow READMEs. The front page is a sales page; depth lives one click away.
+
+Reference for shape and voice: github.com/MitchellkellerLG/research-process-builder — same lowercase / table / bullet pattern, no jargon, opinionated tone.
+
 ---
 
 ## Workflow checklist (apply to every workflow before publishing)
@@ -383,6 +486,9 @@ Don't make users edit JSON inside `context.md` — they'll bracket-mismatch and 
 - [ ] Every sheet-bound column has an explicit word/line cap, an explicit "insufficient data" sentinel for missing data, and (where filterable) a canonical enum list (pattern #16)
 - [ ] If the workflow ships with built-in default configs (creator lists, query buckets, etc.), the pre-step uses pattern #17: prompt → on skip, **print the defaults** about to be used; never silently inherit author opinions
 - [ ] Structured config in `context.md` uses pipe-delimited single-line records, not JSON (pattern #18) — humans should be able to add a creator without learning a schema
+- [ ] `_section_body()` extracts from `### Answer` block first, falls back to section body for legacy context files (pattern #19, #21)
+- [ ] If the workflow dumps the whole `context.md` into an LLM prompt, run it through `_strip_scaffolding()` first so Question/Example/Used-by lines don't pollute the prompt (pattern #19)
+- [ ] No `/setup-context`-style helper skill or CLI wizard built — Claude Code reads `context.md.example` directly and runs the interview (pattern #19)
 - [ ] README rewritten with: setup, quickstart (CSV + Sheets), step table, output formatting, CLI reference, cost estimate, known limitations
 - [ ] `python -m workflows.X.workflow --help` runs cleanly
 - [ ] End-to-end smoke test on a real sheet/CSV with messy column names
