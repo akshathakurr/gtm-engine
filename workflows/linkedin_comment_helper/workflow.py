@@ -6,8 +6,9 @@ Finds recent LinkedIn posts worth commenting on across 3 sources:
   2. Trending      — search broad genre keywords, re-rank by engagement
   3. Signal        — search buying-intent phrases (people implementing AI, etc.)
 
-For each post, asks Claude (using the 'project context' skill) whether it's
-worth commenting on and what angle the user has from past projects.
+For each post, asks Claude (using the project context loaded from the context/
+folder) whether it's worth commenting on and what angle the user has from past
+projects.
 
 Appends new rows to a single rolling output sheet (deduped by Post URL).
 
@@ -231,12 +232,6 @@ def ensure_context_complete(auto: bool) -> Dict[str, str]:
 
     return captured
 
-try:
-    from skills.project_context import skill as _project_context_skill  # type: ignore
-    _PROJECT_CONTEXT_AVAILABLE = True
-except Exception:
-    _project_context_skill = None  # type: ignore
-    _PROJECT_CONTEXT_AVAILABLE = False
 
 
 # ---------------------------------------------------------------------------
@@ -348,7 +343,7 @@ def dedupe_posts(posts: List[dict]) -> List[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Relevance scoring (Claude + project context skill)
+# Relevance scoring (Claude + project context from the context/ folder)
 # ---------------------------------------------------------------------------
 
 def _strip_json_fence(text: str) -> str:
@@ -505,9 +500,7 @@ def _load_keywords(workflow_dir: str, filename: str, ctx_section: Optional[str] 
 
 
 def _load_project_context() -> str:
-    if _PROJECT_CONTEXT_AVAILABLE:
-        return _project_context_skill.get_context()  # type: ignore
-    print("  Note: 'project context' skill not built yet — falling back to context.md.")
+    """Project context lives in the context/ folder — load every .md file in it."""
     try:
         return load_icp()
     except Exception:
