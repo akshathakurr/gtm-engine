@@ -8,17 +8,16 @@ no SaaS subscriptions, no data lock-in, no per-seat pricing. you bring an Anthro
 
 ## what it does
 
-7 workflows that cover most of GTM:
+6 workflows that cover most of GTM:
 
 | workflow | what it does | output |
 |---|---|---|
 | linkedin outreach | find leads, scrape their posts, write personal DMs | google sheet of leads + drafted messages |
-| email outreach | enrich a list of companies, write personalized cold emails | csv ready for instantly / smartlead |
+| email outreach | enrich a list of companies by buying signal, write personalized cold emails | csv ready for instantly / smartlead |
 | competitor analysis | research 12 dimensions of every competitor | filled-in google sheet (firmographics, founders, GTM, scoring) |
 | content idea finder | scan twitter + HN daily, cluster into post ideas | 5 daily ideas, classified by genre + platform |
 | linkedin comment helper | surface LinkedIn posts worth commenting on | ranked list with suggested takes |
 | blog builder | research a topic deeply, draft a blog post | full article + sources |
-| signal-based outreach | find leads by buying signal (hiring, funding, launches) | enriched lead list |
 
 ## how to use it
 
@@ -62,7 +61,6 @@ workflows/
   content_idea_finder/
   linkedin_comment_helper/
   blog_builder/
-  signal_based_lead_outreach/
 
 scrapers/                  single-source data fetchers (LinkedIn, Twitter, G2…)
 skills/                    reusable claude prompt modules

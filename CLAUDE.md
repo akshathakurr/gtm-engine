@@ -23,7 +23,7 @@ If they say "tour," do the tour. If they say "get started," go to **First-time s
 Explain in plain language. **No code, no flag tables, no Python**. Cover:
 
 1. What the repo is — a folder of automations that do GTM work for you, driven by Claude.
-2. The 7 workflows — one paragraph each. What it does, what you give it, what you get back, rough cost. The README has the table; expand each row into a paragraph.
+2. The 6 workflows — one paragraph each. What it does, what you give it, what you get back, rough cost. The README has the table; expand each row into a paragraph.
 3. What they'll need — Anthropic key, Apify token, optionally Exa and a Google account. Explain *why* each one (Claude does the thinking, Apify does the scraping, etc.) — never just a list of services.
 4. End by asking which workflow sounds useful, or if they want to set up first.
 
@@ -94,7 +94,7 @@ Standard files every scraper folder must have: `scraper.py`, `input_schema.json`
 - Always use `Optional` from `typing` for type hints — do not use `X | None` syntax (Python 3.9 compat)
 
 #### `/workflows`
-End-to-end GTM plays. Each workflow folder orchestrates scrapers and uses context to produce actionable outputs. Current workflows: `signal_based_lead_outreach`, `icp_activity_tracker`, `linkedin_outreach`, `linkedin_comment_helper`, `email_outreach`, `content_idea_finder`, `blog_builder`.
+End-to-end GTM plays. Each workflow folder orchestrates scrapers and uses context to produce actionable outputs. Current workflows: `linkedin_outreach`, `email_outreach`, `competitor_analysis`, `content_idea_finder`, `linkedin_comment_helper`, `blog_builder`.
 
 **Rules:**
 - Workflows import scrapers from `/scrapers` rather than duplicating logic.
