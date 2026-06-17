@@ -1,8 +1,8 @@
 # Context Questionnaire
 
-This file is a guided interview. Run `/setup-context` (or any agent that
-reads this file) and it will walk you through the questions below,
-writing your answers into the `### Answer` block under each section.
+This file is a guided interview. Open this folder in Claude Code and say
+"help me get started" — Claude walks you through the questions below and
+writes your answers into the `### Answer` block under each section.
 
 You can also fill it in by hand — workflows read the `### Answer` blocks
 and ignore the question / format / example scaffolding.

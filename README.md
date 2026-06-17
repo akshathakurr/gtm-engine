@@ -21,12 +21,17 @@ no SaaS subscriptions, no data lock-in, no per-seat pricing. you bring an Anthro
 
 ## how to use it
 
-1. install [claude code](https://claude.com/claude-code)
-2. clone this repo
-3. open the folder in claude code
-4. say `help me get started`
+```bash
+git clone https://github.com/akshathakurr/gtm-engine
+cd gtm-engine
+claude "help me get started"
+```
 
-claude code reads the questionnaire, asks the questions to you, fills in your business context, then asks which workflow to run. that's the whole UX. no python required.
+that last line opens claude code and kicks things off on its own — you get a welcome and a few questions, no guessing what to type.
+
+claude code does the rest: it sets up your files, walks you through your keys, interviews you about your business, fills in your context, and shows you the workflows you can run. that's the whole UX. no python required.
+
+don't have claude code yet? install it first — [claude.com/claude-code](https://claude.com/claude-code). already inside claude code, or want to start it yourself? just say `help me get started`.
 
 if you'd rather run things directly, every workflow has its own README with the exact `python -m ...` commands.
 

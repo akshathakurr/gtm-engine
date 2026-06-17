@@ -6,9 +6,10 @@
 context/*.md
 !context/*.md.example
 
-# User skills — same pattern
+# User skills — same pattern (but keep the folder's own README + example)
 skills/*.md
 !skills/*.md.example
+!skills/README.md
 
 # Workflow outputs
 outputs/
