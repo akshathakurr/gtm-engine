@@ -297,15 +297,22 @@ def _build_email_prompt(
 # Self-review audit + repair
 # ---------------------------------------------------------------------------
 
+def _leading_token(value: Any) -> str:
+    """First word of a review answer, lowercased. The model often appends a
+    justification ("no — opens with a direct quote..."); we gate on the verdict,
+    not the prose."""
+    return re.split(r"[^a-z]+", str(value or "").strip().lower(), maxsplit=1)[0]
+
+
 def _audit_copy(parsed: Dict[str, Any]) -> List[str]:
     """Extract violations from the model's self-review. Returns list of issue strings."""
     issues = []
     review = parsed.get("review") or {}
-    if review.get("mass_sent_feel") != "no":
+    if _leading_token(review.get("mass_sent_feel")) != "no":
         issues.append("feels mass-sent")
-    if review.get("would_hook_reply") != "yes":
+    if _leading_token(review.get("would_hook_reply")) != "yes":
         issues.append("weak hook")
-    if review.get("reads_human") != "yes":
+    if _leading_token(review.get("reads_human")) != "yes":
         issues.append("not human")
     banned = review.get("banned_phrases_used") or []
     if banned:
