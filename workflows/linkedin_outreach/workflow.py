@@ -806,10 +806,10 @@ def write_linkedin_copy(
 
     Returns the message as a string, or empty string if the skill is not available.
 
-    Expected skill location: Skills/LinkedIn Copy Writer/skill.py
-    Expected interface:
+    Skill location: skills/linkedin_copy_writer/skill.py
+    Interface:
         write_copy(**kwargs) -> dict
-        returns {"copy": "message text", "errors": [...]}
+        returns {"copy": "message text", "signal_used": str, "review": dict, "errors": [...]}
     """
     if not _COPY_WRITER_AVAILABLE:
         return ""
@@ -1286,8 +1286,8 @@ def main() -> None:
     if args.skip_copy:
         print("\n--- Step 9: Skipping LinkedIn copy (--skip-copy) ---")
     elif not _COPY_WRITER_AVAILABLE:
-        print("\n--- Step 9: LinkedIn Copy Writer Skill not built yet — skipping ---")
-        print("  (Create Skills/LinkedIn Copy Writer/skill.py to enable this step)")
+        print("\n--- Step 9: LinkedIn Copy Writer Skill failed to import — skipping ---")
+        print("  (Check skills/linkedin_copy_writer/skill.py and its dependencies)")
     else:
         print(f"\n--- Step 9: Writing LinkedIn copy for {len(outreach_indices)} leads ---")
 

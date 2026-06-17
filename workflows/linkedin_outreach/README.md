@@ -73,7 +73,7 @@ authed against a Google account that can read/write the sheet
 | **6** | Scrape posts | outreach batch | Apify pulls each lead's recent LinkedIn posts (default: 15 posts, last 90 days). Claude filters by ICP relevance criteria from `context.md`. Writes the matching post URLs (newline-separated). |
 | **7** | Small Talk | outreach batch | Humanizing/conversational signals (hobbies, fandoms, quirks) — top 2-3 as 1-line bullets with source. Identity-verified per evidence; returns empty rather than wrong-person. |
 | **8** | Personalisation hooks | outreach batch | Talking points an SDR can hang a message on. Surfaces 2-3 one-line angles from small talk, matching posts, and company signals. See `skills/personalisation_hook`. |
-| **9** | LinkedIn copy | outreach batch | Final personalised LinkedIn DM. **Stub today** (skips until `skills/linkedin_copy_writer` is built). |
+| **9** | LinkedIn copy | outreach batch | Final personalised LinkedIn DM — a short, human, conversation-starting message built around the strongest signal, with an auditable three-question self-review and one repair pass. See `skills/linkedin_copy_writer`. |
 
 ---
 
@@ -246,7 +246,7 @@ Claude reason aloud. Sheets-only today; no CSV mode for `workflow_ops.py` yet.
 
 ## Known limitations
 
-- **Step 9 is a stub.** `skills/linkedin_copy_writer` isn't built yet — Step 9 gates gracefully and skips. Steps 7 (Small Talk) and 8 (Personalisation Hook) are both live.
+- **All steps are live.** Steps 7 (Small Talk), 8 (Personalisation Hook), and 9 (LinkedIn copy) are all wired in. Step 9 still gates gracefully with a try/import so a broken dependency skips rather than crashes the run.
 - **No `--rows` flag yet.** The whole sheet/CSV is processed every run.
   Idempotency: enrichment skips already-filled rows, but classify/score/competitors
   re-run unconditionally — re-runs cost the LLM bill again.
