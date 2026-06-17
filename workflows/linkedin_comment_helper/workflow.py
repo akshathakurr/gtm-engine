@@ -507,7 +507,7 @@ def _load_keywords(workflow_dir: str, filename: str, ctx_section: Optional[str] 
 def _load_project_context() -> str:
     if _PROJECT_CONTEXT_AVAILABLE:
         return _project_context_skill.get_context()  # type: ignore
-    print("  Note: 'project context' skill not built yet — falling back to context.md.")
+    print("  Note: 'project context' skill failed to import — falling back to raw context.md concat.")
     try:
         return load_icp()
     except Exception:

@@ -64,6 +64,9 @@ When a skill needs to find the best angle from a pile of data, extract the signa
 **Empty-over-padding applies to skills too.**
 Same rule as scrapers: if input signal is weak, return empty + error rather than generic output. A lean company-level email with an error flag beats a fake-personalised one. The caller decides whether to retry, skip, or surface the gap.
 
+**A context-provider skill should clean, not just concat.**
+`project_context.get_context()` is the one skill that reads `/context` itself (every other skill consumes workflow-gathered data). Its value over the raw-concat fallback is *cleaning*: strip `<!-- -->` questionnaire scaffolding, extract only the `### Answer` body from questionnaire files, pass free-form files (`icp.md`, `competitors.md`) through as-is, and drop sections that are empty placeholders OR just empty template labels (`- **Name:**` with no value after the colon). Don't try to strip "instructional prose" inside a half-filled file — that risks dropping real answers; output quality tracks input quality. Return `""` (never raise) so the caller degrades gracefully — its call site has no try/except.
+
 ---
 
 ## GWS (Google Workspace CLI)
