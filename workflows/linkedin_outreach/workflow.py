@@ -1208,7 +1208,7 @@ def main() -> None:
     if args.skip_small_talk:
         print("\n--- Step 7: Skipping small talk (--skip-small-talk) ---")
     elif not _SMALL_TALK_AVAILABLE:
-        print("\n--- Step 7: Small Talk Scraper not built yet — skipping ---")
+        print("\n--- Step 7: Small Talk Scraper failed to import — skipping ---")
         print("  (Create Scrapers/Small Talk Scraper/scraper.py to enable this step)")
     else:
         print(f"\n--- Step 7: Gathering small talk details for {len(outreach_indices)} leads ---")
@@ -1245,8 +1245,7 @@ def main() -> None:
         # Both data sources were skipped — nothing to personalise from
         print("\n--- Step 8: Skipping personalisation hooks (no post or small talk data) ---")
     elif not _PERSONALISATION_AVAILABLE:
-        print("\n--- Step 8: Personalisation Hook Skill not built yet — skipping ---")
-        print("  (Create Skills/Personalisation Hook/skill.py to enable this step)")
+        print("\n--- Step 8: Personalisation Hook Skill failed to import — skipping ---")
     else:
         print(f"\n--- Step 8: Generating personalisation hooks for {len(outreach_indices)} leads ---")
 

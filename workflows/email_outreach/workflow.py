@@ -13,10 +13,10 @@ Flow:
   4  — Find the buyer at each P0 company (name, position, LinkedIn) via web search
   5  — Classify buyer persona: Decision Maker / Champion / Non Decision Maker
   6  — Find email via Apollo Contact Finder
-  7  — Small talk personalisation (Small Talk Scraper — stub today)
+  7  — Small talk personalisation (Small Talk Scraper)
   8  — Scrape + filter LinkedIn posts by ICP relevance criteria
-  9  — Generate personalisation hooks (Personalisation Hook Skill — stub today)
-  10 — Write personalised email copy (Email Copy Writer Skill — stub today)
+  9  — Generate personalisation hooks (Personalisation Hook Skill)
+  10 — Write personalised email copy (Email Copy Writer Skill)
 
 Usage:
   python -m workflows.email_outreach.workflow --sheet-id SHEET_ID
@@ -1112,7 +1112,7 @@ def main() -> None:
     if args.skip_small_talk:
         print("\n--- Step 7: Skipping small talk (--skip-small-talk) ---")
     elif not _SMALL_TALK_AVAILABLE:
-        print("\n--- Step 7: Small Talk Scraper not built yet — skipping ---")
+        print("\n--- Step 7: Small Talk Scraper failed to import — skipping ---")
     else:
         print(f"\n--- Step 7: Gathering small talk for {len(outreach_indices)} leads ---")
 
@@ -1169,7 +1169,7 @@ def main() -> None:
     if args.skip_hooks:
         print("\n--- Step 9: Skipping personalisation hooks (--skip-hooks) ---")
     elif not _PERSONALISATION_AVAILABLE:
-        print("\n--- Step 9: Personalisation Hook Skill not built yet — skipping ---")
+        print("\n--- Step 9: Personalisation Hook Skill failed to import — skipping ---")
     else:
         print(f"\n--- Step 9: Generating personalisation hooks for {len(outreach_indices)} leads ---")
 
@@ -1204,7 +1204,7 @@ def main() -> None:
     if args.skip_copy:
         print("\n--- Step 10: Skipping email copy (--skip-copy) ---")
     elif not _EMAIL_COPY_AVAILABLE:
-        print("\n--- Step 10: Email Copy Writer Skill not built yet — skipping ---")
+        print("\n--- Step 10: Email Copy Writer Skill failed to import — skipping ---")
     else:
         print(f"\n--- Step 10: Writing email copy for {len(outreach_indices)} leads ---")
 
