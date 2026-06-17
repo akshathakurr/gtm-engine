@@ -59,9 +59,20 @@ reply 'no' and I'll never contact you again.
 - **Mobile-first** — max 2 sentences per paragraph. People skim on phones.
 - **Pain points, not features** — talk about their problem, not your product's feature list.
 - **Casual tone** — gen-z energy is fine. No "leverage", "synergy", "streamline", "I hope this finds you".
+- **Natural feel** — casual shorthand ("thru" for "through"), a minor imperfection or two (without looking sloppy), and varied sentence length so it doesn't read AI-perfect.
 - **Subject** — under 8 words, a recognizable detail, no spam triggers (`"Quick question"`, `"Following up"`, `"Checking in"`, `"Synergy"`, `"Hope this finds you"`). `"Re:"` is allowed.
 - **CTA** — one ask, low friction. Optional: reference a specific person on their team.
 - **PS** — humor-driven opt-out. Always present.
+
+### follow-ups
+
+The prompt also carries follow-up guidance (~42% of replies come from follow-ups, not the first touch):
+
+- Add something every time — a new angle, pain, proof, or resource. Never an empty "just bumping this."
+- Never "just checking in" — it measurably reduces meetings booked.
+- Read as a natural continuation of an ongoing thread, referencing prior messages — not a brand-new outreach each time.
+
+Note: the skill writes one email per call. There is no `followup_number` param yet, so this guidance fires only when the caller signals (via `icp_context` / lead data) that the email is a follow-up.
 
 ---
 

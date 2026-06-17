@@ -360,7 +360,7 @@ def write_copy(
     hq: str = "",
     competitors: str = "",
 ) -> Dict[str, Any]:
-    """Return {"copy": str, "signal_used": str, "errors": [str]}."""
+    """Return {"copy": str, "signal_used": str, "review": dict, "errors": [str]}."""
     if not name or not company:
         return {"copy": "", "signal_used": "", "errors": ["missing required fields: name and company"]}
 
