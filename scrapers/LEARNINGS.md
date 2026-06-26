@@ -326,7 +326,13 @@ Replaced `altimis/scweet`, which started demanding *full X account access* — a
 - **Date format unchanged:** `"Fri Jun 26 13:45:15 +0000 2026"` — same `"%a %b %d %H:%M:%S +0000 %Y"` parser as before.
 - **Known limitation:** `from:<handle>` profile searches return author blocks WITHOUT `description`/website (those come back empty). `name`/`followers`/`verified`/tweets are all present. Consumers don't rely on bio, so this is acceptable.
 - **Rate limit:** can return 0 items on *truly simultaneous* back-to-back runs. A small `time.sleep(5)` between batch calls (was 30s for scweet) is sufficient — verified 3 consecutive queries all returned full results. The actor rotates guest tokens internally.
-- **Free-plan actors that DO NOT work (tested & rejected):** `altimis/scweet` (now demands full account access — security risk), `apidojo/twitter-profile-scraper` (blocks free plan), `apidojo/tweet-scraper` (returns `{noResults: true}` + "subscribe to a paid plan"), `xtdata/twitter-x-scraper` (ignores maxItems, cost $2.93 for 718 tweets), `parseforge/x-com-scraper` (keyword search requires a username scope — no standalone search; $8/1k), `gentle_cloud/x-twitter-public-data-scraper` (no keyword search at all), `quacker/twitter-scraper` (4GB browser crawler, $0.35/run, inferior data).
+- **Rejected actors** (each note marks whether it was *run* or judged from *docs*):
+  - `apidojo/tweet-scraper` — RAN 2026-06-26: blocks free-plan API (returns `{noResults: true}` + "subscribe to a paid plan"). Confirmed.
+  - `altimis/scweet` — RAN in prior QA: now demands full X account access (security risk). The actor we replaced.
+  - `parseforge/x-com-scraper` — DOCS only: *works on free plan*, but keyword search requires a username scope (no standalone search) and no date range; $8/1k. Rejected on fit, not on free-plan failure.
+  - `gentle_cloud/x-twitter-public-data-scraper` — DOCS only: no keyword search at all (lookup/profile modes only). Rejected on fit.
+  - `xtdata/twitter-x-scraper` — earlier-session note: ignores maxItems (cost $2.93 for 718 tweets). Not re-run this session.
+  - `apidojo/twitter-profile-scraper`, `quacker/twitter-scraper` — earlier-session notes: blocks free plan / 4GB browser crawler $0.35/run, inferior data. Not re-run this session.
 
 ---
 
