@@ -112,6 +112,13 @@ def _strip_json_fence(text: str) -> str:
     if text.startswith("```"):
         lines = text.split("\n")
         text = "\n".join(lines[1:-1]).strip()
+    # Tolerate prose preamble/suffix around the JSON: carve out the outermost
+    # object or array. Models sometimes reason in prose before emitting JSON.
+    if text and text[0] not in "{[":
+        starts = [i for i in (text.find("{"), text.find("[")) if i != -1]
+        ends = [i for i in (text.rfind("}"), text.rfind("]")) if i != -1]
+        if starts and ends and max(ends) > min(starts):
+            text = text[min(starts):max(ends) + 1].strip()
     return text
 
 
