@@ -2,7 +2,7 @@
 
 Search and scrape Twitter/X posts by keyword, topic, or brand. Use for brand mentions, competitor monitoring, and discussion analysis.
 
-**Actor:** `altimis/scweet` — $0.003/tweet + $0.01 run-start fee (free plan). ~$0.06-0.10 per typical run.
+**Actor:** `kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest` — ~$0.18-0.25 / 1,000 tweets (20-item minimum per run). **No Twitter/X login or cookies required** (public guest tokens), works on the Apify free plan. Replaced `altimis/scweet`, which demanded full X account access.
 
 ## What it does
 
@@ -86,9 +86,9 @@ pip install apify-client python-dotenv
 
 ## Pricing
 
-- $0.01 flat run-start fee per run
-- $0.003 per tweet (free Apify plan)
-- Typical 20-tweet run: ~$0.07
+- ~$0.18-0.25 per 1,000 tweets (pay-per-result)
+- 20-item minimum billed per run
+- Typical 20-tweet run: ~$0.005
 
 ## Notes
 

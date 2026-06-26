@@ -1,269 +1,486 @@
 [
   {
-    "id": "tweet-2040815808197366267",
-    "handle": "charusuresh1",
-    "text": "I'm giving away my full B2B outbound playbook — free.\n\nIncludes:\n✅ ICP worksheet\n✅ 5 cold email templates\n✅ LinkedIn DM scripts\n✅ Follow-up sequence (7 touches)\n✅ Metrics tracker\n\nLike + Comment \"PLAYBOOK\" and I'll DM it to you.",
-    "favorite_count": 1,
-    "retweet_count": 0,
-    "reply_count": 0,
-    "view_count": "54",
-    "tweet_url": "https://x.com/charusuresh1/status/2040815808197366267",
-    "created_at": "Sun Apr 05 15:36:19 +0000 2026",
-    "collected_at_utc": "2026-04-10T10:12:39.815906+00:00",
-    "sort_index": "2042546292122451968",
-    "entry_type": "TimelineTimelineItem",
-    "tweet_display_type": "Tweet",
-    "user": {
-      "handle": "charusuresh1",
-      "name": "Charu Suresh",
-      "id": "VXNlcjoyOTc4MDgyNzk=",
-      "rest_id": "297808279",
-      "verified": false,
-      "is_blue_verified": true,
-      "verified_type": null,
-      "followers_count": 380,
-      "friends_count": 5936,
-      "favourites_count": 3828,
-      "statuses_count": 1637,
-      "listed_count": 1,
-      "media_count": 585,
-      "description": "SAAS Marketing Consultant. Innovating at the intersection of tech and marketing. #SAASMarketing #DigitalStrategy",
-      "url": null,
-      "urls": [],
-      "location": "Kochi,Kerala",
-      "created_at": "Fri May 13 04:33:36 +0000 2011",
-      "profile_image_url_https": "https://pbs.twimg.com/profile_images/1898762458992345088/69rmZtu3_normal.jpg",
-      "profile_banner_url": "https://pbs.twimg.com/profile_banners/297808279/1701861024"
-    },
-    "tweet": {
-      "text": "I'm giving away my full B2B outbound playbook — free.\n\nIncludes:\n✅ ICP worksheet\n✅ 5 cold email templates\n✅ LinkedIn DM scripts\n✅ Follow-up sequence (7 touches)\n✅ Metrics tracker\n\nLike + Comment \"PLAYBOOK\" and I'll DM it to you.",
-      "tweet_url": "https://x.com/charusuresh1/status/2040815808197366267",
-      "favorite_count": 1,
-      "retweet_count": 0,
-      "reply_count": 0,
-      "quote_count": 0,
-      "view_count": "54",
-      "bookmark_count": 0,
-      "lang": "en",
-      "created_at": "Sun Apr 05 15:36:19 +0000 2026",
-      "source": "<a href=\"http://twitter.com/download/android\" rel=\"nofollow\">Twitter for Android</a>",
-      "rest_id": "2040815808197366267",
-      "conversation_id": "2040815808197366267",
-      "in_reply_to_status_id": null,
-      "in_reply_to_user_id": null,
-      "in_reply_to_screen_name": null,
-      "quoted_status_id": null,
-      "mentions": [],
-      "hashtags": [],
-      "entities": {
-        "hashtags": [],
-        "mentions": [],
-        "urls": [],
-        "symbols": [],
-        "timestamps": []
-      },
-      "media": [],
-      "is_quote_status": false,
-      "possibly_sensitive": null,
-      "is_translatable": false,
-      "edit_control": {
-        "edit_tweet_ids": [
-          "2040815808197366267"
-        ],
-        "editable_until_msecs": "1775406979000",
-        "edits_remaining": "5",
-        "is_edit_eligible": true
-      }
-    },
-    "quote_count": 0,
-    "bookmark_count": 0,
+    "type": "tweet",
+    "id": "2070505251200008369",
+    "url": "https://x.com/skylux_inc/status/2070505251200008369",
+    "twitterUrl": "https://twitter.com/skylux_inc/status/2070505251200008369",
+    "text": "Great teams win trophies. Great brands win customers.\n\nPower your CX with AI, Cloud, Analytics &amp; Omnichannel solutions from Skylux.\n\n📧 sales@skyluxinc.com\n🌐 https://t.co/gN98S1JTim\n\n#CX #AI #Skylux https://t.co/AHM7pnpINj",
+    "source": "",
+    "retweetCount": 0,
+    "replyCount": 0,
+    "likeCount": 0,
+    "quoteCount": 0,
+    "viewCount": 2,
+    "createdAt": "Fri Jun 26 13:51:34 +0000 2026",
     "lang": "en",
-    "conversation_id": "2040815808197366267",
-    "in_reply_to_status_id": null,
-    "in_reply_to_user_id": null,
-    "in_reply_to_screen_name": null,
-    "quoted_status_id": null,
-    "is_quote": false,
-    "is_reply": false,
-    "source_root": "search",
-    "source_value": "cold email outbound since:2026-04-03_00:00:00 until:2026-04-10_23:59:59"
+    "bookmarkCount": 0,
+    "isReply": false,
+    "inReplyToId": null,
+    "conversationId": "2070505251200008369",
+    "inReplyToUserId": null,
+    "inReplyToUsername": null,
+    "isPinned": false,
+    "author": {
+      "type": "user",
+      "userName": "skylux_inc",
+      "url": "https://x.com/skylux_inc",
+      "twitterUrl": "https://twitter.com/skylux_inc",
+      "id": "1427073133",
+      "name": "Skylux Inc",
+      "isVerified": false,
+      "isBlueVerified": false,
+      "profilePicture": "https://pbs.twimg.com/profile_images/639792923563847681/v6uChy41_normal.jpg",
+      "coverPicture": "https://pbs.twimg.com/profile_banners/1427073133/1513236003",
+      "description": "Specialist in the dynamic digital and telecommunications industry",
+      "location": "Louisville KY",
+      "followers": 218,
+      "following": 743,
+      "status": "",
+      "canDm": false,
+      "canMediaTag": false,
+      "createdAt": "Tue May 14 05:22:08 +0000 2013",
+      "entities": {
+        "description": {
+          "urls": []
+        },
+        "url": {}
+      },
+      "fastFollowersCount": 0,
+      "favouritesCount": 25,
+      "hasCustomTimelines": true,
+      "isTranslator": false,
+      "mediaCount": 557,
+      "statusesCount": 683,
+      "withheldInCountries": [],
+      "affiliatesHighlightedLabel": {},
+      "possiblySensitive": false,
+      "pinnedTweetIds": [],
+      "profile_bio": {},
+      "isAutomated": false,
+      "automatedBy": null
+    },
+    "extendedEntities": {
+      "media": [
+        {
+          "display_url": "pic.x.com/AHM7pnpINj",
+          "expanded_url": "https://x.com/skylux_inc/status/2070505251200008369/photo/1",
+          "ext_media_availability": {
+            "status": "Available"
+          },
+          "features": {
+            "large": {
+              "faces": []
+            },
+            "medium": {
+              "faces": []
+            },
+            "orig": {
+              "faces": []
+            },
+            "small": {
+              "faces": []
+            }
+          },
+          "id_str": "2070505171164217344",
+          "indices": [
+            202,
+            225
+          ],
+          "media_key": "3_2070505171164217344",
+          "media_results": {
+            "result": {
+              "media_key": "3_2070505171164217344"
+            }
+          },
+          "media_url_https": "https://pbs.twimg.com/media/HLvpe7DaQAAaeVn.jpg",
+          "original_info": {
+            "focus_rects": [
+              {
+                "h": 702,
+                "w": 1254,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "h": 1254,
+                "w": 1254,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "h": 1254,
+                "w": 1100,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "h": 1254,
+                "w": 627,
+                "x": 94,
+                "y": 0
+              },
+              {
+                "h": 1254,
+                "w": 1254,
+                "x": 0,
+                "y": 0
+              }
+            ],
+            "height": 1254,
+            "width": 1254
+          },
+          "sizes": {
+            "large": {
+              "h": 1254,
+              "resize": "fit",
+              "w": 1254
+            },
+            "medium": {
+              "h": 1200,
+              "resize": "fit",
+              "w": 1200
+            },
+            "small": {
+              "h": 680,
+              "resize": "fit",
+              "w": 680
+            },
+            "thumb": {
+              "h": 150,
+              "resize": "crop",
+              "w": 150
+            }
+          },
+          "type": "photo",
+          "url": "https://t.co/AHM7pnpINj"
+        }
+      ]
+    },
+    "card": null,
+    "place": {},
+    "entities": {
+      "hashtags": [
+        {
+          "indices": [
+            186,
+            189
+          ],
+          "text": "CX"
+        },
+        {
+          "indices": [
+            190,
+            193
+          ],
+          "text": "AI"
+        },
+        {
+          "indices": [
+            194,
+            201
+          ],
+          "text": "Skylux"
+        }
+      ],
+      "media": [
+        {
+          "display_url": "pic.x.com/AHM7pnpINj",
+          "expanded_url": "https://x.com/skylux_inc/status/2070505251200008369/photo/1",
+          "ext_media_availability": {
+            "status": "Available"
+          },
+          "features": {
+            "large": {
+              "faces": []
+            },
+            "medium": {
+              "faces": []
+            },
+            "orig": {
+              "faces": []
+            },
+            "small": {
+              "faces": []
+            }
+          },
+          "id_str": "2070505171164217344",
+          "indices": [
+            202,
+            225
+          ],
+          "media_key": "3_2070505171164217344",
+          "media_results": {
+            "result": {
+              "media_key": "3_2070505171164217344"
+            }
+          },
+          "media_url_https": "https://pbs.twimg.com/media/HLvpe7DaQAAaeVn.jpg",
+          "original_info": {
+            "focus_rects": [
+              {
+                "h": 702,
+                "w": 1254,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "h": 1254,
+                "w": 1254,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "h": 1254,
+                "w": 1100,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "h": 1254,
+                "w": 627,
+                "x": 94,
+                "y": 0
+              },
+              {
+                "h": 1254,
+                "w": 1254,
+                "x": 0,
+                "y": 0
+              }
+            ],
+            "height": 1254,
+            "width": 1254
+          },
+          "sizes": {
+            "large": {
+              "h": 1254,
+              "resize": "fit",
+              "w": 1254
+            },
+            "medium": {
+              "h": 1200,
+              "resize": "fit",
+              "w": 1200
+            },
+            "small": {
+              "h": 680,
+              "resize": "fit",
+              "w": 680
+            },
+            "thumb": {
+              "h": 150,
+              "resize": "crop",
+              "w": 150
+            }
+          },
+          "type": "photo",
+          "url": "https://t.co/AHM7pnpINj"
+        }
+      ],
+      "urls": [
+        {
+          "display_url": "skyluxinc.com",
+          "expanded_url": "http://www.skyluxinc.com",
+          "indices": [
+            161,
+            184
+          ],
+          "url": "https://t.co/gN98S1JTim"
+        }
+      ]
+    },
+    "reply_to_user_results": null,
+    "quoted_tweet_results": null,
+    "quoted_tweet": null,
+    "retweeted_tweet": null,
+    "isConversationControlled": false,
+    "searchTermIndex": 0
   },
   {
-    "id": "tweet-2040815339173556557",
-    "handle": "charusuresh1",
-    "text": "Every week I share:\n\n→ Outbound frameworks that book meetings\n→ Cold email teardowns (real examples)\n→ B2B growth strategies with no fluff\n\nIf you're in B2B sales, marketing, or run an agency — follow me.\n\nYour competition already is.",
-    "favorite_count": 1,
-    "retweet_count": 0,
-    "reply_count": 0,
-    "view_count": "36",
-    "tweet_url": "https://x.com/charusuresh1/status/2040815339173556557",
-    "created_at": "Sun Apr 05 15:34:28 +0000 2026",
-    "collected_at_utc": "2026-04-10T10:12:39.815906+00:00",
-    "sort_index": "2042546292122451967",
-    "entry_type": "TimelineTimelineItem",
-    "tweet_display_type": "Tweet",
-    "user": {
-      "handle": "charusuresh1",
-      "name": "Charu Suresh",
-      "id": "VXNlcjoyOTc4MDgyNzk=",
-      "rest_id": "297808279",
-      "verified": false,
-      "is_blue_verified": true,
-      "verified_type": null,
-      "followers_count": 380,
-      "friends_count": 5936,
-      "favourites_count": 3828,
-      "statuses_count": 1637,
-      "listed_count": 1,
-      "media_count": 585,
-      "description": "SAAS Marketing Consultant. Innovating at the intersection of tech and marketing. #SAASMarketing #DigitalStrategy",
-      "url": null,
-      "urls": [],
-      "location": "Kochi,Kerala",
-      "created_at": "Fri May 13 04:33:36 +0000 2011",
-      "profile_image_url_https": "https://pbs.twimg.com/profile_images/1898762458992345088/69rmZtu3_normal.jpg",
-      "profile_banner_url": "https://pbs.twimg.com/profile_banners/297808279/1701861024"
-    },
-    "tweet": {
-      "text": "Every week I share:\n\n→ Outbound frameworks that book meetings\n→ Cold email teardowns (real examples)\n→ B2B growth strategies with no fluff\n\nIf you're in B2B sales, marketing, or run an agency — follow me.\n\nYour competition already is.",
-      "tweet_url": "https://x.com/charusuresh1/status/2040815339173556557",
-      "favorite_count": 1,
-      "retweet_count": 0,
-      "reply_count": 0,
-      "quote_count": 0,
-      "view_count": "36",
-      "bookmark_count": 0,
-      "lang": "en",
-      "created_at": "Sun Apr 05 15:34:28 +0000 2026",
-      "source": "<a href=\"http://twitter.com/download/android\" rel=\"nofollow\">Twitter for Android</a>",
-      "rest_id": "2040815339173556557",
-      "conversation_id": "2040815339173556557",
-      "in_reply_to_status_id": null,
-      "in_reply_to_user_id": null,
-      "in_reply_to_screen_name": null,
-      "quoted_status_id": null,
-      "mentions": [],
-      "hashtags": [],
-      "entities": {
-        "hashtags": [],
-        "mentions": [],
-        "urls": [],
-        "symbols": [],
-        "timestamps": []
-      },
-      "media": [],
-      "is_quote_status": false,
-      "possibly_sensitive": null,
-      "is_translatable": false,
-      "edit_control": {
-        "edit_tweet_ids": [
-          "2040815339173556557"
-        ],
-        "editable_until_msecs": "1775406868000",
-        "edits_remaining": "5",
-        "is_edit_eligible": true
-      }
-    },
-    "quote_count": 0,
-    "bookmark_count": 0,
+    "type": "tweet",
+    "id": "2070504369569608009",
+    "url": "https://x.com/oesnadaki/status/2070504369569608009",
+    "twitterUrl": "https://twitter.com/oesnadaki/status/2070504369569608009",
+    "text": ".@elastic is cutting roughly 7 percent of its staff, impacting about 300 employees as it reorganizes its engineering department. CEO Ash Kulkarni is explicitly citing AI and automation as the drivers, claiming these technologies allow the firm to maintain leaner operations while the nature of development work evolves. The move highlights a growing trend where healthy financials—including a 16 percent revenue jump to $451 million—no longer protect technical roles from displacement by automated workflows. By flattening its hierarchy into three core areas, $ESTC is betting it can simplify operations without losing the momentum gained from its recent return to open-source standards. Management still expects total headcount to grow this year, signaling a strategic pivot toward customer-facing sales over traditional engineering growth.",
+    "source": "",
+    "retweetCount": 0,
+    "replyCount": 0,
+    "likeCount": 0,
+    "quoteCount": 0,
+    "viewCount": 1,
+    "createdAt": "Fri Jun 26 13:48:04 +0000 2026",
     "lang": "en",
-    "conversation_id": "2040815339173556557",
-    "in_reply_to_status_id": null,
-    "in_reply_to_user_id": null,
-    "in_reply_to_screen_name": null,
-    "quoted_status_id": null,
-    "is_quote": false,
-    "is_reply": false,
-    "source_root": "search",
-    "source_value": "cold email outbound since:2026-04-03_00:00:00 until:2026-04-10_23:59:59"
-  },
-  {
-    "id": "tweet-2040815248429703665",
-    "handle": "charusuresh1",
-    "text": "I've helped B2B teams go from 2 → 20 meetings/week with outbound.\n\nHere's what I offer:\n→ Outbound strategy audit\n→ Cold email sequence rewrite\n→ LinkedIn outreach playbooks\n→ ICP + list building\n\nDM me \"GROW\" and let's talk this week.",
-    "favorite_count": 1,
-    "retweet_count": 0,
-    "reply_count": 0,
-    "view_count": "39",
-    "tweet_url": "https://x.com/charusuresh1/status/2040815248429703665",
-    "created_at": "Sun Apr 05 15:34:06 +0000 2026",
-    "collected_at_utc": "2026-04-10T10:12:39.815906+00:00",
-    "sort_index": "2042546292122451966",
-    "entry_type": "TimelineTimelineItem",
-    "tweet_display_type": "Tweet",
-    "user": {
-      "handle": "charusuresh1",
-      "name": "Charu Suresh",
-      "id": "VXNlcjoyOTc4MDgyNzk=",
-      "rest_id": "297808279",
-      "verified": false,
-      "is_blue_verified": true,
-      "verified_type": null,
-      "followers_count": 380,
-      "friends_count": 5936,
-      "favourites_count": 3828,
-      "statuses_count": 1637,
-      "listed_count": 1,
-      "media_count": 585,
-      "description": "SAAS Marketing Consultant. Innovating at the intersection of tech and marketing. #SAASMarketing #DigitalStrategy",
-      "url": null,
-      "urls": [],
-      "location": "Kochi,Kerala",
-      "created_at": "Fri May 13 04:33:36 +0000 2011",
-      "profile_image_url_https": "https://pbs.twimg.com/profile_images/1898762458992345088/69rmZtu3_normal.jpg",
-      "profile_banner_url": "https://pbs.twimg.com/profile_banners/297808279/1701861024"
-    },
-    "tweet": {
-      "text": "I've helped B2B teams go from 2 → 20 meetings/week with outbound.\n\nHere's what I offer:\n→ Outbound strategy audit\n→ Cold email sequence rewrite\n→ LinkedIn outreach playbooks\n→ ICP + list building\n\nDM me \"GROW\" and let's talk this week.",
-      "tweet_url": "https://x.com/charusuresh1/status/2040815248429703665",
-      "favorite_count": 1,
-      "retweet_count": 0,
-      "reply_count": 0,
-      "quote_count": 0,
-      "view_count": "39",
-      "bookmark_count": 0,
-      "lang": "en",
-      "created_at": "Sun Apr 05 15:34:06 +0000 2026",
-      "source": "<a href=\"http://twitter.com/download/android\" rel=\"nofollow\">Twitter for Android</a>",
-      "rest_id": "2040815248429703665",
-      "conversation_id": "2040815248429703665",
-      "in_reply_to_status_id": null,
-      "in_reply_to_user_id": null,
-      "in_reply_to_screen_name": null,
-      "quoted_status_id": null,
-      "mentions": [],
-      "hashtags": [],
+    "bookmarkCount": 0,
+    "isReply": false,
+    "inReplyToId": null,
+    "conversationId": "2070504369569608009",
+    "inReplyToUserId": null,
+    "inReplyToUsername": null,
+    "isPinned": false,
+    "author": {
+      "type": "user",
+      "userName": "oesnadaki",
+      "url": "https://x.com/oesnadaki",
+      "twitterUrl": "https://twitter.com/oesnadaki",
+      "id": "1876214304808087552",
+      "name": "oesnada",
+      "isVerified": false,
+      "isBlueVerified": true,
+      "profilePicture": "https://pbs.twimg.com/profile_images/2036000623582429184/3pkcq9uL_normal.jpg",
+      "coverPicture": "https://pbs.twimg.com/profile_banners/1876214304808087552/1777150119",
+      "description": "your ai-powered signal deck - tech news.",
+      "location": "",
+      "followers": 57,
+      "following": 20,
+      "status": "",
+      "canDm": false,
+      "canMediaTag": false,
+      "createdAt": "Mon Jan 06 10:29:06 +0000 2025",
       "entities": {
-        "hashtags": [],
-        "mentions": [],
-        "urls": [],
-        "symbols": [],
-        "timestamps": []
+        "description": {
+          "urls": []
+        },
+        "url": {}
       },
-      "media": [],
-      "is_quote_status": false,
-      "possibly_sensitive": null,
-      "is_translatable": false,
-      "edit_control": {
-        "edit_tweet_ids": [
-          "2040815248429703665"
-        ],
-        "editable_until_msecs": "1775406846000",
-        "edits_remaining": "5",
-        "is_edit_eligible": true
-      }
+      "fastFollowersCount": 0,
+      "favouritesCount": 50,
+      "hasCustomTimelines": true,
+      "isTranslator": false,
+      "mediaCount": 2075,
+      "statusesCount": 3318,
+      "withheldInCountries": [],
+      "affiliatesHighlightedLabel": {},
+      "possiblySensitive": false,
+      "pinnedTweetIds": [
+        "2048755750575431941"
+      ],
+      "profile_bio": {},
+      "isAutomated": false,
+      "automatedBy": null
     },
-    "quote_count": 0,
-    "bookmark_count": 0,
-    "lang": "en",
-    "conversation_id": "2040815248429703665",
-    "in_reply_to_status_id": null,
-    "in_reply_to_user_id": null,
-    "in_reply_to_screen_name": null,
-    "quoted_status_id": null,
-    "is_quote": false,
-    "is_reply": false,
-    "source_root": "search",
-    "source_value": "cold email outbound since:2026-04-03_00:00:00 until:2026-04-10_23:59:59"
+    "extendedEntities": {
+      "media": [
+        {
+          "additional_media_info": {
+            "monetizable": false
+          },
+          "allow_download_status": {
+            "allow_download": true
+          },
+          "display_url": "pic.x.com/hYUvCuScjj",
+          "expanded_url": "https://x.com/oesnadaki/status/2070504369569608009/video/1",
+          "ext_media_availability": {
+            "status": "Available"
+          },
+          "id_str": "2070503707129585664",
+          "indices": [
+            280,
+            303
+          ],
+          "media_key": "13_2070503707129585664",
+          "media_results": {
+            "result": {
+              "media_key": "13_2070503707129585664"
+            }
+          },
+          "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2070503707129585664/img/lpv2esS1BbiTCKVy.jpg",
+          "original_info": {
+            "focus_rects": [],
+            "height": 1920,
+            "width": 1080
+          },
+          "sizes": {
+            "large": {
+              "h": 1920,
+              "resize": "fit",
+              "w": 1080
+            },
+            "medium": {
+              "h": 1200,
+              "resize": "fit",
+              "w": 675
+            },
+            "small": {
+              "h": 680,
+              "resize": "fit",
+              "w": 383
+            },
+            "thumb": {
+              "h": 150,
+              "resize": "crop",
+              "w": 150
+            }
+          },
+          "type": "video",
+          "url": "https://t.co/hYUvCuScjj",
+          "video_info": {
+            "aspect_ratio": [
+              9,
+              16
+            ],
+            "duration_millis": 27669,
+            "variants": [
+              {
+                "content_type": "application/x-mpegURL",
+                "url": "https://video.twimg.com/amplify_video/2070503707129585664/pl/A5VqLHfnBwPd2KfS.m3u8?tag=28"
+              },
+              {
+                "bitrate": 632000,
+                "content_type": "video/mp4",
+                "url": "https://video.twimg.com/amplify_video/2070503707129585664/vid/avc1/320x568/Kx7MOdReDGmTm6oZ.mp4?tag=28"
+              },
+              {
+                "bitrate": 950000,
+                "content_type": "video/mp4",
+                "url": "https://video.twimg.com/amplify_video/2070503707129585664/vid/avc1/480x852/Chpe8gmTA2n-Zrj4.mp4?tag=28"
+              },
+              {
+                "bitrate": 2176000,
+                "content_type": "video/mp4",
+                "url": "https://video.twimg.com/amplify_video/2070503707129585664/vid/avc1/720x1280/m58JK8QJjFNAgj_0.mp4?tag=28"
+              },
+              {
+                "bitrate": 10368000,
+                "content_type": "video/mp4",
+                "url": "https://video.twimg.com/amplify_video/2070503707129585664/vid/avc1/1080x1920/vRDybPT2BmbBi-4Z.mp4?tag=28"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "card": null,
+    "place": {},
+    "entities": {
+      "hashtags": [],
+      "symbols": [
+        {
+          "indices": [
+            560,
+            565
+          ],
+          "text": "ESTC"
+        }
+      ],
+      "timestamps": [],
+      "urls": [],
+      "user_mentions": [
+        {
+          "id_str": "84512601",
+          "indices": [
+            1,
+            9
+          ],
+          "name": "Elastic",
+          "screen_name": "elastic"
+        }
+      ]
+    },
+    "reply_to_user_results": null,
+    "quoted_tweet_results": null,
+    "quoted_tweet": null,
+    "retweeted_tweet": null,
+    "isConversationControlled": false,
+    "searchTermIndex": 0
   }
 ]

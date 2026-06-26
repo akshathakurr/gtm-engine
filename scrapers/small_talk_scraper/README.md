@@ -117,9 +117,9 @@ python -m scrapers.small_talk_scraper.scraper example_input.json
 
 - Anthropic: ~3-4 calls (queries + identity + extract). ~$0.01-0.03 with Sonnet 4.6.
 - Exa: ~5 search calls (~$0.025).
-- Apify (Twitter): ~$0.07-0.10 per profile, **only if a Twitter handle is found**.
+- Apify (Twitter): ~$0.005 per profile (20-tweet minimum), **only if a Twitter handle is found**.
 
-Total: **~$0.10-0.15 per prospect** with Twitter, **~$0.04 without**.
+Total: **~$0.04-0.06 per prospect** with Twitter, **~$0.04 without**.
 
 ## Design principles
 

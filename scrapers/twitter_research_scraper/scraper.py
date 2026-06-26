@@ -1,14 +1,16 @@
 """
 Twitter Research Scraper — search tweets by keyword, topic, or brand.
 
-Actor: altimis/scweet (PAY_PER_EVENT — $0.003/tweet + $0.01 run-start on free plan)
-  ~$0.06-0.10 per run for a typical keyword search.
+Actor: kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest
+  (~$0.18-0.25 per 1,000 tweets). No Twitter/X login or cookies required — uses
+  public guest tokens, so it's safe to ship in an OSS tool. Works on the Apify
+  free plan. Replaced altimis/scweet, which demanded full X account access.
 
 Input: search_query, max_tweets (default 20), days_back (default 7), include_replies (default False)
 Output: list of tweets with author info, text, engagement metrics, tweet URL
 
-Date filtering: passed as `since`/`until` (YYYY-MM-DD) to the actor — applied server-side
-via Twitter's native since:/until: syntax. Reliable and no over-fetching.
+Date filtering: appended to the query as Twitter's native `since:`/`until:`
+operators (YYYY-MM-DD) — applied server-side. Reliable and no over-fetching.
 """
 
 import os
@@ -28,71 +30,73 @@ from scrapers._apify import dataset_items  # noqa: E402
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))
 
-ACTOR_ID = "altimis/scweet"
+ACTOR_ID = "kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest"
 TWITTER_DATE_FORMAT = "%a %b %d %H:%M:%S +0000 %Y"  # "Sun Apr 05 15:36:19 +0000 2026"
-MIN_RUN_CHARGE_USD = 0.036  # Apify minimum charge per run for this actor
-COST_PER_TWEET_USD = 0.003  # Free plan pricing
+MIN_ITEMS = 20  # actor's minimum billable items per run
+COST_PER_TWEET_USD = 0.00025  # ~$0.25 / 1,000 tweets
+
+
+import logging
+
+# Silence Apify's client logger once at import (thread-safe). Per-call actor-run
+# log streaming is disabled via logger=None.
+logging.getLogger("apify_client").setLevel(logging.WARNING)
 
 
 @contextmanager
 def _suppress_apify_logs():
-    with open(os.devnull, "w") as devnull:
-        old_stdout, old_stderr = sys.stdout, sys.stderr
-        sys.stdout = devnull
-        sys.stderr = devnull
-        try:
-            yield
-        finally:
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
+    """No-op, kept for call-site compatibility.
+
+    Previously swapped sys.stdout/sys.stderr to /dev/null, but a global stream
+    swap corrupts output when this scraper runs alongside others on worker
+    threads. Streaming is disabled at the source via ``.call(logger=None)``.
+    """
+    yield
 
 
 def _parse_tweet(raw: dict) -> dict:
-    """Parse a raw altimis/scweet item into clean output fields."""
-    user = raw.get("user") or {}
-    tweet = raw.get("tweet") or {}
-    screen_name = raw.get("handle") or user.get("handle", "")
+    """Parse a raw kaitoeasyapi tweet item into clean output fields."""
+    author = raw.get("author") or {}
+    screen_name = author.get("userName", "")
 
-    # tweet_url uses x.com — normalize to twitter.com for consistency
-    tweet_url = (raw.get("tweet_url") or tweet.get("tweet_url", "")).replace("x.com", "twitter.com")
-    profile_url = f"https://twitter.com/{screen_name}" if screen_name else ""
+    # tweet url uses x.com — normalize to twitter.com for consistency
+    tweet_url = (raw.get("twitterUrl") or raw.get("url") or "").replace("x.com", "twitter.com")
+    profile_url = author.get("twitterUrl") or (f"https://twitter.com/{screen_name}" if screen_name else "")
 
-    # Hashtags and mentions live in tweet.entities
-    entities = tweet.get("entities") or {}
-    # Hashtags/mentions can be list of dicts or list of strings depending on the tweet
-    raw_hashtags = entities.get("hashtags") or tweet.get("hashtags") or []
-    raw_mentions = entities.get("mentions") or tweet.get("mentions") or []
+    # Hashtags and mentions live in entities
+    entities = raw.get("entities") or {}
+    raw_hashtags = entities.get("hashtags") or []
+    raw_mentions = entities.get("user_mentions") or []
     hashtags = [h.get("text", h) if isinstance(h, dict) else h for h in raw_hashtags if h]
     mentions = [m.get("screen_name", m) if isinstance(m, dict) else m for m in raw_mentions if m]
 
-    # view_count comes as a string
     try:
-        view_count = int(raw.get("view_count") or tweet.get("view_count") or 0)
+        view_count = int(raw.get("viewCount") or 0)
     except (ValueError, TypeError):
         view_count = 0
 
     return {
-        "id": str(raw.get("id", "")).replace("tweet-", ""),
-        "text": raw.get("text") or tweet.get("text", ""),
-        "created_at": raw.get("created_at", ""),
+        "id": str(raw.get("id", "")),
+        "text": raw.get("text", ""),
+        "created_at": raw.get("createdAt", ""),
         "url": tweet_url,
         "author": {
-            "name": user.get("name", ""),
+            "name": author.get("name", ""),
             "screen_name": screen_name,
             "profile_url": profile_url,
-            "followers": user.get("followers_count", 0),
-            "is_verified": bool(user.get("is_blue_verified") or user.get("verified")),
-            "bio": user.get("description", ""),
-            "location": user.get("location", ""),
+            "followers": author.get("followers", 0),
+            "is_verified": bool(author.get("isVerified") or author.get("isBlueVerified")),
+            "bio": author.get("description", ""),
+            "location": author.get("location", ""),
         },
-        "likes": raw.get("favorite_count") or tweet.get("favorite_count") or 0,
-        "retweets": raw.get("retweet_count") or tweet.get("retweet_count") or 0,
-        "replies": raw.get("reply_count") or tweet.get("reply_count") or 0,
-        "quotes": raw.get("quote_count") or tweet.get("quote_count") or 0,
-        "bookmarks": raw.get("bookmark_count") or tweet.get("bookmark_count") or 0,
+        "likes": raw.get("likeCount") or 0,
+        "retweets": raw.get("retweetCount") or 0,
+        "replies": raw.get("replyCount") or 0,
+        "quotes": raw.get("quoteCount") or 0,
+        "bookmarks": raw.get("bookmarkCount") or 0,
         "views": view_count,
-        "is_reply": bool(raw.get("is_reply")),
-        "is_quote": bool(raw.get("is_quote")),
+        "is_reply": bool(raw.get("isReply")),
+        "is_quote": bool(raw.get("quoted_tweet") or raw.get("quoted_tweet_results")),
         "lang": raw.get("lang", ""),
         "hashtags": hashtags,
         "mentions": mentions,
@@ -133,14 +137,18 @@ def search_tweets(
 
     client = ApifyClient(api_key)
 
-    # Build actor input — date filtering passed as since/until (actor appends to query as since:/until:)
-    run_input: dict = {"search_query": query}
+    # Build actor input — date window appended to the query as Twitter's native
+    # since:/until: operators (applied server-side by the actor).
+    search_query = query
     if days_back > 0:
-        run_input["since"] = (datetime.now(timezone.utc) - timedelta(days=days_back)).strftime("%Y-%m-%d")
-        run_input["until"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        since = (datetime.now(timezone.utc) - timedelta(days=days_back)).strftime("%Y-%m-%d")
+        until = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        search_query = f"{query} since:{since} until:{until}"
+    run_input: dict = {"searchTerms": [search_query], "sort": "Latest"}
 
-    # min 13 items to exceed the $0.036 minimum charge (13 * $0.003 = $0.039)
-    platform_max = max(max_tweets, 13)
+    # actor bills a minimum of 20 items per run
+    platform_max = max(max_tweets, MIN_ITEMS)
+    run_input["maxItems"] = platform_max
 
     print(f"Searching tweets: '{query}' (last {days_back}d, max {max_tweets})", file=sys.stderr)
     raw_items = []
@@ -149,6 +157,7 @@ def search_tweets(
             run = client.actor(ACTOR_ID).call(
                 run_input=run_input,
                 max_items=platform_max,
+                logger=None,
             )
         raw_items = dataset_items(client, run)
     except Exception as e:
@@ -165,8 +174,8 @@ def search_tweets(
     tweets = []
     seen_ids = set()
     for item in raw_items:
-        # Skip non-tweet items
-        if not (item.get("text") or (item.get("tweet") or {}).get("text")):
+        # Skip non-tweet items (e.g. {"noResults": true}) and empties
+        if item.get("noResults") or not item.get("text"):
             continue
 
         tweet = _parse_tweet(item)
@@ -191,7 +200,7 @@ def search_tweets(
     }
 
 
-RATE_LIMIT_DELAY = 30  # seconds between calls — avoids Twitter session throttling
+RATE_LIMIT_DELAY = 5  # small gap between calls; actor rotates guest tokens internally
 
 
 def search_tweets_batch(
@@ -201,10 +210,10 @@ def search_tweets_batch(
     include_replies: bool = False,
 ) -> List[dict]:
     """
-    Search tweets for multiple queries with rate-limit-safe delays between calls.
+    Search tweets for multiple queries with a small delay between calls.
 
-    Always use this instead of looping over search_tweets() — the 30s delay between
-    calls prevents Twitter from throttling the actor's session.
+    Use this instead of looping over search_tweets() — the brief delay keeps
+    back-to-back guest-token requests from tripping rate limits.
 
     Args:
         queries:         List of search queries.

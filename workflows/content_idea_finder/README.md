@@ -106,6 +106,6 @@ Use skip flags during testing to keep the bill down.
 
 ## Notes
 
-- Twitter actor (`altimis/scweet`) rate-limits after back-to-back runs. The workflow inserts `time.sleep(30)` between trend queries; profile batch handles rate-limiting internally.
+- Twitter actor (`kaitoeasyapi/...cheapest`) uses public guest tokens — no login required. The workflow inserts a short `time.sleep(2)` between trend queries; the profile batch keeps a 5s gap. The actor rotates tokens internally.
 - HN scraper uses Algolia's free API — no quota concerns.
 - Source IDs in idea cards (`T3`, `H2`) are internal references the LLM uses to point at supporting signals; they're resolved into full quotes in the local JSON output.
