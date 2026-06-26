@@ -1,13 +1,17 @@
 """
 Twitter Profile Scraper — extract profile info and recent tweets from a Twitter/X account.
 
-Actor: altimis/scweet (PAY_PER_EVENT — $0.003/tweet + $0.01 run-start on free plan)
-  ~$0.07-0.10 per run for ~100 tweets.
+Actor: kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest
+  (~$0.18-0.25 per 1,000 tweets). No Twitter/X login or cookies required — uses
+  public guest tokens, so it's safe to ship in an OSS tool. Works on the Apify
+  free plan. Replaced altimis/scweet, which demanded full X account access.
 
 Input: profile_url, max_tweets (default 50), days_back (default 90), include_retweets (default False)
 Output: profile dict + list of parsed tweets
 
-Same actor and field structure as the Twitter Research Scraper (altimis/scweet).
+A profile's tweets are fetched via a `from:<handle>` search; the profile object
+is extracted from the author block carried on each returned tweet.
+Same actor and field structure as the Twitter Research Scraper.
 """
 
 import os
@@ -27,8 +31,9 @@ from scrapers._apify import dataset_items  # noqa: E402
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))
 
-ACTOR_ID = "altimis/scweet"
+ACTOR_ID = "kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest"
 TWITTER_DATE_FORMAT = "%a %b %d %H:%M:%S +0000 %Y"
+MIN_ITEMS = 20  # actor's minimum billable items per run
 
 
 import logging
@@ -56,70 +61,72 @@ def _parse_twitter_date(date_str: str) -> Optional[datetime]:
         return None
 
 
-def _parse_profile(user: dict) -> dict:
-    screen_name = user.get("handle") or user.get("screen_name", "")
-    # Resolve website URL from expanded urls list if available
+def _handle_from_url(url: str) -> str:
+    """Extract a bare @handle from a twitter.com / x.com profile URL."""
+    import re
+    m = re.search(r"(?:twitter|x)\.com/(?:#!/)?@?([A-Za-z0-9_]+)", url or "")
+    return m.group(1) if m else ""
+
+
+def _parse_profile(author: dict) -> dict:
+    screen_name = author.get("userName", "")
+    # Resolve website URL from the profile's entities if present
     website = ""
-    for u in user.get("urls", []):
+    url_entities = ((author.get("entities") or {}).get("url") or {}).get("urls") or []
+    for u in url_entities:
         if u.get("expanded_url"):
             website = u["expanded_url"]
             break
-    if not website:
-        website = user.get("url", "")
 
     return {
-        "name": user.get("name", ""),
+        "name": author.get("name", ""),
         "screen_name": screen_name,
-        "profile_url": f"https://twitter.com/{screen_name}" if screen_name else "",
-        "bio": user.get("description", ""),
-        "location": user.get("location", ""),
+        "profile_url": author.get("twitterUrl") or (f"https://twitter.com/{screen_name}" if screen_name else ""),
+        "bio": author.get("description", ""),
+        "location": author.get("location", ""),
         "website": website,
-        "followers_count": user.get("followers_count", 0),
-        "following_count": user.get("friends_count", 0),
-        "tweet_count": user.get("statuses_count", 0),
-        "is_verified": bool(user.get("is_blue_verified") or user.get("verified")),
-        "account_created_at": user.get("created_at", ""),
-        "profile_image_url": user.get("profile_image_url_https", ""),
+        "followers_count": author.get("followers", 0),
+        "following_count": author.get("following", 0),
+        "tweet_count": author.get("statusesCount", 0),
+        "is_verified": bool(author.get("isVerified") or author.get("isBlueVerified")),
+        "account_created_at": author.get("createdAt", ""),
+        "profile_image_url": author.get("profilePicture", ""),
     }
 
 
 def _parse_tweet(raw: dict) -> dict:
-    """Parse a raw altimis/scweet item. Same structure as Twitter Research Scraper."""
-    user = raw.get("user") or {}
-    tweet = raw.get("tweet") or {}
-    screen_name = raw.get("handle") or user.get("handle", "")
+    """Parse a raw kaitoeasyapi tweet item. Same structure as Twitter Research Scraper."""
+    tweet_url = (raw.get("twitterUrl") or raw.get("url") or "").replace("x.com", "twitter.com")
 
-    tweet_url = (raw.get("tweet_url") or tweet.get("tweet_url", "")).replace("x.com", "twitter.com")
-
-    entities = tweet.get("entities") or {}
-    raw_hashtags = entities.get("hashtags") or tweet.get("hashtags") or []
-    raw_mentions = entities.get("mentions") or tweet.get("mentions") or []
+    entities = raw.get("entities") or {}
+    raw_hashtags = entities.get("hashtags") or []
+    raw_mentions = entities.get("user_mentions") or []
     hashtags = [h.get("text", h) if isinstance(h, dict) else h for h in raw_hashtags if h]
     mentions = [m.get("screen_name", m) if isinstance(m, dict) else m for m in raw_mentions if m]
 
     try:
-        view_count = int(raw.get("view_count") or tweet.get("view_count") or 0)
+        view_count = int(raw.get("viewCount") or 0)
     except (ValueError, TypeError):
         view_count = 0
 
-    # Detect retweets: text starts with "RT @" or retweeted_status exists
-    text = raw.get("text") or tweet.get("text", "")
-    is_retweet = text.startswith("RT @")
+    # Detect retweets: retweeted_tweet present or text starts with "RT @"
+    text = raw.get("text") or ""
+    is_retweet = bool(raw.get("retweeted_tweet")) or text.startswith("RT @")
 
     return {
-        "id": str(raw.get("id", "")).replace("tweet-", ""),
+        "id": str(raw.get("id", "")),
         "text": text,
-        "created_at": raw.get("created_at", ""),
+        "created_at": raw.get("createdAt", ""),
         "url": tweet_url,
-        "likes": raw.get("favorite_count") or tweet.get("favorite_count") or 0,
-        "retweets": raw.get("retweet_count") or tweet.get("retweet_count") or 0,
-        "replies": raw.get("reply_count") or tweet.get("reply_count") or 0,
-        "quotes": raw.get("quote_count") or tweet.get("quote_count") or 0,
-        "bookmarks": raw.get("bookmark_count") or tweet.get("bookmark_count") or 0,
+        "likes": raw.get("likeCount") or 0,
+        "retweets": raw.get("retweetCount") or 0,
+        "replies": raw.get("replyCount") or 0,
+        "quotes": raw.get("quoteCount") or 0,
+        "bookmarks": raw.get("bookmarkCount") or 0,
         "views": view_count,
         "is_retweet": is_retweet,
-        "is_reply": bool(raw.get("is_reply")),
-        "is_quote": bool(raw.get("is_quote")),
+        "is_reply": bool(raw.get("isReply")),
+        "is_quote": bool(raw.get("quoted_tweet") or raw.get("quoted_tweet_results")),
         "lang": raw.get("lang", ""),
         "hashtags": hashtags,
         "mentions": mentions,
@@ -158,17 +165,29 @@ def scrape_twitter_profile(
 
     client = ApifyClient(api_key)
 
-    # Normalize to x.com — actor returns source_value as x.com URLs
-    normalized_url = profile_url.replace("twitter.com", "x.com")
-    run_input = {"profile_urls": [normalized_url]}
+    # Fetch a profile's tweets via a from:<handle> search; date window appended
+    # as Twitter's native since:/until: operators.
+    handle = _handle_from_url(profile_url)
+    if not handle:
+        return {
+            "profile_url": profile_url,
+            "profile": None,
+            "tweets": [],
+            "tweet_count": 0,
+            "date_range": {},
+            "errors": [f"Could not extract handle from URL: {profile_url}"],
+        }
 
-    # Pass days_back as since/until if needed
+    search_query = f"from:{handle}"
     if days_back > 0:
-        run_input["since"] = (datetime.now(timezone.utc) - timedelta(days=days_back)).strftime("%Y-%m-%d")
-        run_input["until"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        since = (datetime.now(timezone.utc) - timedelta(days=days_back)).strftime("%Y-%m-%d")
+        until = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        search_query = f"{search_query} since:{since} until:{until}"
+    run_input = {"searchTerms": [search_query], "sort": "Latest"}
 
-    # min 13 items to exceed the $0.036 minimum charge (13 * $0.003 = $0.039)
-    platform_max = max(max_tweets, 13)
+    # actor bills a minimum of 20 items per run
+    platform_max = max(max_tweets, MIN_ITEMS)
+    run_input["maxItems"] = platform_max
 
     print(f"Fetching tweets for: {profile_url}", file=sys.stderr)
     raw_items = []
@@ -201,12 +220,12 @@ def scrape_twitter_profile(
             "errors": ["Actor returned 0 items"],
         }
 
-    # Extract profile from first tweet's user object
+    # Extract profile from the first tweet's author block
     profile = None
     for item in raw_items:
-        user = item.get("user")
-        if user and user.get("handle"):
-            profile = _parse_profile(user)
+        author = item.get("author")
+        if author and author.get("userName"):
+            profile = _parse_profile(author)
             break
 
     # Parse and filter tweets
@@ -217,7 +236,7 @@ def scrape_twitter_profile(
     tweets = []
     seen_ids = set()
     for item in raw_items:
-        if not (item.get("text") or (item.get("tweet") or {}).get("text")):
+        if item.get("noResults") or not item.get("text"):
             continue
 
         tweet = _parse_tweet(item)
@@ -255,7 +274,7 @@ def scrape_twitter_profile(
     }
 
 
-RATE_LIMIT_DELAY = 30  # seconds between calls — avoids Twitter session throttling
+RATE_LIMIT_DELAY = 5  # small gap between calls; actor rotates guest tokens internally
 
 
 def scrape_twitter_profiles_batch(
@@ -265,10 +284,10 @@ def scrape_twitter_profiles_batch(
     include_retweets: bool = False,
 ) -> List[dict]:
     """
-    Scrape multiple Twitter profiles with rate-limit-safe delays between calls.
+    Scrape multiple Twitter profiles with a small delay between calls.
 
-    Always use this instead of looping over scrape_twitter_profile() — the 30s
-    delay between calls prevents Twitter from throttling the actor's session.
+    Use this instead of looping over scrape_twitter_profile() — the brief delay
+    keeps back-to-back guest-token requests from tripping rate limits.
 
     Args:
         profile_urls:     List of Twitter/X profile URLs.

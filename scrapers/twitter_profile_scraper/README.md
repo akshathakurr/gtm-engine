@@ -2,13 +2,13 @@
 
 Extract profile info and recent tweets from a Twitter/X account.
 
-**Actor:** `altimis/scweet` — $0.003/tweet + $0.01 run-start (free plan). ~$0.07-0.10 per run.
+**Actor:** `kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest` — ~$0.18-0.25 / 1,000 tweets (20-item minimum per run). **No Twitter/X login or cookies required** (public guest tokens), works on the Apify free plan. Replaced `altimis/scweet`, which demanded full X account access.
 Same actor as the Twitter Research Scraper — one actor, consistent field structure.
 
 ## What it does
 
 1. Takes a Twitter/X profile URL
-2. Fetches recent tweets via `altimis/scweet` with `profile_urls` input
+2. Fetches recent tweets via a `from:<handle>` search (handle extracted from the URL)
 3. Filters retweets (optional) and applies `days_back` date cap client-side
 4. Returns profile metadata + parsed tweet list
 
@@ -87,4 +87,5 @@ pip install apify-client python-dotenv
 
 - Retweets excluded by default (`include_retweets: false`).
 - The actor fetches in batches. `max_tweets` caps output client-side.
-- Switched from `quacker/twitter-scraper` (4GB browser crawler, $0.35/run) to `altimis/scweet` — 5x cheaper, 2x more tweets, richer fields (views, bookmarks, is_reply).
+- Switched to `kaitoeasyapi/...cheapest` (2026-06-26) from `altimis/scweet`, which began demanding full X account access — a security risk for an OSS tool. The new actor needs no login (public guest tokens) and is cheaper.
+- **Limitation:** profile bio/website come back empty via the `from:<handle>` search path. Name, followers, verified status, and tweets are all populated.

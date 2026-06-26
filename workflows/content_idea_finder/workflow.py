@@ -365,7 +365,7 @@ def fetch_trend_tweets(queries: List[Dict], min_likes: int, lookback_days: int, 
     print(f"  Searching {len(queries)} Twitter trend queries (min {min_likes} likes)...")
     for i, q in enumerate(queries):
         if i > 0:
-            time.sleep(30)  # altimis/scweet rate-limits on back-to-back runs
+            time.sleep(2)  # small gap; actor rotates guest tokens internally
 
         result = search_tweets(
             query=q["query"],

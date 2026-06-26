@@ -310,24 +310,23 @@ If a discovery call fails with a validation error, stop and read the exact error
 
 ---
 
-## Twitter Profile Scraper — key patterns
+## Twitter / X scrapers — key patterns (both profile + research)
 
-- **Actor:** `altimis/scweet` — same actor as Twitter Research Scraper. Input: `profile_urls: ["https://twitter.com/username"]`. 5x cheaper than `quacker` ($0.07 vs $0.35), returns 2x more tweets, richer fields.
-- **Pricing:** $0.003/tweet + $0.01 run-start. Min 13 items to exceed $0.036 minimum charge. Use `max(max_tweets, 13)` as platform cap.
-- **Profile is embedded in tweets** — no separate profile endpoint. Extract `item["user"]` from the first item that has a `handle` field.
-- **Date format:** `"Mon Sep 01 13:46:53 +0000 2025"` — parse with `datetime.strptime(date_str, "%a %b %d %H:%M:%S +0000 %Y")`.
-- **Retweet detection:** `text.startswith("RT @")`.
-- **Free plan actors that DO NOT work:** `apidojo/twitter-profile-scraper` (blocks free plan), `apidojo/tweet-scraper` (returns `{noResults: true}`), `xtdata/twitter-x-scraper` (ignores maxItems, cost $2.93 for 718 tweets), `quacker/twitter-scraper` (4GB browser crawler, $0.35/run, inferior data).
+**Actor: `kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest`** (swapped in 2026-06-26).
+Replaced `altimis/scweet`, which started demanding *full X account access* — a non-starter for an OSS tool (every user would have to log their personal X account into a third-party actor → ban risk). The kaitoeasyapi actor uses **public guest tokens — no login, no cookies**, works on the **Apify free plan**, and is the cheapest (~$0.18-0.25 / 1,000 tweets).
 
-## Twitter Research Scraper — key patterns
-
-- **Actor:** `altimis/scweet` — works on free plan. $0.003/tweet + $0.01 run-start fee. ~$0.06-0.10 per typical run. Used for BOTH keyword search (`search_query`) and profile scraping (`profile_urls`) — same actor, same field structure.
-- **Input field is `search_query`** (string, not array) — actor validation is strict, probe with curl before guessing field names.
-- **Date filtering:** pass `since` and `until` as `YYYY-MM-DD` strings — the actor appends them to the query as Twitter's native `since:`/`until:` operators (visible in `source_value` field). Never add `since:`/`until:` manually to the query.
-- **`max_items` minimum:** Actor has a $0.036 minimum charge per run. Passing `max_items < 10` raises an error. Always use at least `max(max_tweets, 10)` as platform-level cap.
-- **Key output fields:** `id` (prefixed "tweet-"), `handle`, `text`, `tweet_url` (x.com format — normalize to twitter.com), `favorite_count`, `retweet_count`, `reply_count`, `quote_count`, `bookmark_count`, `view_count` (STRING not int), `is_reply`, `is_quote`, `user{}`, `tweet{}`.
-- **Mentions/hashtags:** Live in `tweet.entities.hashtags` and `tweet.entities.mentions`. Can be list of dicts OR list of strings depending on tweet — always handle both.
-- **Rate limit:** `altimis/scweet` gets Twitter-rate-limited after 2-3 back-to-back runs. Symptoms: returns 0 items in ~13s. Fix: add `time.sleep(30)` between runs in batch workflows, or spread requests over time. The scraper itself is correct — it's Twitter blocking the actor's session.
+- **One actor, two modes** — keyword search and profile scraping both go through `searchTerms` (array):
+  - Keyword search: `{"searchTerms": ["AI sales"], "sort": "Latest", "maxItems": N}`
+  - Profile scrape: `{"searchTerms": ["from:paulg"], ...}` — use the `from:<handle>` operator. Extract the handle from the profile URL with a regex.
+- **Date filtering:** append Twitter's native `since:YYYY-MM-DD until:YYYY-MM-DD` operators to the query string (NOT separate input fields). Reliable, server-side.
+- **`maxItems` minimum is 20** — actor bills a 20-item minimum per run. Use `max(max_tweets, 20)`.
+- **Flat output structure** (NOT scweet's nested `user`/`tweet`): top-level `id`, `text`, `createdAt`, `url`/`twitterUrl` (x.com — normalize to twitter.com), `likeCount`, `retweetCount`, `replyCount`, `quoteCount`, `bookmarkCount`, `viewCount`, `isReply`, `lang`, `entities.hashtags[].text`, `entities.user_mentions[].screen_name`. Author block under `author{}`: `userName`, `name`, `followers`, `following`, `statusesCount`, `isVerified`/`isBlueVerified`, `profilePicture`, `createdAt`.
+- **Profile is embedded in tweets** — no separate profile endpoint. Extract `item["author"]` from the first item with a `userName`.
+- **Quote/retweet detection:** `is_quote = bool(item["quoted_tweet"] or item["quoted_tweet_results"])`; `is_retweet = bool(item["retweeted_tweet"]) or text.startswith("RT @")`.
+- **Date format unchanged:** `"Fri Jun 26 13:45:15 +0000 2026"` — same `"%a %b %d %H:%M:%S +0000 %Y"` parser as before.
+- **Known limitation:** `from:<handle>` profile searches return author blocks WITHOUT `description`/website (those come back empty). `name`/`followers`/`verified`/tweets are all present. Consumers don't rely on bio, so this is acceptable.
+- **Rate limit:** can return 0 items on *truly simultaneous* back-to-back runs. A small `time.sleep(5)` between batch calls (was 30s for scweet) is sufficient — verified 3 consecutive queries all returned full results. The actor rotates guest tokens internally.
+- **Free-plan actors that DO NOT work (tested & rejected):** `altimis/scweet` (now demands full account access — security risk), `apidojo/twitter-profile-scraper` (blocks free plan), `apidojo/tweet-scraper` (returns `{noResults: true}` + "subscribe to a paid plan"), `xtdata/twitter-x-scraper` (ignores maxItems, cost $2.93 for 718 tweets), `parseforge/x-com-scraper` (keyword search requires a username scope — no standalone search; $8/1k), `gentle_cloud/x-twitter-public-data-scraper` (no keyword search at all), `quacker/twitter-scraper` (4GB browser crawler, $0.35/run, inferior data).
 
 ---
 
