@@ -21,6 +21,11 @@ from contextlib import contextmanager
 from dotenv import load_dotenv
 from apify_client import ApifyClient
 
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+from scrapers._apify import dataset_items  # noqa: E402
+
 load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))
 
 ACTOR_ID = "altimis/scweet"
@@ -145,7 +150,7 @@ def search_tweets(
                 run_input=run_input,
                 max_items=platform_max,
             )
-        raw_items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+        raw_items = dataset_items(client, run)
     except Exception as e:
         errors.append(f"Actor run failed: {e}")
         return {

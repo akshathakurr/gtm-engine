@@ -1,8 +1,14 @@
 import os
+import sys
 import json
 import logging
 from typing import Optional
 from apify_client import ApifyClient
+
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+from scrapers._apify import dataset_items, ApifyRunError  # noqa: E402
 
 # Suppress verbose Apify actor log streaming
 logging.getLogger("apify_client").setLevel(logging.WARNING)
@@ -36,7 +42,14 @@ def scrape_linkedin_profiles(profile_urls: list[str], max_profiles: int = 10) ->
     print(f"Scraping {len(urls)} LinkedIn profile(s)...")
     run = client.actor(ACTOR_ID).call(run_input=actor_input)
 
-    raw_items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+    try:
+        raw_items = dataset_items(client, run)
+    except ApifyRunError as e:
+        return {
+            "total": 0,
+            "profiles": [],
+            "errors": [{"url": "all", "reason": str(e)}],
+        }
 
     profiles = []
     errors = []

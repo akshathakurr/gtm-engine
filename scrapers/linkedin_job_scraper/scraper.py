@@ -6,6 +6,11 @@ from urllib.parse import urlencode
 from typing import Optional
 from apify_client import ApifyClient
 
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+from scrapers._apify import dataset_items, ApifyRunError  # noqa: E402
+
 ACTOR_ID = "curious_coder/linkedin-jobs-scraper"
 
 # LinkedIn f_TPR values for time-posted filter
@@ -87,7 +92,10 @@ def scrape_linkedin_jobs(
     with _suppress_apify_logs():
         run = client.actor(ACTOR_ID).call(run_input=actor_input)
 
-    items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+    try:
+        items = dataset_items(client, run)
+    except ApifyRunError as e:
+        return {"query": query, "total": 0, "jobs": [], "errors": [str(e)]}
 
     # Deduplicate by job ID, then cap at max_jobs
     seen_ids = set()

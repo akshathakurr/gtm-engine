@@ -1,5 +1,5 @@
 anthropic>=0.40.0
-apify-client>=1.7.0
+apify-client>=3,<4   # 3.x: .call() returns a Run object (not a dict); pinned so the API contract can't drift back to 1.x
 exa-py>=1.0.0
 python-dotenv>=1.0.0
 requests>=2.31.0

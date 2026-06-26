@@ -1,24 +1,32 @@
 import os
 import sys
 import json
+import logging
 from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from apify_client import ApifyClient
 
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+from scrapers._apify import dataset_items, ApifyRunError  # noqa: E402
+
+# Silence Apify's client logger once at import (thread-safe — happens before any
+# concurrent use). Per-call actor-run log streaming is disabled via logger=None.
+logging.getLogger("apify_client").setLevel(logging.WARNING)
+
 
 @contextmanager
 def _suppress_apify_logs():
-    """Redirects stdout and stderr to /dev/null to silence Apify actor log streaming."""
-    with open(os.devnull, "w") as devnull:
-        old_stdout, old_stderr = sys.stdout, sys.stderr
-        sys.stdout = devnull
-        sys.stderr = devnull
-        try:
-            yield
-        finally:
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
+    """No-op, kept for call-site compatibility.
+
+    This used to redirect sys.stdout/sys.stderr to /dev/null, but a global stream
+    swap corrupts output when scrapers run concurrently (workflows now scrape
+    several profiles in parallel). Streaming is instead disabled at the source
+    via ``.call(logger=None)``, so no suppression context is needed.
+    """
+    yield
 
 ACTOR_ID = "apimaestro/linkedin-profile-posts"
 POSTS_PER_PAGE = 100
@@ -68,6 +76,7 @@ def scrape_linkedin_profile_posts(
     username = _extract_username(profile_url)
 
     all_raw: list = []
+    errors: list = []
     pagination_token: Optional[str] = None
     seen_urns: set = set()
     page = 1
@@ -86,9 +95,12 @@ def scrape_linkedin_profile_posts(
         if pagination_token:
             actor_input["pagination_token"] = pagination_token
 
-        with _suppress_apify_logs():
-            run = client.actor(ACTOR_ID).call(run_input=actor_input)
-        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+        run = client.actor(ACTOR_ID).call(run_input=actor_input, logger=None)
+        try:
+            items = dataset_items(client, run)
+        except ApifyRunError as e:
+            errors.append(f"Actor run failed (page {page}): {e}")
+            break
 
         if not items:
             break
@@ -138,7 +150,7 @@ def scrape_linkedin_profile_posts(
         "profile_url": profile_url,
         "total": len(posts),
         "posts": posts,
-        "errors": [],
+        "errors": errors,
     }
 
 
