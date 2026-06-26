@@ -1,11 +1,19 @@
 # Context Questionnaire
 
-This file is a guided interview. Open this folder in Claude Code and say
-"help me get started" — Claude walks you through the questions below and
-writes your answers into the `### Answer` block under each section.
+This file is the questionnaire behind the workflows — but you don't fill
+most of it in yourself. Open this folder in Claude Code and say "help me
+get started" — Claude asks just **two** questions (your **product** and
+**who it's for**), then researches your website and **drafts every other
+section for you**, into the `### Answer` blocks, for you to review and
+edit. Two questions in, a complete draft out.
 
-You can also fill it in by hand — workflows read the `### Answer` blocks
-and ignore the question / format / example scaffolding.
+You can still fill any section in by hand — workflows read the `### Answer`
+blocks and ignore the question / format / example scaffolding.
+
+A couple of sections are handled differently (noted inline below):
+**ICP Segments** is optional and usually left light; the **LinkedIn**
+sections are asked the first time you run a LinkedIn workflow, not at
+setup — leave them blank.
 
 **Free-form text is fine.** Workflows pass your answers to an LLM, which
 extracts whatever structure it needs (industries, competitors, ICP
@@ -58,7 +66,7 @@ belong to? What size, stage, geography? And how would you split your
 leads into **P0 (must-have)**, **P1 (strong fit)**, and **P2 (worth
 trying)** tiers? Be specific about what bumps a lead up or down a tier.
 
-**Used by:** competitor_analysis · email_outreach · linkedin_outreach · signal_based_lead_outreach · icp_activity_tracker
+**Used by:** competitor_analysis · email_outreach · linkedin_outreach
 
 **Example answer:**
 > B2B SaaS, 20–200 employees, Seed to Series B, US + Western Europe.
@@ -80,6 +88,10 @@ email_outreach workflow uses these to fill an `ICP Segment` column —
 Claude assigns each enriched company to one of your segments. Format:
 `Segment Name — short description (size / stage / industry signals
 that define it)`.
+
+**Optional — most companies don't need this.** Claude leaves it light
+unless segmenting your outreach actually matters to you. Skip it if in
+doubt.
 
 **Used by:** email_outreach
 
@@ -260,6 +272,9 @@ intent, or a good conversation starter.
 
 **Used by:** linkedin_outreach
 
+**Asked at runtime — leave blank.** Claude asks you for this the first
+time you run the LinkedIn outreach workflow, not during setup.
+
 **Example answer:**
 > Keep posts that:
 > - Mention pipeline hygiene, forecasting accuracy, or RevOps hiring
@@ -282,6 +297,9 @@ queries.
 
 **Used by:** linkedin_comment_helper
 
+**Asked at runtime — leave blank.** Claude asks you for this the first
+time you run the LinkedIn comment helper, not during setup.
+
 **Example answer:**
 ```
 RevOps
@@ -302,6 +320,9 @@ search for to find people in active evaluation mode? One per line.
 
 **Used by:** linkedin_comment_helper
 
+**Asked at runtime — leave blank.** Claude asks you for this the first
+time you run the LinkedIn comment helper, not during setup.
+
 **Example answer:**
 ```
 implementing AI in our org
@@ -320,7 +341,7 @@ hiring our first RevOps
 | Section | Workflows |
 |---|---|
 | Product · Who it's for | every workflow |
-| Ideal Customer Profile | competitor_analysis · email_outreach · linkedin_outreach · signal_based_lead_outreach · icp_activity_tracker |
+| Ideal Customer Profile | competitor_analysis · email_outreach · linkedin_outreach |
 | ICP Segments | email_outreach |
 | Right buyers · Decision-maker titles · Champion titles | email_outreach · linkedin_outreach |
 | LinkedIn Post Relevance Filter | linkedin_outreach |
