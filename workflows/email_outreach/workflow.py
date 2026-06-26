@@ -80,6 +80,72 @@ ENRICH_FIELDS: List[Dict[str, str]] = [
 DEFAULT_MAX_POSTS = 15
 DEFAULT_DAYS_BACK = 90
 
+# Concurrency. Per-lead compute (Claude + Exa) runs in a bounded pool; the
+# backend is written sequentially on the main thread afterwards, so it is never
+# touched concurrently. Throttled services use a rate limiter that spaces call
+# *starts* by the same intervals the old serial sleeps used.
+ENRICH_CONCURRENCY = 6        # Claude/Exa per-lead steps
+APOLLO_MIN_INTERVAL = 1       # seconds between Apollo email lookups (step 6)
+APOLLO_CONCURRENCY = 3
+POSTS_MIN_INTERVAL = 5        # seconds between profile-posts runs (step 8)
+POSTS_CONCURRENCY = 3
+
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
+
+class _RateLimiter:
+    """Spaces successive acquire() calls >= min_interval apart (thread-safe).
+
+    Spacing applies to call *starts*, so slow work after acquire() overlaps
+    across threads without bursting a rate-limited service.
+    """
+
+    def __init__(self, min_interval: float):
+        self._min_interval = min_interval
+        self._lock = threading.Lock()
+        self._next = 0.0
+
+    def acquire(self) -> None:
+        if self._min_interval <= 0:
+            return
+        with self._lock:
+            now = time.monotonic()
+            wait = self._next - now
+            if wait > 0:
+                time.sleep(wait)
+                now += wait
+            self._next = now + self._min_interval
+
+
+def _map_rate_limited(fn, items: list, *, min_interval: float = 0.0, max_workers: int = ENRICH_CONCURRENCY):
+    """Run fn(item) over a bounded pool, starts spaced >= min_interval.
+
+    Returns (results, errors) aligned to `items`. fn exceptions are captured
+    (result None, error set), never raised, so one bad item can't kill the batch.
+    Results preserve input order.
+    """
+    n = len(items)
+    if n == 0:
+        return [], []
+    limiter = _RateLimiter(min_interval)
+    results: List[Optional[object]] = [None] * n
+    errors: List[Optional[Exception]] = [None] * n
+
+    def task(idx, item):
+        limiter.acquire()
+        try:
+            return idx, fn(item), None
+        except Exception as e:  # noqa: BLE001 — captured per item, surfaced to caller
+            return idx, None, e
+
+    with ThreadPoolExecutor(max_workers=min(max_workers, n)) as ex:
+        for fut in [ex.submit(task, i, it) for i, it in enumerate(items)]:
+            idx, res, err = fut.result()
+            results[idx] = res
+            errors[idx] = err
+    return results, errors
+
 
 # ---------------------------------------------------------------------------
 # Google Sheets helpers
@@ -925,35 +991,49 @@ def main() -> None:
 
         company_cache: Dict[str, Dict[str, str]] = {}
 
+        def _all_filled(row) -> bool:
+            return all(
+                col_idx_by_key[f["key"]] < len(row) and row[col_idx_by_key[f["key"]]].strip()
+                for f in enrich_fields
+            )
+
+        # Enrich each UNIQUE company that still needs it, concurrently (Claude +
+        # Exa). Deduping by name also avoids paying to enrich the same company
+        # twice when multiple leads share it.
+        to_enrich: List[str] = []
+        seen_companies: set = set()
+        for i, lead in enumerate(leads):
+            company = lead["company"]
+            if not company or _all_filled(data_rows[i]) or company in seen_companies:
+                continue
+            seen_companies.add(company)
+            to_enrich.append(company)
+
+        if to_enrich:
+            print(f"  Enriching {len(to_enrich)} unique company(ies) in parallel...")
+            results, errors = _map_rate_limited(
+                lambda c: enrich_company(c, enrich_fields, client),
+                to_enrich, max_workers=ENRICH_CONCURRENCY,
+            )
+            for c, r, e in zip(to_enrich, results, errors):
+                if e:
+                    print(f"    ! {c} enrichment failed: {e}")
+                company_cache[c] = r or {}
+
+        # Apply + write sequentially so the backend is never touched concurrently.
         for i, lead in enumerate(leads):
             company = lead["company"]
             if not company:
                 continue
             row     = data_rows[i]
             row_num = i + 2
-
-            all_filled = all(
-                col_idx_by_key[f["key"]] < len(row) and row[col_idx_by_key[f["key"]]].strip()
-                for f in enrich_fields
-            )
-            if all_filled:
-                print(f"  Skipping {company} — all enrichment columns filled")
+            if _all_filled(row):
                 enriched = {f["key"]: cell(row, col_idx_by_key[f["key"]]) for f in enrich_fields}
-                company_cache[company] = enriched
-                _apply_enrichment(leads[i], enriched)
-                continue
-
-            if company in company_cache:
-                enriched = company_cache[company]
             else:
-                print(f"  Enriching: {company}...")
-                enriched = enrich_company(company, enrich_fields, client)
-                company_cache[company] = enriched
-
-            for f in enrich_fields:
-                backend.write_cell(row_num, col_idx_by_key[f["key"]], enriched.get(f["key"], ""))
+                enriched = company_cache.get(company, {})
+                for f in enrich_fields:
+                    backend.write_cell(row_num, col_idx_by_key[f["key"]], enriched.get(f["key"], ""))
             _apply_enrichment(leads[i], enriched)
-            print(f"    {company}: {json.dumps({k: enriched.get(k, '') for k in [f['key'] for f in enrich_fields]}, ensure_ascii=False)}")
 
     # ------------------------------------------------------------------
     # Step 2: Score (ICP Segment + Priority + Reasoning)
@@ -1011,36 +1091,46 @@ def main() -> None:
     backend.write_header(position_col_idx, headers[position_col_idx])
     backend.write_header(linkedin_col_idx, headers[linkedin_col_idx])
 
-    for i in outreach_indices:
+    # Each lead's buyer lookup is independent Claude + Exa work — compute in
+    # parallel, then write sequentially.
+    def _buyer_task(i: int):
+        lead = leads[i]
+        if (lead.get("name") or "").strip():
+            if not (lead.get("linkedin") or "").strip():
+                return ("linkedin", find_linkedin_url(lead["name"], lead["company"], client))
+            return ("skip", None)
+        return ("buyer", find_buyer_at_company(lead["company"], icp_context, client))
+
+    buyer_results, buyer_errors = _map_rate_limited(
+        _buyer_task, outreach_indices, max_workers=ENRICH_CONCURRENCY,
+    )
+    for i, r, e in zip(outreach_indices, buyer_results, buyer_errors):
         lead    = leads[i]
         row_num = i + 2
-
-        if (lead.get("name") or "").strip():
-            # Already have person info; just fill LinkedIn URL if missing
-            if not (lead.get("linkedin") or "").strip():
-                print(f"  {lead['name']} ({lead['company']}) — finding LinkedIn URL only")
-                url = find_linkedin_url(lead["name"], lead["company"], client)
-                if url:
-                    lead["linkedin"] = url
-                    backend.write_cell(row_num, linkedin_col_idx, url)
-                    print(f"    → {url}")
-            else:
-                print(f"  {lead['name']} ({lead['company']}) — already filled, skipping")
+        if e:
+            print(f"  {lead['company']} — buyer lookup failed: {e}")
             continue
-
-        print(f"  {lead['company']}...")
-        buyer = find_buyer_at_company(lead["company"], icp_context, client)
-        if buyer.get("name"):
-            lead["name"]     = buyer["name"]
-            lead["position"] = buyer.get("position", "")
-            lead["linkedin"] = buyer.get("linkedin", "")
-            backend.write_cell(row_num, name_col_idx,     lead["name"])
-            backend.write_cell(row_num, position_col_idx, lead["position"])
-            if lead["linkedin"]:
-                backend.write_cell(row_num, linkedin_col_idx, lead["linkedin"])
-            print(f"    → {lead['name']} ({lead['position']})")
-        else:
-            print("    → could not find a buyer")
+        kind, val = r
+        if kind == "skip":
+            print(f"  {lead['name']} ({lead['company']}) — already filled, skipping")
+        elif kind == "linkedin":
+            if val:
+                lead["linkedin"] = val
+                backend.write_cell(row_num, linkedin_col_idx, val)
+                print(f"  {lead['name']} ({lead['company']}) → {val}")
+        else:  # buyer
+            buyer = val or {}
+            if buyer.get("name"):
+                lead["name"]     = buyer["name"]
+                lead["position"] = buyer.get("position", "")
+                lead["linkedin"] = buyer.get("linkedin", "")
+                backend.write_cell(row_num, name_col_idx,     lead["name"])
+                backend.write_cell(row_num, position_col_idx, lead["position"])
+                if lead["linkedin"]:
+                    backend.write_cell(row_num, linkedin_col_idx, lead["linkedin"])
+                print(f"  {lead['company']} → {lead['name']} ({lead['position']})")
+            else:
+                print(f"  {lead['company']} → could not find a buyer")
 
     # ------------------------------------------------------------------
     # Step 5: Classify buyer persona — only for P0 with a buyer
@@ -1082,29 +1172,34 @@ def main() -> None:
         email_col_idx = get_or_create_col(headers, mapping, "email", "Email")
         backend.write_header(email_col_idx, headers[email_col_idx])
 
+        # Decide who still needs a lookup; reuse anything already present.
+        need_email: List[int] = []
         for i in outreach_indices:
-            lead    = leads[i]
-            row     = data_rows[i]
-            row_num = i + 2
-
+            lead = leads[i]
+            row  = data_rows[i]
             if not (lead.get("name") or "").strip():
                 print(f"  {lead['company']} — no buyer, skipping email lookup")
                 continue
-
             existing = cell(row, email_col_idx) if email_col_idx < len(row) else ""
             if existing or (lead.get("email") or "").strip():
-                email = existing or lead["email"]
-                email_by_lead[i] = email
-                print(f"  {lead['name']} — email already present, skipping")
+                email_by_lead[i] = existing or lead["email"]
                 continue
+            need_email.append(i)
 
-            print(f"  {lead['name']} ({lead['company']})...")
-            email = find_email(lead)
+        # Apollo is rate-limited — space lookups APOLLO_MIN_INTERVAL apart, but
+        # overlap their latency across a small pool.
+        results, errors = _map_rate_limited(
+            lambda i: find_email(leads[i]), need_email,
+            min_interval=APOLLO_MIN_INTERVAL, max_workers=APOLLO_CONCURRENCY,
+        )
+        for i, r, e in zip(need_email, results, errors):
+            email = "" if e else (r or "")
+            if e:
+                print(f"  {leads[i]['name']} — email lookup failed: {e}")
             email_by_lead[i] = email
-            lead["email"] = email
-            backend.write_cell(row_num, email_col_idx, email)
-            print(f"    → {email or '(not found)'}")
-            time.sleep(1)  # respect Apollo rate limits
+            leads[i]["email"] = email
+            backend.write_cell(i + 2, email_col_idx, email)
+            print(f"  {leads[i]['name']} ({leads[i]['company']}) → {email or '(not found)'}")
 
     # ------------------------------------------------------------------
     # Step 7: Small talk
@@ -1119,18 +1214,20 @@ def main() -> None:
         small_talk_col_idx = get_or_create_col(headers, mapping, "small_talk", "Small Talk")
         backend.write_header(small_talk_col_idx, headers[small_talk_col_idx])
 
-        for i in outreach_indices:
-            lead    = leads[i]
-            row_num = i + 2
-            if not (lead.get("name") or "").strip():
-                continue
-            print(f"  {lead['name']} ({lead['company']})...")
-            detail = scrape_small_talk(
-                profile_url=lead.get("linkedin", ""), name=lead["name"], company=lead["company"],
-            )
+        st_indices = [i for i in outreach_indices if (leads[i].get("name") or "").strip()]
+        results, errors = _map_rate_limited(
+            lambda i: scrape_small_talk(
+                profile_url=leads[i].get("linkedin", ""), name=leads[i]["name"], company=leads[i]["company"],
+            ),
+            st_indices, max_workers=ENRICH_CONCURRENCY,
+        )
+        for i, r, e in zip(st_indices, results, errors):
+            detail = "" if e else (r or "")
+            if e:
+                print(f"  {leads[i]['name']} — small talk failed: {e}")
             small_talk_by_lead[i] = detail
-            backend.write_cell(row_num, small_talk_col_idx, detail)
-            print(f"    → {(detail[:100] + '...') if len(detail) > 100 else (detail or '(none)')}")
+            backend.write_cell(i + 2, small_talk_col_idx, detail)
+            print(f"  {leads[i]['name']} ({leads[i]['company']}) → {(detail[:80] + '...') if len(detail) > 80 else (detail or '(none)')}")
 
     # ------------------------------------------------------------------
     # Step 8: Posts (LinkedIn) — needs lead.linkedin
@@ -1145,23 +1242,24 @@ def main() -> None:
         post_links_col_idx = get_or_create_col(headers, mapping, "post_links", "LinkedIn Post Links")
         backend.write_header(post_links_col_idx, headers[post_links_col_idx])
 
-        for idx, i in enumerate(has_linkedin):
-            lead    = leads[i]
-            row_num = i + 2
-            print(f"  [{idx+1}/{len(has_linkedin)}] {lead['name']} ({lead['company']})...")
-            post_result = scrape_and_filter_posts(
-                profile_url=lead["linkedin"],
-                icp_context=icp_context,
-                max_posts=post_config["max_posts"],
-                days_back=post_config["days_back"],
-                client=client,
-            )
-            post_data_by_lead[i] = post_result["posts_data"]
-            cell_value = "\n".join(post_result["urls"]) if post_result["urls"] else ""
-            backend.write_cell(row_num, post_links_col_idx, cell_value)
-            print(f"    {len(post_result['urls'])} post(s) matched")
-            if idx < len(has_linkedin) - 1:
-                time.sleep(5)
+        # profile-posts actor throttles on bursts — space starts POSTS_MIN_INTERVAL
+        # apart, overlap run-times across a small pool.
+        results, errors = _map_rate_limited(
+            lambda i: scrape_and_filter_posts(
+                profile_url=leads[i]["linkedin"], icp_context=icp_context,
+                max_posts=post_config["max_posts"], days_back=post_config["days_back"], client=client,
+            ),
+            has_linkedin, min_interval=POSTS_MIN_INTERVAL, max_workers=POSTS_CONCURRENCY,
+        )
+        for i, r, e in zip(has_linkedin, results, errors):
+            if e:
+                print(f"  {leads[i]['name']} — post scraping failed: {e}")
+                post_data_by_lead[i] = []
+                continue
+            post_data_by_lead[i] = r["posts_data"]
+            cell_value = "\n".join(r["urls"]) if r["urls"] else ""
+            backend.write_cell(i + 2, post_links_col_idx, cell_value)
+            print(f"  {leads[i]['name']} ({leads[i]['company']}) → {len(r['urls'])} post(s) matched")
 
     # ------------------------------------------------------------------
     # Step 9: Personalisation hooks
@@ -1176,13 +1274,11 @@ def main() -> None:
         hooks_col_idx = get_or_create_col(headers, mapping, "hooks", "Personalisation Hook")
         backend.write_header(hooks_col_idx, headers[hooks_col_idx])
 
-        for i in outreach_indices:
-            lead    = leads[i]
-            row_num = i + 2
-            if not (lead.get("name") or "").strip():
-                continue
-            print(f"  {lead['name']} ({lead['company']})...")
-            hooks = generate_personalisation_hooks(
+        hook_indices = [i for i in outreach_indices if (leads[i].get("name") or "").strip()]
+
+        def _hook_task(i: int) -> str:
+            lead = leads[i]
+            return generate_personalisation_hooks(
                 name=lead["name"], company=lead["company"], position=lead["position"],
                 matching_posts=post_data_by_lead.get(i, []),
                 small_talk=small_talk_by_lead.get(i, ""),
@@ -1194,9 +1290,15 @@ def main() -> None:
                 total_funding=lead.get("total_funding", ""),
                 hq=lead.get("hq", ""),
             )
+
+        results, errors = _map_rate_limited(_hook_task, hook_indices, max_workers=ENRICH_CONCURRENCY)
+        for i, r, e in zip(hook_indices, results, errors):
+            hooks = "" if e else (r or "")
+            if e:
+                print(f"  {leads[i]['name']} — hook generation failed: {e}")
             hooks_by_lead[i] = hooks
-            backend.write_cell(row_num, hooks_col_idx, hooks)
-            print(f"    → {(hooks[:120] + '...') if len(hooks) > 120 else (hooks or '(none)')}")
+            backend.write_cell(i + 2, hooks_col_idx, hooks)
+            print(f"  {leads[i]['name']} ({leads[i]['company']}) → {(hooks[:100] + '...') if len(hooks) > 100 else (hooks or '(none)')}")
 
     # ------------------------------------------------------------------
     # Step 10: Email copy
@@ -1211,13 +1313,11 @@ def main() -> None:
         copy_col_idx = get_or_create_col(headers, mapping, "copy", "Email Copy")
         backend.write_header(copy_col_idx, headers[copy_col_idx])
 
-        for i in outreach_indices:
-            lead    = leads[i]
-            row_num = i + 2
-            if not (lead.get("name") or "").strip():
-                continue
-            print(f"  {lead['name']} ({lead['company']})...")
-            copy = write_email_copy(
+        copy_indices = [i for i in outreach_indices if (leads[i].get("name") or "").strip()]
+
+        def _copy_task(i: int) -> str:
+            lead = leads[i]
+            return write_email_copy(
                 name=lead["name"], company=lead["company"], position=lead["position"],
                 email=email_by_lead.get(i, lead.get("email", "")),
                 buyer_persona=classifications.get(i, ""),
@@ -1232,8 +1332,14 @@ def main() -> None:
                 hq=lead.get("hq", ""),
                 competitors=lead.get("competitors", ""),
             )
-            backend.write_cell(row_num, copy_col_idx, copy)
-            print(f"    → {(copy[:120] + '...') if len(copy) > 120 else (copy or '(none)')}")
+
+        results, errors = _map_rate_limited(_copy_task, copy_indices, max_workers=ENRICH_CONCURRENCY)
+        for i, r, e in zip(copy_indices, results, errors):
+            copy = "" if e else (r or "")
+            if e:
+                print(f"  {leads[i]['name']} — copy generation failed: {e}")
+            backend.write_cell(i + 2, copy_col_idx, copy)
+            print(f"  {leads[i]['name']} ({leads[i]['company']}) → {(copy[:100] + '...') if len(copy) > 100 else (copy or '(none)')}")
 
     # ------------------------------------------------------------------
     # Summary

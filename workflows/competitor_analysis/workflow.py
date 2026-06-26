@@ -47,10 +47,43 @@ from scrapers.linkedin_profile_post_scraper import scraper as _li_posts_mod
 from scrapers.twitter_profile_scraper import scraper as _twitter_mod
 from scrapers.review_scraper import scraper as _review_mod
 
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
 
 # ---------------------------------------------------------------------------
 # Inlined helpers (kept here so each workflow is self-contained)
 # ---------------------------------------------------------------------------
+
+# Each competitor's independent enrichment lookups (Claude + Exa) run together
+# in a bounded pool. Competitors themselves stay sequential, so throttled Apify
+# actors and the single-threaded sheet/CSV backend are never hit concurrently.
+COMPETITOR_ENRICH_CONCURRENCY = 6
+
+
+def _run_parallel(tasks: Dict[str, "callable"], max_workers: int = COMPETITOR_ENRICH_CONCURRENCY) -> Dict[str, tuple]:
+    """Run named zero-arg thunks concurrently. Returns {key: (result, error)}.
+
+    Exceptions are captured per task (never raised), so one failed lookup can't
+    abort the others or the competitor.
+    """
+    out: Dict[str, tuple] = {}
+    if not tasks:
+        return out
+    lock = threading.Lock()
+
+    def run(key, fn):
+        try:
+            value, err = fn(), None
+        except Exception as e:  # noqa: BLE001 — captured per task, surfaced to caller
+            value, err = None, e
+        with lock:
+            out[key] = (value, err)
+
+    with ThreadPoolExecutor(max_workers=min(max_workers, len(tasks))) as ex:
+        for fut in [ex.submit(run, k, fn) for k, fn in tasks.items()]:
+            fut.result()
+    return out
 
 def gws_read_sheet(sheet_id: str, sheet_name: str) -> List[List[str]]:
     result = subprocess.run(
@@ -119,6 +152,13 @@ def _strip_json_fence(text: str) -> str:
     if text.startswith("```"):
         lines = text.split("\n")
         text = "\n".join(lines[1:-1]).strip()
+    # Tolerate prose preamble/suffix around the JSON: carve out the outermost
+    # object or array. Models sometimes reason in prose before emitting JSON.
+    if text and text[0] not in "{[":
+        starts = [i for i in (text.find("{"), text.find("[")) if i != -1]
+        ends = [i for i in (text.rfind("}"), text.rfind("]")) if i != -1]
+        if starts and ends and max(ends) > min(starts):
+            text = text[min(starts):max(ends) + 1].strip()
     return text
 
 
@@ -453,17 +493,27 @@ Return JSON with exactly these keys:
 - "Est. Revenue": same format as Total Funding, or "not available"
 - "HQ Location": city name only (e.g. "San Francisco", "New York", "London")
 
-Return empty string for any field not found. Return only valid JSON."""
+Return empty string for any field not found.
 
-    try:
-        resp = client.messages.create(
-            model=CLAUDE_MODEL, max_tokens=300,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        return json.loads(_strip_json_fence(resp.content[0].text))
-    except Exception as e:
-        print(f"    Firmographics extraction failed: {e}")
-        return empty
+CRITICAL: Respond with ONLY the raw JSON object — start with {{ and end with }}. No preamble, no reasoning, no markdown fences."""
+
+    # One retry: the model occasionally returns an empty completion, which
+    # would silently drop all firmographics. Retry once before degrading.
+    last_err = None
+    for attempt in range(2):
+        try:
+            resp = client.messages.create(
+                model=CLAUDE_MODEL, max_tokens=500,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = _strip_json_fence(resp.content[0].text) if resp.content else ""
+            if not text:
+                raise ValueError("empty completion")
+            return json.loads(text)
+        except Exception as e:
+            last_err = e
+    print(f"    Firmographics extraction failed after retry: {last_err}")
+    return empty
 
 
 # ---------------------------------------------------------------------------
@@ -1153,73 +1203,106 @@ def main() -> None:
         else:
             print("  [1] No website URL — skipping scrape")
 
-        # ── Step 2: Company LinkedIn URL ──────────────────────────────────────
-        if not get_col("Company LinkedIn URL"):
-            print("  [2] Finding LinkedIn URL...")
-            li_url = find_linkedin_url(competitor, website, scraped, client)
-            write_col("Company LinkedIn URL", li_url)
-            print(f"    → {li_url or '(not found)'}")
-        else:
-            print("  [2] Company LinkedIn URL already filled — skipping")
-
-        # ── Step 3: Company description ───────────────────────────────────────
-        if not get_col("Company Description") and scraped:
-            print("  [3] Drafting company description...")
-            desc = draft_description(competitor, scraped, client)
-            write_col("Company Description", desc)
-            print(f"    → {desc[:100] or '(none)'}")
-        else:
-            if get_col("Company Description"):
-                print("  [3] Company Description already filled — skipping")
-            else:
-                print("  [3] No scraped data — skipping description")
-
-        # ── Step 4: Firmographics ─────────────────────────────────────────────
+        # ── Steps 2–10: independent enrichment ────────────────────────────────
+        # These depend only on the company name / website / scraped pages, not on
+        # each other, and use only Exa + Claude (plus the reviews actor — a single
+        # call to a different actor than the founder-post step). Compute them
+        # concurrently, then write sequentially so the backend stays single-threaded.
         firm_cols = ["Employee Count", "Founded Year", "Last Funding Stage", "Total Funding", "Est. Revenue", "HQ Location"]
-        missing   = [c for c in firm_cols if not get_col(c)]
-        if missing:
-            print(f"  [4] Getting firmographics (missing: {', '.join(missing)})...")
-            firm = get_firmographics(competitor, client)
-            for c in missing:
-                write_col(c, firm.get(c, ""))
-            print(f"    → {json.dumps({k: firm.get(k,'') for k in missing}, ensure_ascii=False)}")
-        else:
-            print("  [4] Firmographics already filled — skipping")
-
-        # ── Step 5: Recent news ───────────────────────────────────────────────
-        if not get_col("Recent News"):
-            print("  [5] Searching recent news...")
-            news = get_recent_news(competitor, website, client)
-            write_col("Recent News", news)
-            print(f"    → {news[:120] or '(none)'}")
-        else:
-            print("  [5] Recent News already filled — skipping")
-
-        # ── Step 6: Founders ──────────────────────────────────────────────────
         f1_cols = ["Founder (1) Name", "Founder (1) LinkedIn", "Founder (1) Twitter"]
         f2_cols = ["Founder (2) Name", "Founder (2) LinkedIn", "Founder (2) Twitter"]
+        product_cols = [
+            "Target Persona (User)", "Sales Motion", "Primary CTA", "Pricing",
+            "Customer Stories", "Product Features", "Top Logos", "Marketing Messaging", "SEO",
+        ]
+        firm_missing     = [c for c in firm_cols if not get_col(c)]
         missing_founders = [c for c in f1_cols + f2_cols if not get_col(c)]
-        founders: List[Dict[str, str]] = []
+        product_missing  = [c for c in product_cols if not get_col(c)] if scraped else []
 
+        tasks: Dict[str, "callable"] = {}
+        if not get_col("Company LinkedIn URL"):
+            tasks["li_url"] = lambda: find_linkedin_url(competitor, website, scraped, client)
+        if not get_col("Company Description") and scraped:
+            tasks["desc"] = lambda: draft_description(competitor, scraped, client)
+        if firm_missing:
+            tasks["firm"] = lambda: get_firmographics(competitor, client)
+        if not get_col("Recent News"):
+            tasks["news"] = lambda: get_recent_news(competitor, website, client)
         if missing_founders:
-            print("  [6] Finding founders...")
-            founders = find_founders(competitor, website, client)
-            f1 = founders[0] if len(founders) > 0 else {}
-            f2 = founders[1] if len(founders) > 1 else {}
+            tasks["founders"] = lambda: find_founders(competitor, website, client)
+        if product_missing:
+            tasks["prod"] = lambda: extract_product_info(competitor, scraped, client)
+        if not get_col("Deal Size"):
+            tasks["deal"] = lambda: get_deal_size(competitor, client)
+        if not args.skip_reviews and not get_col("Customer Reviews"):
+            tasks["reviews"] = lambda: get_customer_reviews(competitor, website, client)
+
+        if tasks:
+            print(f"  [2-10] Enriching — {len(tasks)} lookups in parallel: {', '.join(tasks)}")
+            res = _run_parallel(tasks)
+            for key, (_v, err) in res.items():
+                if err:
+                    print(f"    ! {key} lookup failed: {err}")
+        else:
+            res = {}
+            print("  [2-10] All enrichment columns already filled — skipping")
+
+        def _val(key, default):
+            value, _err = res.get(key, (None, None))
+            return value if value is not None else default
+
+        # Step 2: Company LinkedIn URL
+        if "li_url" in tasks:
+            write_col("Company LinkedIn URL", _val("li_url", ""))
+
+        # Step 3: Company description
+        if "desc" in tasks:
+            write_col("Company Description", _val("desc", ""))
+
+        # Step 4: Firmographics
+        if "firm" in tasks:
+            firm = _val("firm", {}) or {}
+            for c in firm_missing:
+                write_col(c, firm.get(c, ""))
+
+        # Step 5: Recent news
+        if "news" in tasks:
+            write_col("Recent News", _val("news", ""))
+
+        # Step 6: Founders (write, then rebuild the list from final cell values)
+        if "founders" in tasks:
+            found = _val("founders", []) or []
+            f1 = found[0] if len(found) > 0 else {}
+            f2 = found[1] if len(found) > 1 else {}
             for col_name, key in [("Founder (1) Name", "name"), ("Founder (1) LinkedIn", "linkedin"), ("Founder (1) Twitter", "twitter")]:
                 if not get_col(col_name): write_col(col_name, f1.get(key, ""))
             for col_name, key in [("Founder (2) Name", "name"), ("Founder (2) LinkedIn", "linkedin"), ("Founder (2) Twitter", "twitter")]:
                 if not get_col(col_name): write_col(col_name, f2.get(key, ""))
-            names = " | ".join(filter(None, [f1.get("name"), f2.get("name")]))
-            print(f"    → {names or '(not found)'}")
-        else:
-            print("  [6] Founder columns already filled — skipping")
-            founders = [
-                {"name": get_col("Founder (1) Name"), "linkedin": get_col("Founder (1) LinkedIn"), "twitter": get_col("Founder (1) Twitter")},
-                {"name": get_col("Founder (2) Name"), "linkedin": get_col("Founder (2) LinkedIn"), "twitter": get_col("Founder (2) Twitter")},
-            ]
+        founders: List[Dict[str, str]] = [
+            {"name": get_col("Founder (1) Name"), "linkedin": get_col("Founder (1) LinkedIn"), "twitter": get_col("Founder (1) Twitter")},
+            {"name": get_col("Founder (2) Name"), "linkedin": get_col("Founder (2) LinkedIn"), "twitter": get_col("Founder (2) Twitter")},
+        ]
 
-        # ── Step 7: Founder post types ────────────────────────────────────────
+        # Step 8: Product info
+        if "prod" in tasks:
+            prod = _val("prod", {}) or {}
+            for c in product_missing:
+                write_col(c, prod.get(c, ""))
+
+        # Step 9: Customer reviews
+        if "reviews" in tasks:
+            review_val = (_val("reviews", "") or "") or "not available"
+            idx = col_map["Customer Reviews"]
+            backend.write_cell(row_num, idx, review_val)
+            written["Customer Reviews"] = review_val
+        elif args.skip_reviews:
+            print("  [9] Skipping reviews (--skip-reviews)")
+
+        # Step 10: Deal size
+        if "deal" in tasks:
+            write_col("Deal Size", _val("deal", ""))
+
+        # ── Step 7: Founder post types (throttled actors → kept sequential) ────
         founder_post_summaries: List[str] = []
         if args.skip_founder_posts:
             print("  [7] Skipping founder posts (--skip-founder-posts)")
@@ -1232,7 +1315,6 @@ def main() -> None:
                 if not fname:
                     continue
                 if get_col(post_col):
-                    print(f"  [7.{fi+1}] {post_col} already filled — skipping")
                     founder_post_summaries.append(f"[{fname}] {get_col(post_col)}")
                     continue
                 print(f"  [7.{fi+1}] Getting post type for {fname}...")
@@ -1248,47 +1330,6 @@ def main() -> None:
                     founder_post_summaries.append(f"[{fname}] {pt}")
                 print(f"    → {pt[:100] or '(no data)'}")
                 time.sleep(2)
-
-        # ── Step 8: Product info ──────────────────────────────────────────────
-        product_cols = [
-            "Target Persona (User)", "Sales Motion", "Primary CTA", "Pricing",
-            "Customer Stories", "Product Features", "Top Logos", "Marketing Messaging", "SEO",
-        ]
-        missing_prod = [c for c in product_cols if not get_col(c)]
-        if missing_prod and scraped:
-            print(f"  [8] Extracting product info ({len(missing_prod)} fields)...")
-            prod = extract_product_info(competitor, scraped, client)
-            for c in missing_prod:
-                write_col(c, prod.get(c, ""))
-            print(f"    → Sales Motion: {prod.get('Sales Motion','?')} | CTA: {prod.get('Primary CTA','?')}")
-            print(f"    → Features: {prod.get('Product Features','')[:80]}")
-        elif not scraped and missing_prod:
-            print("  [8] No scraped data — skipping product info")
-        else:
-            print("  [8] Product columns already filled — skipping")
-
-        # ── Step 9: Customer reviews ──────────────────────────────────────────
-        if args.skip_reviews:
-            print("  [9] Skipping reviews (--skip-reviews)")
-        elif not get_col("Customer Reviews"):
-            print("  [9] Getting customer reviews...")
-            reviews = get_customer_reviews(competitor, website, client)
-            review_val = reviews or "not available"
-            idx = col_map["Customer Reviews"]
-            backend.write_cell(row_num, idx, review_val)
-            written["Customer Reviews"] = review_val
-            print(f"    → {review_val[:100]}")
-        else:
-            print("  [9] Customer Reviews already filled — skipping")
-
-        # ── Step 10: Deal size ────────────────────────────────────────────────
-        if not get_col("Deal Size"):
-            print("  [10] Searching deal size...")
-            deal = get_deal_size(competitor, client)
-            write_col("Deal Size", deal)
-            print(f"    → {deal}")
-        else:
-            print("  [10] Deal Size already filled — skipping")
 
         # ── Step 11: Content type ─────────────────────────────────────────────
         if not get_col("Content Type"):
