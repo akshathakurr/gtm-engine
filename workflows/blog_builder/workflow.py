@@ -380,6 +380,7 @@ def fetch_reference_posts(
                 topic_hint,
                 include_domains=[domain],
                 num_results=num_per_company,
+                type="fast",
                 text=True,
                 highlights=True,
                 start_published_date=cutoff,
@@ -413,6 +414,7 @@ def fetch_topic_posts(
             results = exa_client.search_and_contents(
                 q,
                 num_results=num_per_query,
+                type="fast",
                 text=True,
                 start_published_date=cutoff,
             )

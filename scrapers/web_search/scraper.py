@@ -45,6 +45,9 @@ def search_web(
 
     kwargs = {
         "num_results": num_results,
+        # Exa "fast" search type — same content index, p50 latency <425ms.
+        # Available on the free plan; full param compatibility with contents.
+        "type": "fast",
         "highlights": {"num_sentences": 3, "highlights_per_url": 2},
         "summary": {"query": question},
     }

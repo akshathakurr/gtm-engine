@@ -35,7 +35,9 @@ Already-filled cells are skipped — safe to re-run after partial failures.
 
 ## Scrapers used
 
-`web_search` (Exa) · `website_scraper` (requests + BeautifulSoup + Jina fallback) · `linkedin_profile_post_scraper` · `twitter_profile_scraper` · `review_scraper` (G2 + Trustpilot)
+`web_search` (Exa) · `firecrawl_scraper` (primary website scraper — JS-rendered markdown, when `FIRECRAWL_API_KEY` is set) · `website_scraper` (requests + BeautifulSoup + Jina fallback — used when no Firecrawl key) · `linkedin_profile_post_scraper` · `twitter_profile_scraper` · `review_scraper` (G2 + Trustpilot)
+
+> **Website scraping:** company pages (homepage + pricing/about/customers) are fetched via **Firecrawl** when a key is set — it renders JavaScript, so pricing tables and case-study pages that the static scraper missed now come through. Falls back to the static `website_scraper` automatically when no key is present. Firecrawl free tier (1,000 pages/mo) easily covers any competitor run (~6 pages/company).
 
 ## Usage
 
