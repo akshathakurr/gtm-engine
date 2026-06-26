@@ -313,7 +313,7 @@ If a discovery call fails with a validation error, stop and read the exact error
 ## Twitter / X scrapers — key patterns (both profile + research)
 
 **Actor: `kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest`** (swapped in 2026-06-26).
-Replaced `altimis/scweet`, which started demanding *full X account access* — a non-starter for an OSS tool (every user would have to log their personal X account into a third-party actor → ban risk). The kaitoeasyapi actor uses **public guest tokens — no login, no cookies**, works on the **Apify free plan**, and is the cheapest (~$0.18-0.25 / 1,000 tweets).
+Replaced `altimis/scweet`, which started demanding *full X account access* — a non-starter for an OSS tool (every user would have to log their personal X account into a third-party actor → ban risk). The kaitoeasyapi actor uses **public guest tokens — no login, no cookies**, works on the **Apify free plan**, and is among the cheapest (~$0.18-0.25 / 1,000 tweets).
 
 - **One actor, two modes** — keyword search and profile scraping both go through `searchTerms` (array):
   - Keyword search: `{"searchTerms": ["AI sales"], "sort": "Latest", "maxItems": N}`
@@ -324,7 +324,7 @@ Replaced `altimis/scweet`, which started demanding *full X account access* — a
 - **Profile is embedded in tweets** — no separate profile endpoint. Extract `item["author"]` from the first item with a `userName`.
 - **Quote/retweet detection:** `is_quote = bool(item["quoted_tweet"] or item["quoted_tweet_results"])`; `is_retweet = bool(item["retweeted_tweet"]) or text.startswith("RT @")`.
 - **Date format unchanged:** `"Fri Jun 26 13:45:15 +0000 2026"` — same `"%a %b %d %H:%M:%S +0000 %Y"` parser as before.
-- **Known limitation:** `from:<handle>` profile searches return author blocks WITHOUT `description`/website (those come back empty). `name`/`followers`/`verified`/tweets are all present. Consumers don't rely on bio, so this is acceptable.
+- **Bio/website are usually present** but can be empty for some accounts. Verified: `from:sama` returns full `description`+`location`; `from:paulg` came back empty (cause unconfirmed — account-specific or intermittent, NOT a systematic limitation). `name`/`followers`/`verified`/tweets are always present. Consumers don't read bio anyway, so it's a non-issue either way.
 - **Rate limit:** can return 0 items on *truly simultaneous* back-to-back runs. A small `time.sleep(5)` between batch calls (was 30s for scweet) is sufficient — verified 3 consecutive queries all returned full results. The actor rotates guest tokens internally.
 - **Rejected actors** (each note marks whether it was *run* or judged from *docs*):
   - `apidojo/tweet-scraper` — RAN 2026-06-26: blocks free-plan API (returns `{noResults: true}` + "subscribe to a paid plan"). Confirmed.

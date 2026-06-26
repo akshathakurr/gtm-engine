@@ -88,4 +88,4 @@ pip install apify-client python-dotenv
 - Retweets excluded by default (`include_retweets: false`).
 - The actor fetches in batches. `max_tweets` caps output client-side.
 - Switched to `kaitoeasyapi/...cheapest` (2026-06-26) from `altimis/scweet`, which began demanding full X account access — a security risk for an OSS tool. The new actor needs no login (public guest tokens) and is cheaper.
-- **Limitation:** profile bio/website come back empty via the `from:<handle>` search path. Name, followers, verified status, and tweets are all populated.
+- **Note:** profile bio/website are usually populated but can be empty for some accounts (observed empty for `paulg`, full for `sama` — cause unconfirmed). Name, followers, verified status, and tweets are always present; no consumer reads bio.

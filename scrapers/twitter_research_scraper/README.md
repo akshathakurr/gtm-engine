@@ -86,9 +86,9 @@ pip install apify-client python-dotenv
 
 ## Pricing
 
-- $0.01 flat run-start fee per run
-- $0.003 per tweet (free Apify plan)
-- Typical 20-tweet run: ~$0.07
+- ~$0.18-0.25 per 1,000 tweets (pay-per-result)
+- 20-item minimum billed per run
+- Typical 20-tweet run: ~$0.005
 
 ## Notes
 
