@@ -86,6 +86,73 @@ def load_icp(*_args, **_kwargs) -> str:
     return "\n\n---\n\n".join(parts)
 
 SLEEP_BETWEEN_PROFILES = 5  # apimaestro/linkedin-profile-posts throttles on bursts
+SEARCH_MIN_INTERVAL = 2     # spacing between posts-search actor calls (was the batch sleep)
+ICP_CONCURRENCY = 3         # max in-flight profile-posts runs (bounded to stay well under free-plan limits)
+SEARCH_CONCURRENCY = 3      # max in-flight posts-search runs
+
+
+# ---------------------------------------------------------------------------
+# Rate-limited concurrency
+#
+# Apify actors throttle on bursts, so we space request *starts* by a minimum
+# interval (the same intervals the old serial sleeps used) while letting the
+# slow actor run-times overlap across a small, bounded pool. In-flight runs are
+# capped by max_workers, so we never exceed the free plan's concurrent-run room.
+# ---------------------------------------------------------------------------
+
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
+
+class _RateLimiter:
+    """Spaces successive acquire() calls >= min_interval apart (thread-safe).
+
+    Spacing applies to call *starts*, so work done after acquire() overlaps
+    across threads without ever bursting the actor.
+    """
+
+    def __init__(self, min_interval: float):
+        self._min_interval = min_interval
+        self._lock = threading.Lock()
+        self._next = 0.0
+
+    def acquire(self) -> None:
+        with self._lock:
+            now = time.monotonic()
+            wait = self._next - now
+            if wait > 0:
+                time.sleep(wait)
+                now += wait
+            self._next = now + self._min_interval
+
+
+def _map_rate_limited(fn, items: list, *, min_interval: float, max_workers: int):
+    """Run fn(item) over a bounded thread pool, starts spaced >= min_interval.
+
+    Returns (results, errors) — two lists aligned to `items`. fn exceptions are
+    captured (results[i] is None, errors[i] is the exception), never raised, so
+    one bad item can't kill the batch.
+    """
+    n = len(items)
+    if n == 0:
+        return [], []
+    limiter = _RateLimiter(min_interval)
+    results: List[Optional[object]] = [None] * n
+    errors: List[Optional[Exception]] = [None] * n
+
+    def task(i: int, item):
+        limiter.acquire()
+        try:
+            return i, fn(item), None
+        except Exception as e:  # noqa: BLE001 — captured per-item, surfaced to caller
+            return i, None, e
+
+    with ThreadPoolExecutor(max_workers=min(max_workers, n)) as ex:
+        for fut in [ex.submit(task, i, it) for i, it in enumerate(items)]:
+            i, res, err = fut.result()
+            results[i] = res
+            errors[i] = err
+    return results, errors
 
 
 # ---------------------------------------------------------------------------
@@ -98,6 +165,9 @@ REQUIRED_SECTIONS = [
     {
         "key": "project",
         "header": "Project",
+        # The standard context.md describes the project via Product + Who it's
+        # for, not a dedicated Project section. Fall back to those.
+        "fallback_headers": ["Product", "Who it's for"],
         "prompt": "What is your project / company? (one paragraph — what it does, who it's for, what problem it solves)",
     },
     {
@@ -187,6 +257,9 @@ def ensure_context_complete(auto: bool) -> Dict[str, str]:
 
     for spec in REQUIRED_SECTIONS:
         body = _section_body(text, spec["header"])
+        if not body:
+            parts = [_section_body(text, h) for h in spec.get("fallback_headers", [])]
+            body = "\n\n".join(p for p in parts if p).strip()
         if body:
             captured[spec["key"]] = body
         else:
@@ -279,27 +352,46 @@ def _normalize_search_post(post: dict, source: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def pull_icp_posts(profile_urls: List[str], max_per_profile: int, days_back: int) -> List[dict]:
+    # One profile-posts run per URL, starts spaced SLEEP_BETWEEN_PROFILES apart,
+    # run-times overlapped across a small pool.
+    def scrape_one(url: str) -> dict:
+        return _post_scraper.scrape_linkedin_profile_posts(
+            profile_url=url,
+            max_posts=max_per_profile,
+            days_back=days_back,
+        )
+
+    results, errors = _map_rate_limited(
+        scrape_one, profile_urls,
+        min_interval=SLEEP_BETWEEN_PROFILES, max_workers=ICP_CONCURRENCY,
+    )
     posts: List[dict] = []
-    for i, url in enumerate(profile_urls):
-        if i > 0:
-            time.sleep(SLEEP_BETWEEN_PROFILES)
-        try:
-            result = _post_scraper.scrape_linkedin_profile_posts(
-                profile_url=url,
-                max_posts=max_per_profile,
-                days_back=days_back,
-            )
-            posts.extend(_normalize_profile_post(p, "icp") for p in result.get("posts", []))
-        except Exception as e:
-            print(f"  ICP profile {url} failed: {e}")
+    for url, res, err in zip(profile_urls, results, errors):
+        if err:
+            print(f"  ICP profile {url} failed: {err}")
+            continue
+        posts.extend(_normalize_profile_post(p, "icp") for p in (res or {}).get("posts", []))
     return posts
+
+
+def _search_keywords(keywords: List[str], sort: str, max_posts: int) -> List[dict]:
+    """Run posts-search for each keyword concurrently (starts spaced), in order."""
+    def search_one(kw: str) -> dict:
+        return _search_scraper.search_linkedin_posts(kw, sort=sort, max_posts=max_posts)
+
+    results, errors = _map_rate_limited(
+        search_one, keywords,
+        min_interval=SEARCH_MIN_INTERVAL, max_workers=SEARCH_CONCURRENCY,
+    )
+    for kw, err in zip(keywords, errors):
+        if err:
+            print(f"  Search keyword '{kw}' failed: {err}")
+    return [r for r in results if r]
 
 
 def pull_trending_posts(keywords: List[str], max_per_keyword: int, days_back: int) -> List[dict]:
     """Search by genre keywords (relevance sort), filter to recent, re-rank by engagement."""
-    results = _search_scraper.search_linkedin_posts_batch(
-        keywords=keywords, sort="relevance", max_posts=max_per_keyword,
-    )
+    results = _search_keywords(keywords, sort="relevance", max_posts=max_per_keyword)
     posts: List[dict] = []
     for r in results:
         for p in r.get("posts", []):
@@ -314,9 +406,9 @@ def pull_trending_posts(keywords: List[str], max_per_keyword: int, days_back: in
 
 def pull_signal_posts(keywords: List[str], max_per_keyword: int, days_back: int) -> List[dict]:
     """Search by signal keywords (date sort), filter to recent."""
-    results = _search_scraper.search_linkedin_posts_batch(
-        keywords=keywords, sort="date_posted", max_posts=max_per_keyword,
-    )
+    global _SEARCH_MAX_POSTS
+    _SEARCH_MAX_POSTS = max_per_keyword
+    results = _search_keywords(keywords, sort="date_posted", max_posts=max_per_keyword)
     posts: List[dict] = []
     for r in results:
         for p in r.get("posts", []):
@@ -351,6 +443,13 @@ def _strip_json_fence(text: str) -> str:
     if text.startswith("```"):
         lines = text.split("\n")
         text = "\n".join(lines[1:-1]).strip()
+    # Tolerate prose preamble/suffix around the JSON: carve out the outermost
+    # object or array. Models sometimes reason in prose before emitting JSON.
+    if text and text[0] not in "{[":
+        starts = [i for i in (text.find("{"), text.find("[")) if i != -1]
+        ends = [i for i in (text.rfind("}"), text.rfind("]")) if i != -1]
+        if starts and ends and max(ends) > min(starts):
+            text = text[min(starts):max(ends) + 1].strip()
     return text
 
 
@@ -553,40 +652,73 @@ def main():
 
     all_posts: List[dict] = []
 
-    # ---- Source 1: ICP profiles
-    if not args.skip_icp:
+    # ---- Sources. ICP uses the profile-posts actor; trending + signal share
+    # the posts-search actor. Each source below handles its own skip/config and
+    # returns its posts. In auto mode the ICP stream and the search stream run
+    # concurrently (different actors → no shared throttle); within each stream
+    # calls stay rate-limited. Interactive mode runs them sequentially so the
+    # between-source pauses still make sense.
+
+    def run_icp() -> List[dict]:
+        if args.skip_icp:
+            return []
         if "TODO" in icp_sheet_id:
             print("[ICP] Sheet ID not configured in config.json — skipping ICP source.")
+            return []
+        print(f"[ICP] Reading profile URLs from sheet '{icp_sheet_name}'...")
+        urls = read_icp_profile_urls(icp_sheet_id, icp_sheet_name, icp_url_col)
+        # Dedupe — duplicate URLs in the sheet would otherwise pay for the same
+        # profile-posts run more than once.
+        deduped = list(dict.fromkeys(urls))
+        if len(deduped) < len(urls):
+            print(f"  Found {len(urls)} URLs ({len(urls) - len(deduped)} duplicate(s) skipped).")
         else:
-            print(f"[ICP] Reading profile URLs from sheet '{icp_sheet_name}'...")
-            urls = read_icp_profile_urls(icp_sheet_id, icp_sheet_name, icp_url_col)
-            print(f"  Found {len(urls)} ICP profile URLs.")
-            if urls:
-                print(f"[ICP] Pulling posts ({SLEEP_BETWEEN_PROFILES}s between profiles)...")
-                icp_posts = pull_icp_posts(urls, max_per_profile, days_back)
-                print(f"  Got {len(icp_posts)} ICP posts.")
-                all_posts.extend(icp_posts)
-        if interactive:
-            _pause("ICP pull complete")
+            print(f"  Found {len(deduped)} ICP profile URLs.")
+        urls = deduped
+        if not urls:
+            return []
+        print(f"[ICP] Pulling posts (≥{SLEEP_BETWEEN_PROFILES}s between starts, up to {ICP_CONCURRENCY} in flight)...")
+        icp_posts = pull_icp_posts(urls, max_per_profile, days_back)
+        print(f"  Got {len(icp_posts)} ICP posts.")
+        return icp_posts
 
-    # ---- Source 2: Trending
-    if not args.skip_trending:
+    def run_trending() -> List[dict]:
+        if args.skip_trending:
+            return []
         print(f"[TRENDING] Searching {len(genre_keywords)} genre keywords...")
-        trending = pull_trending_posts(genre_keywords, max_per_keyword, days_back)
-        trending = trending[:trending_top_n]
+        trending = pull_trending_posts(genre_keywords, max_per_keyword, days_back)[:trending_top_n]
         print(f"  Got {len(trending)} trending posts (top {trending_top_n} by engagement).")
-        all_posts.extend(trending)
-        if interactive:
-            _pause("Trending pull complete")
+        return trending
 
-    # ---- Source 3: Signal
-    if not args.skip_signal:
+    def run_signal() -> List[dict]:
+        if args.skip_signal:
+            return []
         print(f"[SIGNAL] Searching {len(signal_keywords)} signal keywords...")
         signal_posts = pull_signal_posts(signal_keywords, max_per_keyword, days_back)
         print(f"  Got {len(signal_posts)} signal posts.")
-        all_posts.extend(signal_posts)
-        if interactive:
+        return signal_posts
+
+    if interactive:
+        all_posts.extend(run_icp())
+        if not args.skip_icp:
+            _pause("ICP pull complete")
+        all_posts.extend(run_trending())
+        if not args.skip_trending:
+            _pause("Trending pull complete")
+        all_posts.extend(run_signal())
+        if not args.skip_signal:
             _pause("Signal pull complete")
+    else:
+        # Search stream keeps trending → signal sequential (one stream on the
+        # shared posts-search actor), running alongside the ICP stream.
+        def search_stream() -> List[dict]:
+            return run_trending() + run_signal()
+
+        with ThreadPoolExecutor(max_workers=2) as ex:
+            icp_fut = ex.submit(run_icp)
+            search_fut = ex.submit(search_stream)
+            all_posts.extend(icp_fut.result())
+            all_posts.extend(search_fut.result())
 
     # ---- Dedupe
     all_posts = dedupe_posts(all_posts)

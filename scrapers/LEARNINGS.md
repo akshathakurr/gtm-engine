@@ -56,13 +56,21 @@ This is the cleanest version. Do NOT use the devnull/stdout redirect pattern fro
 The `ApifyClient` SDK handles polling automatically. Use it unless the actor requires a non-standard run flow.
 ```python
 from apify_client import ApifyClient
+from scrapers._apify import dataset_items, ApifyRunError
 
 client = ApifyClient(APIFY_TOKEN)
 with _suppress_apify_logs():
     run = client.actor(ACTOR_ID).call(run_input=payload)
-items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+items = dataset_items(client, run)   # reads run.default_dataset_id; raises ApifyRunError if run is None
 ```
-Do NOT use raw `requests.post` + manual polling (`_run_actor`, `_wait_for_run`, `_fetch_dataset`). The Post Research scraper does this — it works but it's more code for no benefit. SDK is the standard.
+Read the dataset via `dataset_items(client, run)` — never `run["defaultDatasetId"]`.
+In **apify-client 3.x**, `.call()` returns a `Run` model (attribute access: `run.default_dataset_id`),
+which is **not** subscriptable, so `run["defaultDatasetId"]` raises `TypeError`. It also returns
+`None` when the run fails/aborts/times out; `dataset_items` guards that and raises `ApifyRunError`,
+which a scraper inside a `try/except` turns into its normal error shape (never a stack trace to the user).
+`requirements.txt` pins `apify-client>=3,<4` so this contract can't drift back to the 1.x dict form.
+
+Do NOT use raw `requests.post` + manual polling (`_run_actor`, `_wait_for_run`, `_fetch_dataset`). The Post Research scraper does this — it works but it's more code for no benefit. SDK is the standard. (That scraper's `run` is a raw REST dict, so it alone still uses `run["defaultDatasetId"]`.)
 
 ### 5. Main function — always returns a dict, never raises
 ```python
@@ -197,23 +205,31 @@ LinkedIn company slugs (the identifier in the URL) are not always derivable from
 
 ## Code patterns (copy from existing scrapers, don't reinvent)
 
-### Log suppression — always include this
+### Log suppression — must be thread-safe
+Disable Apify actor-run log streaming at the source by passing `logger=None` to
+`.call(...)`, and silence the client logger once at import. Do **NOT** swap
+`sys.stdout`/`sys.stderr` (or use `contextlib.redirect_stderr`) — a global stream
+swap corrupts output when scrapers run concurrently (workflows now parallelize
+scrapes across worker threads), leaving stdout pointed at a closed/devnull stream.
+
 ```python
+import logging
 from contextlib import contextmanager
+
+# Once at import — thread-safe, happens before any concurrent use.
+logging.getLogger("apify_client").setLevel(logging.WARNING)
 
 @contextmanager
 def _suppress_apify_logs():
-    with open(os.devnull, "w") as devnull:
-        old_stdout, old_stderr = sys.stdout, sys.stderr
-        sys.stdout = devnull
-        sys.stderr = devnull
-        try:
-            yield
-        finally:
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
+    # No-op kept for call-site compatibility; streaming is disabled per call below.
+    yield
+
+# At every call site:
+run = client.actor(ACTOR_ID).call(run_input=payload, logger=None)
+items = dataset_items(client, run)
 ```
-Wrap every `client.actor(...).call(...)` in `with _suppress_apify_logs():`. Without this, Apify floods the terminal with hundreds of log lines.
+The old stdout/stderr-swapping version is unsafe under concurrency — every scraper
+that swaps streams in one thread corrupts *all* threads' output for that window.
 
 ### Deduplication — always track seen URNs
 Apify actors can return the same item across paginated calls. Always maintain a `seen_urns` set and skip duplicates.

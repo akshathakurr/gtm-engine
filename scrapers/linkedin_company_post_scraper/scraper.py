@@ -5,6 +5,11 @@ from contextlib import contextmanager
 from typing import Optional
 from apify_client import ApifyClient
 
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+from scrapers._apify import dataset_items, ApifyRunError  # noqa: E402
+
 # ⚠️  FIELD NAME WARNING
 # This scraper was built without a live discovery call (Apify monthly limit was exceeded).
 # Field names below are based on apimaestro's profile-post actor conventions.
@@ -59,6 +64,7 @@ def scrape_linkedin_company_posts(
     company_slug = _extract_slug(company_url)
 
     all_raw: list = []
+    errors: list = []
     pagination_token: Optional[str] = None
     seen_urns: set = set()
     page = 1
@@ -78,7 +84,11 @@ def scrape_linkedin_company_posts(
 
         with _suppress_apify_logs():
             run = client.actor(ACTOR_ID).call(run_input=actor_input)
-        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+        try:
+            items = dataset_items(client, run)
+        except ApifyRunError as e:
+            errors.append(f"Actor run failed (page {page}): {e}")
+            break
 
         if not items:
             break
@@ -108,7 +118,7 @@ def scrape_linkedin_company_posts(
         "company_url": company_url,
         "total": len(posts),
         "posts": posts,
-        "errors": [],
+        "errors": errors,
     }
 
 
@@ -225,7 +235,7 @@ if __name__ == "__main__":
         print(f"Discovery call for {slug}...")
         with _suppress_apify_logs():
             run = client.actor(ACTOR_ID).call(run_input=actor_input)
-        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+        items = dataset_items(client, run)
         output_path = os.path.join(os.path.dirname(__file__), "raw_sample.json")
         with open(output_path, "w") as f:
             json.dump(items, f, indent=2, ensure_ascii=False)

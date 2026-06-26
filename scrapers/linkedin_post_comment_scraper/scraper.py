@@ -20,6 +20,11 @@ from contextlib import contextmanager
 from dotenv import load_dotenv
 from apify_client import ApifyClient
 
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+from scrapers._apify import dataset_items  # noqa: E402
+
 load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))
 
 ACTOR_ID = "apimaestro/linkedin-post-comments-replies-engagements-scraper-no-cookies"
@@ -117,7 +122,7 @@ def scrape_post_comments(
         try:
             with _suppress_apify_logs():
                 run = client.actor(ACTOR_ID).call(run_input=run_input)
-            items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+            items = dataset_items(client, run)
         except Exception as e:
             errors.append(f"Actor run failed (page {page}): {e}")
             break

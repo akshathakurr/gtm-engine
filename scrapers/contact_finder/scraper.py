@@ -24,7 +24,6 @@ import sys
 import json
 import time
 import contextlib
-import io
 from typing import Optional, List
 
 import requests
@@ -37,8 +36,11 @@ BASE_URL = "https://api.apollo.io/api/v1"
 
 @contextlib.contextmanager
 def _suppress_logs():
-    with contextlib.redirect_stderr(io.StringIO()):
-        yield
+    # No-op, kept for call-site compatibility. Previously redirected sys.stderr
+    # to an in-memory buffer, but a global stream swap corrupts output when
+    # email lookups run on worker threads. These calls use raw `requests`
+    # (Apollo REST), so there is nothing streaming to suppress.
+    yield
 
 
 def _headers() -> dict:

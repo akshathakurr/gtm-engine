@@ -23,6 +23,11 @@ from contextlib import contextmanager
 import requests
 from dotenv import load_dotenv
 
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+from scrapers._apify import dataset_items  # noqa: E402
+
 load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))
 
 JINA_BASE = "https://r.jina.ai/"
@@ -31,17 +36,22 @@ G2_ACTOR_ID = "zen-studio/g2-reviews-scraper"
 
 # ── Apify log suppression ────────────────────────────────────────────────────
 
+import logging
+
+# Silence Apify's client logger once at import (thread-safe). Per-call actor-run
+# log streaming is disabled via logger=None.
+logging.getLogger("apify_client").setLevel(logging.WARNING)
+
+
 @contextmanager
 def _suppress_apify_logs():
-    with open(os.devnull, "w") as devnull:
-        old_stdout, old_stderr = sys.stdout, sys.stderr
-        sys.stdout = devnull
-        sys.stderr = devnull
-        try:
-            yield
-        finally:
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
+    """No-op, kept for call-site compatibility.
+
+    Previously swapped sys.stdout/sys.stderr to /dev/null, but a global stream
+    swap corrupts output when this scraper runs alongside others on worker
+    threads. Streaming is disabled at the source via ``.call(logger=None)``.
+    """
+    yield
 
 
 # ── G2 ───────────────────────────────────────────────────────────────────────
@@ -62,8 +72,9 @@ def _scrape_g2(product_url: str, max_reviews: int) -> dict:
             run = client.actor(G2_ACTOR_ID).call(
                 run_input={"url": product_url},
                 max_items=platform_max,
+                logger=None,
             )
-        raw_items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+        raw_items = dataset_items(client, run)
     except Exception as e:
         return _error_result("g2", product_url, f"Actor run failed: {e}")
 

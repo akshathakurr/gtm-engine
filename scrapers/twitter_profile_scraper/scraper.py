@@ -20,23 +20,33 @@ from contextlib import contextmanager
 from dotenv import load_dotenv
 from apify_client import ApifyClient
 
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+from scrapers._apify import dataset_items  # noqa: E402
+
 load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))
 
 ACTOR_ID = "altimis/scweet"
 TWITTER_DATE_FORMAT = "%a %b %d %H:%M:%S +0000 %Y"
 
 
+import logging
+
+# Silence Apify's client logger once at import (thread-safe). Per-call actor-run
+# log streaming is disabled via logger=None.
+logging.getLogger("apify_client").setLevel(logging.WARNING)
+
+
 @contextmanager
 def _suppress_apify_logs():
-    with open(os.devnull, "w") as devnull:
-        old_stdout, old_stderr = sys.stdout, sys.stderr
-        sys.stdout = devnull
-        sys.stderr = devnull
-        try:
-            yield
-        finally:
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
+    """No-op, kept for call-site compatibility.
+
+    Previously swapped sys.stdout/sys.stderr to /dev/null, but a global stream
+    swap corrupts output when this scraper runs alongside others on worker
+    threads. Streaming is disabled at the source via ``.call(logger=None)``.
+    """
+    yield
 
 
 def _parse_twitter_date(date_str: str) -> Optional[datetime]:
@@ -167,8 +177,9 @@ def scrape_twitter_profile(
             run = client.actor(ACTOR_ID).call(
                 run_input=run_input,
                 max_items=platform_max,
+                logger=None,
             )
-        raw_items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+        raw_items = dataset_items(client, run)
     except Exception as e:
         errors.append(f"Actor run failed: {e}")
         return {

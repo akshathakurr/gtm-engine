@@ -12,7 +12,6 @@ import os
 import sys
 import time
 import contextlib
-import io
 from typing import Optional, List
 from datetime import datetime
 
@@ -27,8 +26,12 @@ BASE_URL = "https://api.apify.com/v2"
 
 @contextlib.contextmanager
 def _suppress_apify_logs():
-    with contextlib.redirect_stderr(io.StringIO()):
-        yield
+    # No-op, kept for call-site compatibility. This used to redirect sys.stderr
+    # to an in-memory buffer, but a global stream swap corrupts output when
+    # searches run concurrently (workflows now search several keywords in
+    # parallel). These calls use raw `requests`, so there is no actor-log
+    # streaming to suppress anyway.
+    yield
 
 
 def _run_actor(payload: dict) -> str:
@@ -148,6 +151,7 @@ def search_linkedin_posts(
         if run["status"] != "SUCCEEDED":
             errors.append(f"Actor run failed with status: {run['status']}")
         else:
+            # `run` here is a raw REST dict from _wait_for_run, not an SDK Run object.
             dataset_id = run["defaultDatasetId"]
             raw_items = _fetch_dataset(dataset_id, limit=max_posts)
 
