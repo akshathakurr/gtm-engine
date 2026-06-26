@@ -1,0 +1,20 @@
+{
+  "type": "object",
+  "properties": {
+    "url": {
+      "type": "string",
+      "description": "The page URL to scrape (e.g. a pricing or case-studies page)."
+    },
+    "wait_ms": {
+      "type": "integer",
+      "description": "Milliseconds to wait for JS content to render before capture.",
+      "default": 3000
+    },
+    "only_main_content": {
+      "type": "boolean",
+      "description": "Strip nav/header/footer chrome and return only main content.",
+      "default": true
+    }
+  },
+  "required": ["url"]
+}

@@ -46,6 +46,7 @@ from scrapers.website_scraper import scraper as _website_mod
 from scrapers.linkedin_profile_post_scraper import scraper as _li_posts_mod
 from scrapers.twitter_profile_scraper import scraper as _twitter_mod
 from scrapers.review_scraper import scraper as _review_mod
+from scrapers.firecrawl_scraper import scraper as _firecrawl_mod
 
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -334,13 +335,22 @@ OUTPUT_COLUMNS = [
 # ---------------------------------------------------------------------------
 
 def scrape_website(url: str) -> dict:
+    """Scrape a company website. Uses Firecrawl (JS-rendered, reliable) when
+    FIRECRAWL_API_KEY is set; falls back to the static scraper otherwise."""
     if not url:
         return {}
     try:
+        fc = _firecrawl_mod.scrape_website(url)
+        if fc is not None:
+            return fc
+        # No Firecrawl key — fall back to the static requests/BeautifulSoup path.
         return _website_mod.scrape_website(url=url)
     except Exception as e:
         print(f"    Website scrape error: {e}")
-        return {}
+        try:
+            return _website_mod.scrape_website(url=url)
+        except Exception:
+            return {}
 
 
 # ---------------------------------------------------------------------------
@@ -808,16 +818,25 @@ def extract_product_info(
     homepage   = scraped.get("homepage_text", "")[:2000]
     product_t  = pricing_t = customers_t = blog_t = ""
 
+    # A site can expose several pages that match the same bucket (e.g. /pricing
+    # AND /pages/pricing). Keep the one with the MOST content — a thin/empty
+    # duplicate must not clobber the real page. Pricing tables also sit below
+    # hero/FAQ copy, so keep enough of the page that price figures survive
+    # (Popl's start at ~2135 chars).
     for key, text in page_texts.items():
         kl = key.lower()
         if any(kw in kl for kw in ["product", "platform", "feature", "solution"]):
-            product_t = text[:2500]
+            if len(text) > len(product_t):
+                product_t = text[:2500]
         elif any(kw in kl for kw in ["pricing", "plan"]):
-            pricing_t = text[:2000]
+            if len(text) > len(pricing_t):
+                pricing_t = text[:9000]
         elif any(kw in kl for kw in ["customer", "case", "stor", "client", "logo"]):
-            customers_t = text[:1500]
+            if len(text) > len(customers_t):
+                customers_t = text[:1500]
         elif any(kw in kl for kw in ["blog", "resource", "insight", "article"]):
-            blog_t = text[:2000]
+            if len(text) > len(blog_t):
+                blog_t = text[:2000]
 
     # Top logos: prefer scraper's extracted list, fall back to customers page text
     top_logos = ", ".join(scraped.get("customers", [])[:5])

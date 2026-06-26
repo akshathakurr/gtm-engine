@@ -341,6 +341,7 @@ def scrape_website(url: str) -> dict:
             "founded_year": None,
             "icp_hints": [],
             "full_text_by_page": {},
+            "page_urls": {},
             "errors": [f"Failed to fetch homepage: {base_url}"],
         }
 
@@ -353,6 +354,7 @@ def scrape_website(url: str) -> dict:
 
     # Fetch key pages in parallel — keep soups for logo extraction
     full_text_by_page = {"homepage": homepage_text}
+    page_urls = {"homepage": base_url}  # label -> source URL, for downstream re-fetch
     pages_scraped = ["homepage"]
     all_soups = [homepage_soup]
 
@@ -369,6 +371,7 @@ def scrape_website(url: str) -> dict:
             label = urlparse(page_url).path.strip("/").replace("/", "_") or "home"
             if text:
                 full_text_by_page[label] = text
+                page_urls[label] = page_url
                 pages_scraped.append(label)
                 all_soups.append(soup)
             else:
@@ -404,6 +407,7 @@ def scrape_website(url: str) -> dict:
         "founded_year": founded_year,
         "icp_hints": icp_hints,
         "full_text_by_page": full_text_by_page,
+        "page_urls": page_urls,
         "errors": errors,
     }
 

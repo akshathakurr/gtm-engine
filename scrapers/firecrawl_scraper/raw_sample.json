@@ -1,0 +1,55 @@
+{
+  "success": true,
+  "data": {
+    "markdown": "Introducing Firecrawl Research Index, a specialized index for AI/ML research with SOTA recall. [Try it now →](https://docs.firecrawl.dev/features/research?utm_source=firecrawl-web&utm_medium=banner&utm_campaign=research-index-launch)\n\n//\n\nTransparent\n\n//\n\n# Flexible pricing\n\nStart for free, then scale as you grow.\n\nMonthly credits\n\n1k\n\n5k\n\n6.5k\n\n8k\n\n100k\n\n130k\n\n160k\n\n500k\n\n650k\n\n1M\n\nCustom\n\n🇺🇸USD\n\n### Free Plan\n\nA lightweight way to get started.\n\nNo cost, no card, no hassle.\n\n1,000 credits / month\n\n$0123456789\n\n/month\n\nGet started\n\nScrape1,000pages\n\n2 concurrent requests\n\nLow rate limits\n\n### Hobby\n\nGreat for side projects and small tools.\n\nFast, simple, no overkill.\n\n5,000 credits / month\n\n$01234567890123456789\n\n/month\n\nBilled yearly\n\nSave $38\n\nSubscribe\n\nScrape5,000pages\n\n5 concurrent re\n...[truncated for sample]",
+    "metadata": {
+      "sentry-trace": [
+        "c9cfc9c030f0971c6484633b6462d660-3dd2daad774771c7-0",
+        "c9cfc9c030f0971c6484633b6462d660-5e851cd0776685ef-0"
+      ],
+      "twitter:title": "Firecrawl - The context API to search, scrape, and interact with the web at scale. 🔥",
+      "referrer": "origin-when-cross-origin",
+      "og:site_name": "Firecrawl - The context API to search, scrape, and interact with the web at scale. 🔥",
+      "twitter:creator": "@firecrawl",
+      "og:title": "Firecrawl - The context API to search, scrape, and interact with the web at scale. 🔥",
+      "next-size-adjust": "",
+      "ogDescription": "Firecrawl is the context API to search, scrape, and interact with the web at scale. Turn any source into clean Markdown or structured data your agents can ship with.",
+      "author": "Firecrawl",
+      "publisher": "Firecrawl",
+      "og:image": "https://www.firecrawl.dev/og.png",
+      "twitter:site": "@firecrawl",
+      "og:url": "https://www.firecrawl.dev",
+      "og:type": "website",
+      "language": "en",
+      "viewport": "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no",
+      "ogTitle": "Firecrawl - The context API to search, scrape, and interact with the web at scale. 🔥",
+      "robots": "follow, index",
+      "og:description": "Firecrawl is the context API to search, scrape, and interact with the web at scale. Turn any source into clean Markdown or structured data your agents can ship with.",
+      "baggage": [
+        "sentry-environment=vercel-production,sentry-release=15f9081eb6bf4162776f47a044c3ea11e2295b88,sentry-public_key=1d3122a166ee4102e2fa0b2f1f49b6af,sentry-trace_id=c9cfc9c030f0971c6484633b6462d660,sentry-org_id=4510354045468672,sentry-sampled=false,sentry-sample_rand=0.33282725039066174,sentry-sample_rate=0",
+        "sentry-environment=vercel-production,sentry-release=15f9081eb6bf4162776f47a044c3ea11e2295b88,sentry-public_key=1d3122a166ee4102e2fa0b2f1f49b6af,sentry-trace_id=c9cfc9c030f0971c6484633b6462d660,sentry-org_id=4510354045468672,sentry-sampled=false,sentry-sample_rand=0.33282725039066174,sentry-sample_rate=0"
+      ],
+      "twitter:card": "summary_large_image",
+      "ogSiteName": "Firecrawl - The context API to search, scrape, and interact with the web at scale. 🔥",
+      "twitter:description": "Firecrawl is the context API to search, scrape, and interact with the web at scale. Turn any source into clean Markdown or structured data your agents can ship with.",
+      "ogUrl": "https://www.firecrawl.dev",
+      "keywords": "Firecrawl,AI web data,web scraping API,AI agents,search API,interact API,web data infrastructure,LLM,open source",
+      "creator": "Firecrawl",
+      "twitter:image": "https://www.firecrawl.dev/og.png",
+      "title": "Pricing | Firecrawl",
+      "ogImage": "https://www.firecrawl.dev/og.png",
+      "description": "Flexible, usage-based pricing for Firecrawl. Search, scrape, crawl, and interact with the web at scale. Free tier available, pay-as-you-go credits, and custom enterprise plans.",
+      "favicon": "https://www.firecrawl.dev/favicon.png",
+      "scrapeId": "019f04b6-36e5-76a8-b2f7-db85ca066c10",
+      "sourceURL": "https://www.firecrawl.dev/pricing",
+      "url": "https://www.firecrawl.dev/pricing",
+      "statusCode": 200,
+      "contentType": "text/html; charset=utf-8",
+      "proxyUsed": "basic",
+      "cacheState": "hit",
+      "cachedAt": "2026-06-26T07:22:12.093Z",
+      "creditsUsed": 1,
+      "concurrencyLimited": false
+    }
+  }
+}
