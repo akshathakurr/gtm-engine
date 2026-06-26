@@ -105,6 +105,13 @@ def _strip_json_fence(text: str) -> str:
     if text.startswith("```"):
         lines = text.split("\n")
         text = "\n".join(lines[1:-1]).strip()
+    # Tolerate prose preamble/suffix around the JSON: carve out the outermost
+    # object or array. Models sometimes reason in prose before emitting JSON.
+    if text and text[0] not in "{[":
+        starts = [i for i in (text.find("{"), text.find("[")) if i != -1]
+        ends = [i for i in (text.rfind("}"), text.rfind("]")) if i != -1]
+        if starts and ends and max(ends) > min(starts):
+            text = text[min(starts):max(ends) + 1].strip()
     return text
 
 
@@ -129,6 +136,10 @@ REQUIRED_SECTIONS = [
     {
         "key": "project",
         "header": "Project",
+        # The standard context.md (from the 2-question onboarding) describes the
+        # project via Product + Who it's for, not a dedicated Project section.
+        # Fall back to those so blog_builder works without a Project header.
+        "fallback_headers": ["Product", "Who it's for"],
         "prompt": "What is your project / company? (one paragraph — what it does, who it's for, what problem it solves)",
     },
     {
@@ -208,7 +219,9 @@ def parse_reference_sources(text: str) -> List[Dict[str, str]]:
     out: List[Dict[str, str]] = []
     for line in body.splitlines():
         line = line.strip()
-        if not line or line.startswith("#") or line.startswith("(") or line.startswith("-"):
+        # Skip blanks, comments, scaffolding bullets, and ``` code-fence lines
+        # (the documented context.md wraps the reference block in a fence).
+        if not line or line.startswith(("#", "(", "-", "```")):
             continue
         if "|" in line:
             name, domain = [x.strip() for x in line.split("|", 1)]
@@ -248,6 +261,10 @@ def ensure_context_complete(auto: bool) -> Dict[str, str]:
 
     for spec in REQUIRED_SECTIONS:
         body = _section_body(text, spec["header"])
+        if not body:
+            # Try fallback sections (e.g. Project ← Product + Who it's for)
+            parts = [_section_body(text, h) for h in spec.get("fallback_headers", [])]
+            body = "\n\n".join(p for p in parts if p).strip()
         if body:
             captured[spec["key"]] = body
         else:
