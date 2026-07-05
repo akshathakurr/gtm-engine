@@ -50,6 +50,17 @@ def _strip_json_fence(text: str) -> str:
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```$", "", text)
+    text = text.strip()
+    # Tolerate prose preamble/suffix (and trailing "Extra data") around the JSON:
+    # carve out the outermost object or array.
+    if text and text[0] not in "{[":
+        starts = [i for i in (text.find("{"), text.find("[")) if i != -1]
+        if starts:
+            text = text[min(starts):]
+    if text and text[-1] not in "}]":
+        ends = [i for i in (text.rfind("}"), text.rfind("]")) if i != -1]
+        if ends:
+            text = text[:max(ends) + 1]
     return text.strip()
 
 
@@ -58,7 +69,10 @@ def _claude_json(client: anthropic.Anthropic, prompt: str, max_tokens: int = 150
         model=CLAUDE_MODEL, max_tokens=max_tokens,
         messages=[{"role": "user", "content": prompt}],
     )
-    return json.loads(_strip_json_fence(resp.content[0].text))
+    text = _strip_json_fence(resp.content[0].text)
+    # raw_decode parses the first JSON value and ignores any trailing text
+    # (Claude sometimes appends a note after the JSON → "Extra data" on loads).
+    return json.JSONDecoder().raw_decode(text)[0]
 
 
 def _twitter_handle_from_url(url: str) -> Optional[str]:
@@ -93,12 +107,14 @@ def resolve_identity(
     if twitter_url or not client:
         return identity
 
-    # Look for the handle on twitter/x via Exa
+    # Find the person's Twitter/X handle. Exa's plan rejects include_domains for
+    # twitter.com / x.com (returns 403 SOURCE_NOT_AVAILABLE), so we search
+    # broadly and keep only results whose URL is a twitter/x profile — the
+    # candidate loop below filters to those via _twitter_handle_from_url().
     try:
         result = search_web(
-            query=f'"{name}" {company} twitter',
-            num_results=5,
-            include_domains=["twitter.com", "x.com"],
+            query=f'"{name}" {company} twitter OR x.com profile',
+            num_results=10,
             summary_question=f"Is this the Twitter/X profile of {name} who works at {company}? What is their bio?",
         )
     except Exception as e:

@@ -19,6 +19,7 @@ as fallback if the fields are not filled in.
 Usage:
   python -m workflows.linkedin_outreach.workflow --sheet-id SHEET_ID
   python -m workflows.linkedin_outreach.workflow --sheet-id SHEET_ID --sheet-name "Leads"
+  python -m workflows.linkedin_outreach.workflow --sheet-id SHEET_ID --limit 5   # quick test run
   python -m workflows.linkedin_outreach.workflow --sheet-id SHEET_ID --add-persona "VP Sales"
   python -m workflows.linkedin_outreach.workflow --sheet-id SHEET_ID --remove-persona "Founder"
   python -m workflows.linkedin_outreach.workflow --sheet-id SHEET_ID --enrich-columns "Employee Count,HQ"
@@ -86,6 +87,76 @@ SCORE_FIELDS: List[Dict[str, str]] = [
 # Fallback scraping defaults if not defined in icp.md
 DEFAULT_MAX_POSTS = 15
 DEFAULT_DAYS_BACK  = 90
+
+
+# Concurrency. Per-lead compute (Claude + Exa + Apify) runs in a bounded pool;
+# the backend is written sequentially on the main thread afterwards, so it is
+# never touched concurrently. Throttled services use a rate limiter that spaces
+# call *starts* by a fixed interval.
+ENRICH_CONCURRENCY = 6        # Claude/Exa per-lead steps
+POSTS_MIN_INTERVAL = 5        # seconds between profile-posts runs (step 6)
+POSTS_CONCURRENCY = 3
+# Classify/score run one LLM call per chunk of leads (not one call for the whole
+# sheet). Chunking prevents (a) JSON truncation on large sheets — 1000 leads
+# overrun max_tokens and later leads come back blank — and (b) batch-context
+# drift, where the same lead is classified differently depending on its neighbours.
+LLM_BATCH_SIZE = 40
+
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
+
+class _RateLimiter:
+    """Spaces successive acquire() calls >= min_interval apart (thread-safe).
+
+    Spacing applies to call *starts*, so slow work after acquire() overlaps
+    across threads without bursting a rate-limited service.
+    """
+
+    def __init__(self, min_interval: float):
+        self._min_interval = min_interval
+        self._lock = threading.Lock()
+        self._next = 0.0
+
+    def acquire(self) -> None:
+        if self._min_interval <= 0:
+            return
+        with self._lock:
+            now = time.monotonic()
+            wait = self._next - now
+            if wait > 0:
+                time.sleep(wait)
+                now += wait
+            self._next = now + self._min_interval
+
+
+def _map_rate_limited(fn, items: list, *, min_interval: float = 0.0, max_workers: int = ENRICH_CONCURRENCY):
+    """Run fn(item) over a bounded pool, starts spaced >= min_interval.
+
+    Returns (results, errors) aligned to `items`. fn exceptions are captured
+    (result None, error set), never raised, so one bad item can't kill the batch.
+    Results preserve input order.
+    """
+    n = len(items)
+    if n == 0:
+        return [], []
+    limiter = _RateLimiter(min_interval)
+    results: List[Optional[object]] = [None] * n
+    errors: List[Optional[Exception]] = [None] * n
+
+    def task(idx, item):
+        limiter.acquire()
+        try:
+            return idx, fn(item), None
+        except Exception as e:  # noqa: BLE001 — captured per item, surfaced to caller
+            return idx, None, e
+
+    with ThreadPoolExecutor(max_workers=min(max_workers, n)) as ex:
+        for fut in [ex.submit(task, i, it) for i, it in enumerate(items)]:
+            idx, res, err = fut.result()
+            results[idx] = res
+            errors[idx] = err
+    return results, errors
 
 
 # ---------------------------------------------------------------------------
@@ -305,6 +376,13 @@ def _strip_json_fence(text: str) -> str:
     if text.startswith("```"):
         lines = text.split("\n")
         text = "\n".join(lines[1:-1]).strip()
+    # Tolerate prose preamble/suffix around the JSON: carve out the outermost
+    # object or array. Models sometimes reason in prose before emitting JSON.
+    if text and text[0] not in "{[":
+        starts = [i for i in (text.find("{"), text.find("[")) if i != -1]
+        ends = [i for i in (text.rfind("}"), text.rfind("]")) if i != -1]
+        if starts and ends and max(ends) > min(starts):
+            text = text[min(starts):max(ends) + 1].strip()
     return text
 
 
@@ -346,7 +424,7 @@ Return JSON: {{"<field_name>": [<idx>, ...] or null, ...}}
 Only valid JSON, no explanation."""
 
     resp = client.messages.create(
-        model=CLAUDE_MODEL, max_tokens=400,
+        model=CLAUDE_MODEL, temperature=0, max_tokens=400,
         messages=[{"role": "user", "content": prompt}],
     )
     parsed = json.loads(_strip_json_fence(resp.content[0].text))
@@ -413,7 +491,7 @@ Only valid JSON, no explanation."""
 
     try:
         resp = client.messages.create(
-            model=CLAUDE_MODEL, max_tokens=200,
+            model=CLAUDE_MODEL, temperature=0, max_tokens=200,
             messages=[{"role": "user", "content": prompt}],
         )
         parsed = json.loads(_strip_json_fence(resp.content[0].text))
@@ -450,12 +528,12 @@ def classify_personas(
     if remove_personas:
         overrides += f"\nFor this run only, exclude these titles/roles: {', '.join(remove_personas)}"
 
-    leads_block = "\n".join(
-        f"{i+1}. Name: {l['name']} | Title: {l['position']} | Company: {l['company']}"
-        for i, l in enumerate(leads)
-    )
-
-    prompt = f"""You are a B2B sales analyst classifying leads by buyer role.
+    def _classify_chunk(chunk: List[Dict]) -> List[str]:
+        leads_block = "\n".join(
+            f"{i+1}. Name: {l['name']} | Title: {l['position']} | Company: {l['company']}"
+            for i, l in enumerate(chunk)
+        )
+        prompt = f"""You are a B2B sales analyst classifying leads by buyer role.
 
 ICP / Buyer Persona Context:
 {icp_context}
@@ -472,14 +550,26 @@ Leads:
 Return a JSON array — one object per lead — with "index" (1-based) and "classification".
 Only return valid JSON, no explanation."""
 
-    resp = client.messages.create(
-        model=CLAUDE_MODEL, max_tokens=2000,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    parsed = json.loads(_strip_json_fence(resp.content[0].text))
-    result = [""] * len(leads)
-    for item in parsed:
-        result[item["index"] - 1] = item["classification"]
+        resp = client.messages.create(
+            model=CLAUDE_MODEL, temperature=0, max_tokens=2000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        parsed = json.loads(_strip_json_fence(resp.content[0].text))
+        out = [""] * len(chunk)
+        for item in parsed:
+            idx = item.get("index", 0) - 1
+            if 0 <= idx < len(chunk):
+                out[idx] = item.get("classification", "")
+        return out
+
+    # One call per chunk keeps each response small (no truncation) and each
+    # lead judged against only its chunk. Chunks are independent → run in parallel.
+    chunks = [leads[i:i + LLM_BATCH_SIZE] for i in range(0, len(leads), LLM_BATCH_SIZE)]
+    chunk_results, _ = _map_rate_limited(_classify_chunk, chunks, max_workers=ENRICH_CONCURRENCY)
+    result: List[str] = []
+    for chunk, res in zip(chunks, chunk_results):
+        # A failed chunk yields None — pad with blanks so later chunks stay aligned.
+        result.extend(res if res is not None else [""] * len(chunk))
     return result
 
 
@@ -545,7 +635,7 @@ Return only valid JSON, no explanation."""
 
     try:
         resp = client.messages.create(
-            model=CLAUDE_MODEL, max_tokens=500,
+            model=CLAUDE_MODEL, temperature=0, max_tokens=500,
             messages=[{"role": "user", "content": prompt}],
         )
         return json.loads(_strip_json_fence(resp.content[0].text))
@@ -560,19 +650,21 @@ def score_leads(
     icp_context: str,
     client: anthropic.Anthropic,
 ) -> List[Dict[str, str]]:
-    leads_block = "\n".join(
-        (
-            f"{i+1}. {l['name']} | {l['position']} @ {l['company']} | Persona: {classifications[i]}"
-            + (f" | Employees: {l['employee_count']}" if l.get("employee_count") else "")
-            + (f" | Revenue: {l['est_revenue']}" if l.get("est_revenue") else "")
-            + (f" | Funding: {l['total_funding']}" if l.get("total_funding") else "")
-            + (f" | Founded: {l['founded_year']}" if l.get("founded_year") else "")
-            + (f" | HQ: {l['hq']}" if l.get("hq") else "")
+    def _score_chunk(pairs: List[tuple]) -> List[Dict[str, str]]:
+        # pairs: list of (lead, classification), 1-based indexing within the chunk
+        leads_block = "\n".join(
+            (
+                f"{i+1}. {l['name']} | {l['position']} @ {l['company']} | Persona: {cls}"
+                + (f" | Employees: {l['employee_count']}" if l.get("employee_count") else "")
+                + (f" | Revenue: {l['est_revenue']}" if l.get("est_revenue") else "")
+                + (f" | Funding: {l['total_funding']}" if l.get("total_funding") else "")
+                + (f" | Founded: {l['founded_year']}" if l.get("founded_year") else "")
+                + (f" | HQ: {l['hq']}" if l.get("hq") else "")
+            )
+            for i, (l, cls) in enumerate(pairs)
         )
-        for i, l in enumerate(leads)
-    )
 
-    prompt = f"""You are a GTM analyst prioritizing sales leads.
+        prompt = f"""You are a GTM analyst prioritizing sales leads.
 
 ICP Context:
 {icp_context}
@@ -597,20 +689,35 @@ For each lead, return:
 
 Return only valid JSON, no explanation."""
 
-    resp = client.messages.create(
-        model=CLAUDE_MODEL, max_tokens=4000,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    parsed = json.loads(_strip_json_fence(resp.content[0].text))
-    result: List[Dict[str, str]] = [
-        {"priority": "", "icp_segment": "", "reasoning": ""} for _ in leads
-    ]
-    for item in parsed:
-        result[item["index"] - 1] = {
-            "priority":    item.get("priority", ""),
-            "icp_segment": item.get("icp_segment", ""),
-            "reasoning":   item.get("reasoning", ""),
-        }
+        resp = client.messages.create(
+            model=CLAUDE_MODEL, temperature=0, max_tokens=4000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        parsed = json.loads(_strip_json_fence(resp.content[0].text))
+        out: List[Dict[str, str]] = [
+            {"priority": "", "icp_segment": "", "reasoning": ""} for _ in pairs
+        ]
+        for item in parsed:
+            idx = item.get("index", 0) - 1
+            if 0 <= idx < len(pairs):
+                out[idx] = {
+                    "priority":    item.get("priority", ""),
+                    "icp_segment": item.get("icp_segment", ""),
+                    "reasoning":   item.get("reasoning", ""),
+                }
+        return out
+
+    # One call per chunk — avoids JSON truncation on large sheets and keeps each
+    # lead scored against only its chunk. Chunks are independent → run in parallel.
+    all_pairs = list(zip(leads, classifications))
+    chunks = [all_pairs[i:i + LLM_BATCH_SIZE] for i in range(0, len(all_pairs), LLM_BATCH_SIZE)]
+    chunk_results, _ = _map_rate_limited(_score_chunk, chunks, max_workers=ENRICH_CONCURRENCY)
+    result: List[Dict[str, str]] = []
+    for chunk, res in zip(chunks, chunk_results):
+        if res is not None:
+            result.extend(res)
+        else:
+            result.extend({"priority": "", "icp_segment": "", "reasoning": ""} for _ in chunk)
     return result
 
 
@@ -649,7 +756,7 @@ Return only valid JSON, no explanation."""
 
     try:
         resp = client.messages.create(
-            model=CLAUDE_MODEL, max_tokens=200,
+            model=CLAUDE_MODEL, temperature=0, max_tokens=200,
             messages=[{"role": "user", "content": prompt}],
         )
         return json.loads(_strip_json_fence(resp.content[0].text))
@@ -717,7 +824,7 @@ Return only valid JSON, no explanation."""
 
     try:
         resp = client.messages.create(
-            model=CLAUDE_MODEL, max_tokens=300,
+            model=CLAUDE_MODEL, temperature=0, max_tokens=300,
             messages=[{"role": "user", "content": prompt}],
         )
         matching = json.loads(_strip_json_fence(resp.content[0].text))
@@ -891,6 +998,8 @@ def main() -> None:
                         help="(Sheets only) Sheet tab name. Default: Sheet1")
     parser.add_argument("--output-csv", default=None,
                         help="(CSV only) Where to write enriched output. Defaults to overwriting --input-csv.")
+    parser.add_argument("--limit", type=int, default=None, metavar="N",
+                        help="Process only the first N leads (quick, cheap test runs)")
     parser.add_argument("--add-persona", action="append", default=[], metavar="TITLE",
                         help="One-time: also treat this title as a buyer (can repeat)")
     parser.add_argument("--remove-persona", action="append", default=[], metavar="TITLE",
@@ -946,6 +1055,9 @@ def main() -> None:
 
     headers: List[str] = list(rows[0])
     data_rows: List[List[str]] = rows[1:]
+    if args.limit is not None:
+        data_rows = data_rows[:max(0, args.limit)]
+        print(f"--limit {args.limit}: processing first {len(data_rows)} lead(s).")
     print(f"Found {len(data_rows)} leads.")
 
     print("\nDetecting columns via Claude...")
@@ -1050,37 +1162,50 @@ def main() -> None:
             col_idx_by_key[f["key"]] = idx
             backend.write_header(idx, headers[idx])
 
-        company_cache: Dict[str, Dict[str, str]] = {}
-
-        for i in dm_indices:
-            lead    = leads[i]
-            company = lead["company"]
-            row     = data_rows[i]
-            row_num = i + 2
-
-            all_filled = all(
+        def _all_filled(row) -> bool:
+            return all(
                 col_idx_by_key[f["key"]] < len(row) and row[col_idx_by_key[f["key"]]].strip()
                 for f in enrich_fields
             )
-            if all_filled:
-                print(f"  Skipping {company} — already filled")
-                enriched = {f["key"]: cell(row, col_idx_by_key[f["key"]]) for f in enrich_fields}
-                company_cache[company] = enriched
-                _apply_enrichment(leads[i], enriched)
+
+        # Enrich each UNIQUE DM company that still needs it, concurrently
+        # (Claude + Exa). Deduping by name avoids paying twice when two DMs
+        # share a company.
+        company_cache: Dict[str, Dict[str, str]] = {}
+        to_enrich: List[str] = []
+        seen_companies: set = set()
+        for i in dm_indices:
+            company = leads[i]["company"]
+            if not company or _all_filled(data_rows[i]) or company in seen_companies:
                 continue
+            seen_companies.add(company)
+            to_enrich.append(company)
 
-            if company in company_cache:
-                enriched = company_cache[company]
+        if to_enrich:
+            print(f"  Enriching {len(to_enrich)} unique company(ies) in parallel...")
+            results, errors = _map_rate_limited(
+                lambda c: enrich_company(c, enrich_fields, client),
+                to_enrich, max_workers=ENRICH_CONCURRENCY,
+            )
+            for c, r, e in zip(to_enrich, results, errors):
+                if e:
+                    print(f"    ! {c} enrichment failed: {e}")
+                company_cache[c] = r or {}
+
+        # Apply + write sequentially so the backend is never touched concurrently.
+        for i in dm_indices:
+            company = leads[i]["company"]
+            if not company:
+                continue
+            row     = data_rows[i]
+            row_num = i + 2
+            if _all_filled(row):
+                enriched = {f["key"]: cell(row, col_idx_by_key[f["key"]]) for f in enrich_fields}
             else:
-                print(f"  Enriching: {company}...")
-                enriched = enrich_company(company, enrich_fields, client)
-                company_cache[company] = enriched
-
-            for f in enrich_fields:
-                backend.write_cell(row_num, col_idx_by_key[f["key"]], enriched.get(f["key"], ""))
-
+                enriched = company_cache.get(company, {})
+                for f in enrich_fields:
+                    backend.write_cell(row_num, col_idx_by_key[f["key"]], enriched.get(f["key"], ""))
             _apply_enrichment(leads[i], enriched)
-            print(f"    {company}: {json.dumps(enriched, ensure_ascii=False)}")
 
     elif not enrich_fields:
         print("\n--- Step 2: Skipping enrichment (--skip-enrich) ---")
@@ -1143,24 +1268,31 @@ def main() -> None:
     competitors_col_idx = get_or_create_col(headers, mapping, "competitors", "Competitors")
     backend.write_header(competitors_col_idx, headers[competitors_col_idx])
 
+    # Look up competitors for each UNIQUE company in the batch, in parallel.
     competitor_cache: Dict[str, List[str]] = {}
-
+    uniq_companies: List[str] = []
+    seen_companies = set()
     for i in outreach_indices:
-        company = leads[i]["company"]
-        row_num = i + 2
+        c = leads[i]["company"]
+        if c and c not in seen_companies:
+            seen_companies.add(c)
+            uniq_companies.append(c)
 
-        if company in competitor_cache:
-            comps = competitor_cache[company]
-        else:
-            print(f"  {company}...")
-            comps = find_competitors(company, client)
-            competitor_cache[company] = comps
+    results, errors = _map_rate_limited(
+        lambda c: find_competitors(c, client), uniq_companies, max_workers=ENRICH_CONCURRENCY,
+    )
+    for c, r, e in zip(uniq_companies, results, errors):
+        if e:
+            print(f"  {c} — competitor lookup failed: {e}")
+        competitor_cache[c] = r or []
 
+    # Write per lead sequentially.
+    for i in outreach_indices:
+        comps = competitor_cache.get(leads[i]["company"], [])
         competitors_by_lead[i] = comps  # keep in memory for Step 9
-
-        backend.write_cell(row_num, competitors_col_idx, ", ".join(comps))
+        backend.write_cell(i + 2, competitors_col_idx, ", ".join(comps))
         if comps:
-            print(f"    → {', '.join(comps)}")
+            print(f"  {leads[i]['company']} → {', '.join(comps)}")
 
     # ------------------------------------------------------------------
     # Step 6: Scrape + filter LinkedIn posts
@@ -1168,39 +1300,36 @@ def main() -> None:
     if args.skip_posts:
         print("\n--- Step 6: Skipping post scraping (--skip-posts) ---")
     else:
-        print(f"\n--- Step 6: Scraping LinkedIn posts for {len(outreach_indices)} leads ---")
+        has_linkedin = [i for i in outreach_indices if (leads[i].get("linkedin") or "").strip()]
+        print(f"\n--- Step 6: Scraping LinkedIn posts for {len(has_linkedin)} leads ---")
         print(f"  Config: {post_config['max_posts']} posts / {post_config['days_back']} days")
 
         post_links_col_idx = get_or_create_col(headers, mapping, "post_links", "LinkedIn Post Links")
         backend.write_header(post_links_col_idx, headers[post_links_col_idx])
 
-        # post_data_by_lead is declared above — populated here for Step 8
-
+        # Leads without a LinkedIn URL get an empty entry so Step 8 can read it.
         for i in outreach_indices:
-            lead         = leads[i]
-            linkedin_url = lead.get("linkedin", "")
-            row_num      = i + 2
+            if i not in has_linkedin:
+                post_data_by_lead[i] = []
 
-            if not linkedin_url:
-                print(f"  {lead['name']} — no LinkedIn URL, skipping")
+        # profile-posts actor throttles on bursts — space starts POSTS_MIN_INTERVAL
+        # apart, overlap run-times across a small pool.
+        results, errors = _map_rate_limited(
+            lambda i: scrape_and_filter_posts(
+                profile_url=leads[i]["linkedin"], icp_context=icp_context,
+                max_posts=post_config["max_posts"], days_back=post_config["days_back"], client=client,
+            ),
+            has_linkedin, min_interval=POSTS_MIN_INTERVAL, max_workers=POSTS_CONCURRENCY,
+        )
+        for i, r, e in zip(has_linkedin, results, errors):
+            if e:
+                print(f"  {leads[i]['name']} — post scraping failed: {e}")
                 post_data_by_lead[i] = []
                 continue
-
-            print(f"  {lead['name']} ({lead['company']})...")
-            post_result = scrape_and_filter_posts(
-                profile_url=linkedin_url,
-                icp_context=icp_context,
-                max_posts=post_config["max_posts"],
-                days_back=post_config["days_back"],
-                client=client,
-            )
-
-            post_data_by_lead[i] = post_result["posts_data"]  # full text kept in memory
-
-            cell_value = "\n".join(post_result["urls"]) if post_result["urls"] else ""
-            backend.write_cell(row_num, post_links_col_idx, cell_value)
-            print(f"    {len(post_result['urls'])} post(s) matched")
-            time.sleep(5)  # avoid LinkedIn rate-limiting the actor session on bulk runs
+            post_data_by_lead[i] = r["posts_data"]  # full text kept in memory
+            cell_value = "\n".join(r["urls"]) if r["urls"] else ""
+            backend.write_cell(i + 2, post_links_col_idx, cell_value)
+            print(f"  {leads[i]['name']} ({leads[i]['company']}) → {len(r['urls'])} post(s) matched")
 
     # ------------------------------------------------------------------
     # Step 7: Small talk personalisation
@@ -1209,34 +1338,26 @@ def main() -> None:
         print("\n--- Step 7: Skipping small talk (--skip-small-talk) ---")
     elif not _SMALL_TALK_AVAILABLE:
         print("\n--- Step 7: Small Talk Scraper failed to import — skipping ---")
-        print("  (Create Scrapers/Small Talk Scraper/scraper.py to enable this step)")
     else:
         print(f"\n--- Step 7: Gathering small talk details for {len(outreach_indices)} leads ---")
 
         small_talk_col_idx = get_or_create_col(headers, mapping, "small_talk", "Small Talk")
         backend.write_header(small_talk_col_idx, headers[small_talk_col_idx])
 
-        # small_talk_by_lead is declared above — populated here for Step 8
-
-        for i in outreach_indices:
-            lead         = leads[i]
-            linkedin_url = lead.get("linkedin", "")
-            row_num      = i + 2
-
-            print(f"  {lead['name']} ({lead['company']})...")
-            detail = scrape_small_talk(
-                profile_url=linkedin_url,
-                name=lead["name"],
-                company=lead["company"],
-            )
-
+        st_indices = [i for i in outreach_indices if (leads[i].get("name") or "").strip()]
+        results, errors = _map_rate_limited(
+            lambda i: scrape_small_talk(
+                profile_url=leads[i].get("linkedin", ""), name=leads[i]["name"], company=leads[i]["company"],
+            ),
+            st_indices, max_workers=ENRICH_CONCURRENCY,
+        )
+        for i, r, e in zip(st_indices, results, errors):
+            detail = "" if e else (r or "")
+            if e:
+                print(f"  {leads[i]['name']} — small talk failed: {e}")
             small_talk_by_lead[i] = detail  # keep in memory for Step 8
-
-            backend.write_cell(row_num, small_talk_col_idx, detail)
-            if detail:
-                print(f"    → {detail[:100]}{'...' if len(detail) > 100 else ''}")
-            else:
-                print("    → (no detail found)")
+            backend.write_cell(i + 2, small_talk_col_idx, detail)
+            print(f"  {leads[i]['name']} ({leads[i]['company']}) → {(detail[:80] + '...') if len(detail) > 80 else (detail or '(none)')}")
 
     # ------------------------------------------------------------------
     # Step 8: Personalisation hooks
@@ -1252,15 +1373,10 @@ def main() -> None:
         hooks_col_idx = get_or_create_col(headers, mapping, "hooks", "Personalisation Hook")
         backend.write_header(hooks_col_idx, headers[hooks_col_idx])
 
-        for i in outreach_indices:
-            lead    = leads[i]
-            row_num = i + 2
-
-            print(f"  {lead['name']} ({lead['company']})...")
-            hooks = generate_personalisation_hooks(
-                name=lead["name"],
-                company=lead["company"],
-                position=lead["position"],
+        def _hook_task(i: int) -> str:
+            lead = leads[i]
+            return generate_personalisation_hooks(
+                name=lead["name"], company=lead["company"], position=lead["position"],
                 matching_posts=post_data_by_lead.get(i, []),
                 small_talk=small_talk_by_lead.get(i, ""),
                 icp_context=icp_context,
@@ -1272,13 +1388,14 @@ def main() -> None:
                 hq=lead.get("hq", ""),
             )
 
+        results, errors = _map_rate_limited(_hook_task, outreach_indices, max_workers=ENRICH_CONCURRENCY)
+        for i, r, e in zip(outreach_indices, results, errors):
+            hooks = "" if e else (r or "")
+            if e:
+                print(f"  {leads[i]['name']} — hook generation failed: {e}")
             hooks_by_lead[i] = hooks  # keep in memory for Step 9
-
-            backend.write_cell(row_num, hooks_col_idx, hooks)
-            if hooks:
-                print(f"    → {hooks[:120]}{'...' if len(hooks) > 120 else ''}")
-            else:
-                print("    → (no hooks generated)")
+            backend.write_cell(i + 2, hooks_col_idx, hooks)
+            print(f"  {leads[i]['name']} ({leads[i]['company']}) → {(hooks[:100] + '...') if len(hooks) > 100 else (hooks or '(none)')}")
 
     # ------------------------------------------------------------------
     # Step 9: Write LinkedIn copy
@@ -1287,22 +1404,16 @@ def main() -> None:
         print("\n--- Step 9: Skipping LinkedIn copy (--skip-copy) ---")
     elif not _COPY_WRITER_AVAILABLE:
         print("\n--- Step 9: LinkedIn Copy Writer Skill failed to import — skipping ---")
-        print("  (Check skills/linkedin_copy_writer/skill.py and its dependencies)")
     else:
         print(f"\n--- Step 9: Writing LinkedIn copy for {len(outreach_indices)} leads ---")
 
         copy_col_idx = get_or_create_col(headers, mapping, "copy", "LinkedIn Copy")
         backend.write_header(copy_col_idx, headers[copy_col_idx])
 
-        for i in outreach_indices:
-            lead    = leads[i]
-            row_num = i + 2
-
-            print(f"  {lead['name']} ({lead['company']})...")
-            copy = write_linkedin_copy(
-                name=lead["name"],
-                company=lead["company"],
-                position=lead["position"],
+        def _copy_task(i: int) -> str:
+            lead = leads[i]
+            return write_linkedin_copy(
+                name=lead["name"], company=lead["company"], position=lead["position"],
                 buyer_persona=classifications[i],
                 priority=scores[i]["priority"],
                 competitors=competitors_by_lead.get(i, []),
@@ -1316,11 +1427,13 @@ def main() -> None:
                 hq=lead.get("hq", ""),
             )
 
-            backend.write_cell(row_num, copy_col_idx, copy)
-            if copy:
-                print(f"    → {copy[:120]}{'...' if len(copy) > 120 else ''}")
-            else:
-                print("    → (no copy generated)")
+        results, errors = _map_rate_limited(_copy_task, outreach_indices, max_workers=ENRICH_CONCURRENCY)
+        for i, r, e in zip(outreach_indices, results, errors):
+            copy = "" if e else (r or "")
+            if e:
+                print(f"  {leads[i]['name']} — copy generation failed: {e}")
+            backend.write_cell(i + 2, copy_col_idx, copy)
+            print(f"  {leads[i]['name']} ({leads[i]['company']}) → {(copy[:100] + '...') if len(copy) > 100 else (copy or '(none)')}")
 
     # ------------------------------------------------------------------
     # Summary

@@ -180,6 +180,7 @@ python -m workflows.email_outreach.workflow [options]
 | `--sheet-name NAME` | Sheet tab name. Default `Sheet1`. |
 | `--input-csv PATH` | Read companies from a CSV. Mutually exclusive with `--sheet-id`. |
 | `--output-csv PATH` | Where to write enriched CSV. Defaults to overwriting `--input-csv`. |
+| `--limit N` | Process only the first N rows — for quick, cheap test runs. |
 | `--add-persona "VP Sales"` | Treat this title as a buyer for *this run only* (repeatable). |
 | `--remove-persona "Founder"` | Exclude this title for *this run only* (repeatable). |
 | `--enrich-fields KEYS` | Comma-separated subset of enrichment fields, by snake_case key. |
