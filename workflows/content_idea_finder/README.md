@@ -102,7 +102,7 @@ Edit these to change the defaults; or add your own sections to `context.md` to o
 - LLM clustering (Sonnet 4.6): ~$0.05
 - **Total: ~$1.00/day** if all sources run
 
-Use skip flags during testing to keep the bill down.
+Before any Twitter actor is billed, the workflow prints an itemized **worst-case spend estimate** (trends + creators; HN is free). Without `--auto` it waits for a `y/N` confirmation; with `--auto` it prints the estimate and proceeds. Use skip flags during testing to keep the bill down.
 
 ## Notes
 

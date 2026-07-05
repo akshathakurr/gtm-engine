@@ -148,7 +148,8 @@ End-to-end GTM plays. Each workflow folder orchestrates scrapers and uses contex
 - Workflows import scrapers from `/scrapers` rather than duplicating logic.
 - Workflows read context from `/context` to personalize output.
 - Each workflow folder has a `README.md` documenting inputs, scrapers used, output shape.
-- Shared Google Sheets I/O (`gws_read_sheet`, `gws_write_range`, `col_letter`, `find_col`, `ensure_col`, `cell`), `context.md` parsing (`load_icp`, `section_body`, `read_context_file`, `append_to_context_file`), and Claude-JSON handling (`strip_json_fence`) live in `workflows/_common.py`. Import them — don't re-inline (the old per-workflow copies drifted apart and one was a latent parse bug).
+- Shared Google Sheets I/O (`gws_read_sheet`, `gws_write_range`, `col_letter`, `find_col`, `ensure_col`, `cell`), `context.md` parsing (`load_icp`, `section_body`, `read_context_file`, `append_to_context_file`), Claude-JSON handling (`strip_json_fence`), and Apify spend preview (`preview_and_confirm`, `estimate_apify_cost`, `APIFY_UNIT_COST`) live in `workflows/_common.py`. Import them — don't re-inline (the old per-workflow copies drifted apart and one was a latent parse bug).
+- **Spend preview:** any workflow that fans out across paid Apify actors should call `preview_and_confirm([...])` with worst-case item counts *before* the first actor run — it prints an itemized cost estimate and, in interactive mode, gates the run on a `y/N`. Wired into `linkedin_comment_helper` and `content_idea_finder`; keep `APIFY_UNIT_COST` in sync with each scraper's README pricing.
 
 #### `/skills`
 Reusable Claude prompt modules — markdown templates that workflows call into when they need an LLM to do something narrow (write a hook, classify a post, etc.).

@@ -48,6 +48,12 @@ python3 workflow.py --project "Io Fold" --mode auto --skip-icp --skip-trending  
 python3 workflow.py --project "Io Fold" --mode auto --days-back 14 --max-per-keyword 50
 ```
 
+## Cost & spend preview
+
+This workflow fans out across three paid Apify sources, so a single run costs more than it looks: trending + signal search each run one actor call **per keyword** (`≈ keywords × max_per_keyword` posts at $0.005/post), and the ICP source runs the **profile-posts actor at $5/1,000** — 1,000× the search rate — once per profile. With the default config (7 genre + 5 signal keywords × 25, plus ICP profiles × 10) a run is roughly **$2.50 worst-case** — about half an Apify free-plan month.
+
+Before any actor is billed, the workflow prints an itemized **worst-case spend estimate**. In `--mode interactive` it waits for you to confirm (`y/N`) before spending; in `--mode auto` it prints the estimate for the record and proceeds. Trim `max_per_keyword`, cut keywords, or `--skip-icp` to bring the number down.
+
 ## Setup blockers (before first run)
 
 1. Paste your ICP sheet ID into `config.json` `icp_sheet.id` (or pass `--icp-sheet-id`)
