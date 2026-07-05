@@ -1,6 +1,8 @@
 import os
 import sys
 import json
+import time
+import threading
 from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, List
@@ -8,6 +10,26 @@ from exa_py import Exa
 
 DEFAULT_NUM_RESULTS = 5
 DEFAULT_SUMMARY_QUESTION = "What is most important or notable about this?"
+
+# Exa's plan caps requests at ~10/second. Workflows fan out searches across
+# threads (and small-talk fans out again internally), so concurrent callers can
+# easily burst past the cap and eat 429s — a 429 is a wasted paid call. A
+# process-wide limiter spaces call *starts* so the burst rate stays under 10/s
+# no matter how many threads call search_web at once.
+_EXA_MIN_INTERVAL = 0.12  # ~8.3 req/s, safely under the 10/s cap
+_exa_lock = threading.Lock()
+_exa_next = 0.0
+
+
+def _exa_throttle() -> None:
+    global _exa_next
+    with _exa_lock:
+        now = time.monotonic()
+        wait = _exa_next - now
+        if wait > 0:
+            time.sleep(wait)
+            now += wait
+        _exa_next = now + _EXA_MIN_INTERVAL
 
 
 def search_web(
@@ -64,6 +86,7 @@ def search_web(
 
     print(f"Searching: {query!r} ({num_results} results)")
 
+    _exa_throttle()
     response = exa.search_and_contents(query, **kwargs)
 
     # Deduplicate by URL

@@ -22,6 +22,7 @@ Usage:
   python -m workflows.email_outreach.workflow --sheet-id SHEET_ID
   python -m workflows.email_outreach.workflow --input-csv companies.csv --output-csv companies.out.csv
   python -m workflows.email_outreach.workflow --sheet-id SHEET_ID --include-p1
+  python -m workflows.email_outreach.workflow --sheet-id SHEET_ID --limit 5   # quick test run
   python -m workflows.email_outreach.workflow --sheet-id SHEET_ID --enrich-fields employee_count,total_funding,hq
 """
 
@@ -89,6 +90,11 @@ APOLLO_MIN_INTERVAL = 1       # seconds between Apollo email lookups (step 6)
 APOLLO_CONCURRENCY = 3
 POSTS_MIN_INTERVAL = 5        # seconds between profile-posts runs (step 8)
 POSTS_CONCURRENCY = 3
+# Score/classify run one LLM call per chunk of companies (not one call for the
+# whole sheet). Chunking prevents (a) JSON truncation on large sheets — 1000
+# rows overrun max_tokens and later rows come back blank — and (b) batch-context
+# drift, where the same company is scored differently depending on its neighbours.
+LLM_BATCH_SIZE = 40
 
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -349,6 +355,13 @@ def _strip_json_fence(text: str) -> str:
     if text.startswith("```"):
         lines = text.split("\n")
         text = "\n".join(lines[1:-1]).strip()
+    # Tolerate prose preamble/suffix around the JSON: carve out the outermost
+    # object or array. Models sometimes reason in prose before emitting JSON.
+    if text and text[0] not in "{[":
+        starts = [i for i in (text.find("{"), text.find("[")) if i != -1]
+        ends = [i for i in (text.rfind("}"), text.rfind("]")) if i != -1]
+        if starts and ends and max(ends) > min(starts):
+            text = text[min(starts):max(ends) + 1].strip()
     return text
 
 
@@ -382,7 +395,7 @@ Return JSON: {{"<field_name>": [<idx>, ...] or null, ...}}
 Only valid JSON, no explanation."""
 
     resp = client.messages.create(
-        model=CLAUDE_MODEL, max_tokens=600,
+        model=CLAUDE_MODEL, temperature=0, max_tokens=600,
         messages=[{"role": "user", "content": prompt}],
     )
     parsed = json.loads(_strip_json_fence(resp.content[0].text))
@@ -467,7 +480,7 @@ Return only valid JSON, no explanation."""
 
     try:
         resp = client.messages.create(
-            model=CLAUDE_MODEL, max_tokens=600,
+            model=CLAUDE_MODEL, temperature=0, max_tokens=600,
             messages=[{"role": "user", "content": prompt}],
         )
         return json.loads(_strip_json_fence(resp.content[0].text))
@@ -486,20 +499,21 @@ def score_companies(
     client: anthropic.Anthropic,
 ) -> List[Dict[str, str]]:
     """Score every company on ICP Segment + Priority. Person info is not used here."""
-    leads_block = "\n".join(
-        (
-            f"{i+1}. {l['company']}"
-            + (f" | {l.get('company_description', '')}" if l.get("company_description") else "")
-            + (f" | Employees: {l['employee_count']}" if l.get("employee_count") else "")
-            + (f" | Revenue: {l['est_revenue']}" if l.get("est_revenue") else "")
-            + (f" | Funding: {l['total_funding']}" if l.get("total_funding") else "")
-            + (f" | Founded: {l['founded_year']}" if l.get("founded_year") else "")
-            + (f" | HQ: {l['hq']}" if l.get("hq") else "")
+    def _score_chunk(chunk: List[Dict]) -> List[Dict[str, str]]:
+        leads_block = "\n".join(
+            (
+                f"{i+1}. {l['company']}"
+                + (f" | {l.get('company_description', '')}" if l.get("company_description") else "")
+                + (f" | Employees: {l['employee_count']}" if l.get("employee_count") else "")
+                + (f" | Revenue: {l['est_revenue']}" if l.get("est_revenue") else "")
+                + (f" | Funding: {l['total_funding']}" if l.get("total_funding") else "")
+                + (f" | Founded: {l['founded_year']}" if l.get("founded_year") else "")
+                + (f" | HQ: {l['hq']}" if l.get("hq") else "")
+            )
+            for i, l in enumerate(chunk)
         )
-        for i, l in enumerate(leads)
-    )
 
-    prompt = f"""You are a GTM analyst prioritizing companies for outbound email outreach.
+        prompt = f"""You are a GTM analyst prioritizing companies for outbound email outreach.
 
 ICP Context:
 {icp_context}
@@ -524,20 +538,34 @@ For each company, return:
 
 Return only valid JSON, no explanation."""
 
-    resp = client.messages.create(
-        model=CLAUDE_MODEL, max_tokens=4000,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    parsed = json.loads(_strip_json_fence(resp.content[0].text))
-    result: List[Dict[str, str]] = [
-        {"priority": "", "icp_segment": "", "reasoning": ""} for _ in leads
-    ]
-    for item in parsed:
-        result[item["index"] - 1] = {
-            "priority":    item.get("priority", ""),
-            "icp_segment": item.get("icp_segment", ""),
-            "reasoning":   item.get("reasoning", ""),
-        }
+        resp = client.messages.create(
+            model=CLAUDE_MODEL, temperature=0, max_tokens=4000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        parsed = json.loads(_strip_json_fence(resp.content[0].text))
+        out: List[Dict[str, str]] = [
+            {"priority": "", "icp_segment": "", "reasoning": ""} for _ in chunk
+        ]
+        for item in parsed:
+            idx = item.get("index", 0) - 1
+            if 0 <= idx < len(chunk):
+                out[idx] = {
+                    "priority":    item.get("priority", ""),
+                    "icp_segment": item.get("icp_segment", ""),
+                    "reasoning":   item.get("reasoning", ""),
+                }
+        return out
+
+    # One call per chunk — avoids JSON truncation on large sheets and keeps each
+    # company scored against only its chunk. Chunks are independent → run in parallel.
+    chunks = [leads[i:i + LLM_BATCH_SIZE] for i in range(0, len(leads), LLM_BATCH_SIZE)]
+    chunk_results, _ = _map_rate_limited(_score_chunk, chunks, max_workers=ENRICH_CONCURRENCY)
+    result: List[Dict[str, str]] = []
+    for chunk, res in zip(chunks, chunk_results):
+        if res is not None:
+            result.extend(res)
+        else:
+            result.extend({"priority": "", "icp_segment": "", "reasoning": ""} for _ in chunk)
     return result
 
 
@@ -589,7 +617,7 @@ Return only valid JSON, no explanation."""
 
     try:
         resp = client.messages.create(
-            model=CLAUDE_MODEL, max_tokens=200,
+            model=CLAUDE_MODEL, temperature=0, max_tokens=200,
             messages=[{"role": "user", "content": prompt}],
         )
         return json.loads(_strip_json_fence(resp.content[0].text))
@@ -625,7 +653,7 @@ def find_linkedin_url(name: str, company: str, client: anthropic.Anthropic) -> s
 
     try:
         resp = client.messages.create(
-            model=CLAUDE_MODEL, max_tokens=100,
+            model=CLAUDE_MODEL, temperature=0, max_tokens=100,
             messages=[{"role": "user", "content": (
                 f"Extract the LinkedIn profile URL for {name} at {company} from this text.\n\n"
                 + "\n".join(snippets[:8])
@@ -655,12 +683,12 @@ def classify_personas(
     if remove_personas:
         overrides += f"\nFor this run only, exclude these titles/roles: {', '.join(remove_personas)}"
 
-    leads_block = "\n".join(
-        f"{i+1}. Name: {l['name']} | Title: {l['position']} | Company: {l['company']}"
-        for i, l in enumerate(leads)
-    )
-
-    prompt = f"""You are a B2B sales analyst classifying leads by buyer role.
+    def _classify_chunk(chunk: List[Dict]) -> List[str]:
+        leads_block = "\n".join(
+            f"{i+1}. Name: {l['name']} | Title: {l['position']} | Company: {l['company']}"
+            for i, l in enumerate(chunk)
+        )
+        prompt = f"""You are a B2B sales analyst classifying leads by buyer role.
 
 ICP / Buyer Persona Context:
 {icp_context}
@@ -677,14 +705,24 @@ Leads:
 Return a JSON array — one object per lead — with "index" (1-based) and "classification".
 Only return valid JSON, no explanation."""
 
-    resp = client.messages.create(
-        model=CLAUDE_MODEL, max_tokens=2000,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    parsed = json.loads(_strip_json_fence(resp.content[0].text))
-    result = [""] * len(leads)
-    for item in parsed:
-        result[item["index"] - 1] = item["classification"]
+        resp = client.messages.create(
+            model=CLAUDE_MODEL, temperature=0, max_tokens=2000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        parsed = json.loads(_strip_json_fence(resp.content[0].text))
+        out = [""] * len(chunk)
+        for item in parsed:
+            idx = item.get("index", 0) - 1
+            if 0 <= idx < len(chunk):
+                out[idx] = item.get("classification", "")
+        return out
+
+    # One call per chunk — no truncation, each lead judged against only its chunk.
+    chunks = [leads[i:i + LLM_BATCH_SIZE] for i in range(0, len(leads), LLM_BATCH_SIZE)]
+    chunk_results, _ = _map_rate_limited(_classify_chunk, chunks, max_workers=ENRICH_CONCURRENCY)
+    result: List[str] = []
+    for chunk, res in zip(chunks, chunk_results):
+        result.extend(res if res is not None else [""] * len(chunk))
     return result
 
 
@@ -782,7 +820,7 @@ Return only valid JSON, no explanation."""
 
     try:
         resp = client.messages.create(
-            model=CLAUDE_MODEL, max_tokens=300,
+            model=CLAUDE_MODEL, temperature=0, max_tokens=300,
             messages=[{"role": "user", "content": prompt}],
         )
         matching = json.loads(_strip_json_fence(resp.content[0].text))
@@ -875,6 +913,8 @@ def main() -> None:
                         help="(Sheets only) Sheet tab name. Default: Sheet1")
     parser.add_argument("--output-csv", default=None,
                         help="(CSV only) Where to write output. Defaults to overwriting --input-csv.")
+    parser.add_argument("--limit", type=int, default=None, metavar="N",
+                        help="Process only the first N rows (quick, cheap test runs)")
     parser.add_argument("--add-persona", action="append", default=[], metavar="TITLE",
                         help="One-time: also treat this title as a buyer (can repeat)")
     parser.add_argument("--remove-persona", action="append", default=[], metavar="TITLE",
@@ -923,6 +963,9 @@ def main() -> None:
 
     headers: List[str] = list(rows[0])
     data_rows: List[List[str]] = rows[1:]
+    if args.limit is not None:
+        data_rows = data_rows[:max(0, args.limit)]
+        print(f"--limit {args.limit}: processing first {len(data_rows)} row(s).")
     print(f"Found {len(data_rows)} rows.")
 
     print("\nDetecting columns via Claude...")
