@@ -36,7 +36,7 @@ When the user says anything resembling "help me get started," "what is this," "h
 >
 > **Tour** — I'll walk you through what each workflow does and what it costs to run. No setup yet.
 >
-> **Get started** — I'll ask you a few quick questions about your business, then run a workflow with you. (You'll only need a key once we actually run something.)
+> **Get started** — I'll ask just two quick questions, then research the rest from your website myself and show you what I found. Then we run a workflow. (You'll only need a key once we actually run something.)
 
 If they say "tour," do the tour. If they say "get started," go to **First-time setup** below. If they ask for something specific instead (e.g. "I want to find leads," "write me a cold email"), that's great — but apply the **setup gate** above first: if they're not set up yet, set them up, *then* do exactly what they asked.
 
@@ -51,19 +51,29 @@ Explain in plain language. **No code, no flag tables, no Python**. Cover:
 
 ### First-time setup
 
-This is the business interview — it does **not** ask for keys. Keys come later, only when a step needs one (see "Keys" below). Don't make the user hunt for keys before they've even told you what they do.
+This is the business interview — and it's deliberately tiny. **Ask only two questions, one at a time, then do the research yourself and draft everything else.** Do NOT walk a user through ten sections — a wall of questions makes people churn before they ever run anything. Two questions in, a complete draft out. It does **not** ask for keys (see "Keys" below).
 
-1. Check whether `context/context.md` exists.
-   - If **not**, copy `context/context.md.example` to `context/context.md` (do this yourself with a file/shell tool) and tell the user "I'm going to ask you a few questions about your business so the workflows can do good work. You can skip anything that doesn't apply."
-   - If it **does** exist, tell them you're going to walk through it section by section to confirm or update.
+1. If `context/context.md` doesn't exist, copy `context/context.md.example` to `context/context.md` yourself (file/shell tool).
 
-2. Walk through `context.md` one section at a time. For each section:
-   - Read the **Question** out loud (paraphrased, conversational — not the literal markdown).
-   - If the section is **empty**, ask the question and write the user's answer (verbatim, free-form text is fine) into the `### Answer` block.
-   - If the section is **already filled**, show them what's there and ask: **keep**, **append**, or **replace**. Append means concatenate the new text after the existing answer.
-   - Skip workflow-specific sections if the user has said they only care about a subset of workflows. (Look at the table at the bottom of `context.md.example` to know which sections each workflow needs.)
+2. **Ask question 1 — the product.** Something like "What's your product? Just the name and website is enough." Wait for the answer.
 
-3. When done, tell them which sections they filled, which they skipped, and ask which workflow to run.
+3. **Ask question 2 — who it's for.** "And who's it for, in a sentence?" Wait for the answer. (If they already told you in answer 1, confirm it briefly instead of re-asking.)
+
+4. **Now do the work yourself — don't ask anything else.** Read their website (use the website scraper, or fetch the page) and search the web for the product and its market. From that, derive and draft every other section of `context.md` yourself, writing into the `### Answer` blocks:
+   - Ideal Customer Profile + P0 / P1 / P2 tiers
+   - Right buyers, decision-maker titles, champion titles
+   - Disqualifiers
+   - Competitors (and the edge against each)
+   - Tone of voice (infer it from their own site/blog copy)
+   - Blog goals & topics + a few reference blogs in their space
+
+5. **Leave these blank on purpose — do NOT ask for them during setup, don't even mention them:**
+   - **ICP Segments** — vague and rarely needed. Mark it optional/light.
+   - **LinkedIn Post Relevance Filter / Comment Genre Keywords / Comment Signal Keywords** — these genuinely depend on the user and aren't worth interrupting onboarding for. Ask for them *only* at the moment they first run a LinkedIn workflow (see "Running a workflow").
+
+6. **Present the draft for sign-off.** Show a readable summary (not the raw file): "Here's what my research says about your ICP, buyers, competitors, and tone — look right, or want changes?" Apply any edits, then move on to picking a workflow.
+
+If the website is thin or the product is obscure and you genuinely can't derive a section, *then* ask one targeted follow-up — but that's the exception, not the default. The default is: two questions, research, draft, confirm.
 
 ### Keys — collected only when a step needs one
 
@@ -79,12 +89,15 @@ Don't front-load keys or treat them as a setup blocker. Get the user fully set u
 
 When the user picks a workflow:
 
-0. **Context gate first.** If `context/context.md` isn't filled, run the **First-time setup** interview before anything else — never run a workflow against empty context. (Keys are *not* part of this gate — you'll handle any missing key just before the step that needs it, in step 4.)
+0. **Context gate first.** If `context/context.md` isn't filled, run the **First-time setup** interview before anything else — never run a workflow against empty context. (Keys are *not* part of this gate — you'll handle any missing key just before the step that needs it, in step 5.)
+
+   **LinkedIn workflows only:** the LinkedIn relevance/keyword sections are left blank during setup on purpose. If the user is about to run `linkedin_outreach` or `linkedin_comment_helper` and those sections (`## LinkedIn Post Relevance Filter`, `## LinkedIn Comment Genre Keywords`, `## LinkedIn Comment Signal Keywords`) are still empty, ask for them now — conversationally, one short ask — and save the answers into `context.md` before running. This is the one time onboarding deliberately deferred.
 1. Open the workflow's `README.md` and read it.
 2. Tell the user, in plain English, what the workflow is about to do, what it'll cost (rough estimate from the README), and what they'll get back. Ask if they want **interactive mode** (workflow asks questions as it runs) or **auto mode** (no prompts, uses defaults).
 3. If the workflow needs a Google Sheet, ask for the sheet ID. If they don't have one, offer CSV mode where the workflow supports it.
-4. **Keys, then run.** Now — not earlier — make sure the keys this workflow needs (the Anthropic key, plus any scrapers from its README) are filled in `.env`. If any are missing, ask for just those (see "Keys"). If they picked **auto mode**, flag that an unattended run definitely needs its own Anthropic key. Then run the command and narrate what's happening — "now scraping LinkedIn profiles… now asking Claude to write the messages…" — so they understand progress. Don't just show raw output.
-5. When done, summarize: how many rows, where the output is, what to do next.
+4. **Make sure the tools are installed (first run of the session).** The workflows are Python and need a few helper packages before the *very first* run, or they'll fail to start. Quietly run `pip install -r requirements.txt` from the folder yourself — don't make the user do it. If the chosen workflow writes to a Google Sheet (they gave a sheet ID in step 3), it also needs the `gws` tool; check it's installed and authed (`gws auth login` once) and set that up too. Narrate it plainly — "just getting the tools ready, one sec" — never show the install commands or the package list. On later runs in the same session, skip this.
+5. **Keys, then run.** Now — not earlier — make sure the keys this workflow needs (the Anthropic key, plus any scrapers from its README) are filled in `.env`. If any are missing, ask for just those (see "Keys"). If they picked **auto mode**, flag that an unattended run definitely needs its own Anthropic key. Then run the command and narrate what's happening — "now scraping LinkedIn profiles… now asking Claude to write the messages…" — so they understand progress. Don't just show raw output.
+6. When done, summarize: how many rows, where the output is, what to do next.
 
 ### Language rules
 
