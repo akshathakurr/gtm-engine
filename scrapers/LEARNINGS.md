@@ -287,9 +287,8 @@ Use `Optional[X]` from `typing`, not `X | None`. The system runs Python 3.9.
 
 ## Credentials
 
-- **Apify API token + Exa API key:** `/Users/akshatthakur/Code/GTM Engine/.env`
-- Keys: `APIFY_API_TOKEN`, `EXA_API_KEY`
-- Old Apify token also at: `/Users/akshatthakur/Code/linkedin_profile_scraper/.env` (backup reference only)
+- Live in the repo-root `.env` (copy `.env.example` to `.env` and fill in). `config.py` loads it via `load_dotenv(REPO_ROOT/.env, override=True)`; scrapers load it via `../../.env`.
+- Keys: `APIFY_API_TOKEN`, `EXA_API_KEY` (plus `ANTHROPIC_API_KEY`, `APOLLO_API_KEY`, `FIRECRAWL_API_KEY` per workflow).
 
 ---
 

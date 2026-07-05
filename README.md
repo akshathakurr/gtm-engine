@@ -76,9 +76,9 @@ every workflow folder has its own README — open it for the full details.
 
 ## status
 
-early. opinionated. some workflows are battle-tested, others are stubs being filled in. expect rough edges; PRs welcome.
+early. opinionated. all 6 workflows are built and end-to-end tested — some more battle-tested than others, and a few of the underlying scrapers are still stubs being filled in. expect rough edges; PRs welcome.
 
-most-tested today: linkedin outreach · email outreach · competitor analysis · content idea finder.
+most battle-tested today: linkedin outreach · email outreach · competitor analysis · content idea finder.
 
 ## license
 
