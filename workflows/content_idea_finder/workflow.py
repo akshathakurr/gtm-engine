@@ -31,19 +31,24 @@ Usage:
 """
 
 import os
-import re
 import sys
-import csv
 import json
 import time
 import argparse
 import subprocess
 from datetime import datetime, timezone
-from typing import Optional, List, Dict
+from typing import List, Dict
 
 import anthropic
 
 from config import CLAUDE_MODEL, CONTEXT_DIR
+from workflows._common import (
+    strip_json_fence as _strip_json_fence, gws_read_sheet, CONTEXT_FILE,
+    read_context_file as _read_context_file,
+    append_to_context_file as _append_to_context_file,
+    section_body as _section_body,
+    preview_and_confirm,
+)
 from scrapers.twitter_profile_scraper.scraper import scrape_twitter_profiles_batch
 from scrapers.twitter_research_scraper.scraper import search_tweets
 from scrapers.hacker_news_scraper.scraper import scrape_hn
@@ -70,17 +75,6 @@ def load_json(filename: str) -> Dict:
 # Google Sheets helpers
 # ---------------------------------------------------------------------------
 
-def gws_read_sheet(sheet_id: str, sheet_name: str) -> List[List[str]]:
-    result = subprocess.run(
-        [
-            "gws", "sheets", "spreadsheets", "values", "get",
-            "--params", json.dumps({"spreadsheetId": sheet_id, "range": sheet_name}),
-        ],
-        capture_output=True, text=True, check=True,
-    )
-    return json.loads(result.stdout).get("values", [])
-
-
 def gws_append_rows(sheet_id: str, sheet_name: str, rows: List[List[str]]) -> None:
     subprocess.run(
         [
@@ -104,63 +98,10 @@ def gws_write_headers(sheet_id: str, sheet_name: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# LLM helpers
-# ---------------------------------------------------------------------------
-
-def _strip_json_fence(text: str) -> str:
-    text = text.strip()
-    if text.startswith("```"):
-        lines = text.split("\n")
-        text = "\n".join(lines[1:-1]).strip()
-    return text
-
-
-# ---------------------------------------------------------------------------
 # Interactive pre-step — for each input, check context.md → prompt → fall back
 # to built-in JSON defaults (and show the defaults so the user knows what's
 # being used).
 # ---------------------------------------------------------------------------
-
-_CONTEXT_FILE = "context.md"
-
-
-def _read_context_file() -> str:
-    path = os.path.join(CONTEXT_DIR, _CONTEXT_FILE)
-    if not os.path.exists(path):
-        return ""
-    with open(path) as f:
-        return f.read()
-
-
-def _append_to_context_file(section_header: str, body: str) -> None:
-    path = os.path.join(CONTEXT_DIR, _CONTEXT_FILE)
-    body = body.strip()
-    if not body:
-        return
-    block = f"\n\n## {section_header}\n{body}\n"
-    if os.path.exists(path):
-        with open(path, "a") as f:
-            f.write(block)
-    else:
-        with open(path, "w") as f:
-            f.write("# Context\n" + block)
-
-
-def _section_body(text: str, header: str) -> str:
-    if not text:
-        return ""
-    pattern = rf"(?ms)^##\s+{re.escape(header)}\s*$\n(.*?)(?=^##\s+|\Z)"
-    m = re.search(pattern, text)
-    if not m:
-        return ""
-    section = m.group(1)
-    ans = re.search(r"(?ms)^###\s+Answer\s*$\n(.*?)(?=^###\s+|\Z)", section)
-    body = ans.group(1) if ans else section
-    body = "\n".join(ln for ln in body.splitlines() if not ln.strip().startswith("<!--")).strip()
-    if body.lower() in ("(fill this in)", "(none)", "(skip)"):
-        return ""
-    return body
-
 
 def _read_multiline_input(prompt_text: str) -> str:
     print(prompt_text)
@@ -348,7 +289,7 @@ def resolve_inputs(auto: bool) -> Dict:
         if choice in ("", "y", "yes"):
             for header, body in answers_to_save.items():
                 _append_to_context_file(header, body)
-            print(f"Saved to {os.path.join(CONTEXT_DIR, _CONTEXT_FILE)}.\n")
+            print(f"Saved to {os.path.join(CONTEXT_DIR, CONTEXT_FILE)}.\n")
         else:
             print("Not saved — your answers will be used for this run only.\n")
 
@@ -624,6 +565,14 @@ Return only valid JSON, no explanation."""
     )
     classifications = json.loads(_strip_json_fence(resp.content[0].text))
 
+    # The model is asked for one classification per topic in order; if it returns
+    # a different count, pad/truncate so every topic survives (blank genre) rather
+    # than silently dropping the tail that zip() would.
+    if len(classifications) != len(topics):
+        print(f"  ! classifier returned {len(classifications)} items for "
+              f"{len(topics)} topics; padding to align.")
+        classifications = (classifications + [{}] * len(topics))[:len(topics)]
+
     result = []
     for topic, cls in zip(topics, classifications):
         result.append({
@@ -757,6 +706,19 @@ def main() -> None:
     min_likes     = inputs["min_likes"]
     min_points    = inputs["min_points"]
 
+    # ---- Spend preview. Only Twitter trends + creator pulls hit a paid Apify
+    # actor (HN uses the free Algolia API). Worst case bills the actor's 20-item
+    # floor per run; 25 is the per-query/per-creator fetch default.
+    TWEETS_PER_PULL = 25  # matches fetch_trend_tweets / fetch_creator_posts defaults
+    if not preview_and_confirm([
+        ("Twitter trend search", "twitter",
+         (0 if args.skip_trends else len(trend_queries) * TWEETS_PER_PULL)),
+        ("Creator tweet pulls",  "twitter",
+         (0 if args.skip_creators else len(creators_list) * TWEETS_PER_PULL)),
+    ], interactive=not args.auto):
+        print("Aborted — no Apify runs were started.")
+        return
+
     trend_posts: List[Dict] = []
     hn_stories:  List[Dict] = []
 
@@ -805,20 +767,20 @@ def main() -> None:
         # --- Phase 2: Creator views (now that topics are known) ---
         creator_posts: List[Dict] = []
         if not args.skip_creators:
-            print(f"\n--- Phase 2: Fetching creator views ---")
+            print("\n--- Phase 2: Fetching creator views ---")
             creator_posts = fetch_creator_posts(
                 creators=creators_list,
                 lookback_days=args.lookback_days,
             )
             print(f"  Total: {len(creator_posts)} creator tweets")
-            print(f"\n  Matching creator views to topics...")
+            print("\n  Matching creator views to topics...")
             enriched_topics = match_creator_views(raw_topics, creator_posts)
         else:
             print("\n--- Phase 2: Creator lookup skipped ---")
             enriched_topics = [{**t, "creator_views": []} for t in raw_topics]
 
         # --- Phase 3: Classify into full idea cards ---
-        print(f"\n--- Phase 3: Classifying idea cards ---")
+        print("\n--- Phase 3: Classifying idea cards ---")
         classified = classify_ideas(enriched_topics, user_genres, client)
 
     # ======================================================================
@@ -896,25 +858,25 @@ def main() -> None:
         # Creator views on the seed idea
         creator_posts: List[Dict] = []
         if not args.skip_creators:
-            print(f"\n--- Fetching creator views on seed idea ---")
+            print("\n--- Fetching creator views on seed idea ---")
             creator_posts = fetch_creator_posts(
                 creators=creators_list,
                 lookback_days=args.lookback_days,
             )
             print(f"  Total: {len(creator_posts)} creator tweets")
-            print(f"\n  Matching creator views to seed topic...")
+            print("\n  Matching creator views to seed topic...")
             enriched_topics = match_creator_views([seed_topic], creator_posts)
         else:
             enriched_topics = [{**seed_topic, "creator_views": []}]
 
         # Classify
-        print(f"\n--- Classifying idea card ---")
+        print("\n--- Classifying idea card ---")
         classified = classify_ideas(enriched_topics, user_genres, client)
 
     # ======================================================================
     # HYDRATE + FINALIZE
     # ======================================================================
-    print(f"\n--- Hydrating source quotes ---")
+    print("\n--- Hydrating source quotes ---")
     ideas: List[Dict] = []
     for n, idea in enumerate(classified, 1):
         quotes = hydrate_source_quotes(
@@ -940,12 +902,12 @@ def main() -> None:
     # ======================================================================
     # OUTPUT
     # ======================================================================
-    print(f"\n--- Writing outputs ---")
+    print("\n--- Writing outputs ---")
     write_outputs(ideas, args.sheet_id, args.sheet_name, run_date)
 
-    print(f"\n======= Done =======")
+    print("\n======= Done =======")
     print(f"  {len(ideas)} idea card(s) generated.")
-    print(f"  Hook + body left blank — fill in via writing skill when ready.")
+    print("  Hook + body left blank — fill in via writing skill when ready.")
 
 
 if __name__ == "__main__":

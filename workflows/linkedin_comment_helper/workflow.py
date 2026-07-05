@@ -18,72 +18,27 @@ Usage:
 """
 
 import os
-import re
 import sys
 import json
 import time
 import argparse
-import subprocess
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict
 
 import anthropic
 
 from config import CLAUDE_MODEL, CONTEXT_DIR
+from workflows._common import (
+    strip_json_fence as _strip_json_fence,
+    gws_read_sheet, gws_write_range, find_col, cell, load_icp,
+    read_context_file as _read_context_file,
+    append_to_context_file as _append_to_context_file,
+    section_body as _section_body,
+    preview_and_confirm,
+)
 from scrapers.linkedin_profile_post_scraper import scraper as _post_scraper
 from scrapers.linkedin_post_research import scraper as _search_scraper
 
-
-# ---------------------------------------------------------------------------
-# Inlined helpers (kept here so each workflow is self-contained)
-# ---------------------------------------------------------------------------
-
-def gws_read_sheet(sheet_id: str, sheet_name: str) -> List[List[str]]:
-    """Return all rows from a sheet tab as a list of lists."""
-    result = subprocess.run(
-        ["gws", "sheets", "spreadsheets", "values", "get",
-         "--params", json.dumps({"spreadsheetId": sheet_id, "range": sheet_name})],
-        capture_output=True, text=True, check=True,
-    )
-    return json.loads(result.stdout).get("values", [])
-
-
-def gws_write_range(sheet_id: str, range_: str, values: List[List[str]]) -> None:
-    """Write a list of rows to the given A1-notation range."""
-    subprocess.run(
-        ["gws", "sheets", "spreadsheets", "values", "update",
-         "--params", json.dumps({"spreadsheetId": sheet_id, "range": range_,
-                                  "valueInputOption": "USER_ENTERED"}),
-         "--json", json.dumps({"values": values})],
-        capture_output=True, text=True, check=True,
-    )
-
-
-def find_col(headers: List[str], *names: str) -> Optional[int]:
-    lower = [n.lower() for n in names]
-    for i, h in enumerate(headers):
-        if h.strip().lower() in lower:
-            return i
-    return None
-
-
-def cell(row: List[str], idx: Optional[int]) -> str:
-    return row[idx].strip() if idx is not None and idx < len(row) else ""
-
-
-def load_icp(*_args, **_kwargs) -> str:
-    """Concatenate all .md files in context/ (excluding .example templates)."""
-    parts = []
-    for fname in sorted(os.listdir(CONTEXT_DIR)):
-        if fname.endswith(".md") and ".example" not in fname:
-            with open(os.path.join(CONTEXT_DIR, fname)) as f:
-                parts.append(f.read())
-    if not parts:
-        raise FileNotFoundError(
-            f"No context .md files found in {CONTEXT_DIR}. "
-            f"Copy context/context.md.example to context/context.md and fill it in."
-        )
-    return "\n\n---\n\n".join(parts)
 
 SLEEP_BETWEEN_PROFILES = 5  # apimaestro/linkedin-profile-posts throttles on bursts
 SEARCH_MIN_INTERVAL = 2     # spacing between posts-search actor calls (was the batch sleep)
@@ -183,44 +138,6 @@ REQUIRED_SECTIONS = [
         "multiline": True,
     },
 ]
-
-
-def _read_context_file() -> str:
-    path = os.path.join(CONTEXT_DIR, _CONTEXT_FILE)
-    if not os.path.exists(path):
-        return ""
-    with open(path) as f:
-        return f.read()
-
-
-def _append_to_context_file(section_header: str, body: str) -> None:
-    path = os.path.join(CONTEXT_DIR, _CONTEXT_FILE)
-    body = body.strip()
-    if not body:
-        return
-    block = f"\n\n## {section_header}\n{body}\n"
-    if os.path.exists(path):
-        with open(path, "a") as f:
-            f.write(block)
-    else:
-        with open(path, "w") as f:
-            f.write("# Context\n" + block)
-
-
-def _section_body(text: str, header: str) -> str:
-    if not text:
-        return ""
-    pattern = rf"(?ms)^##\s+{re.escape(header)}\s*$\n(.*?)(?=^##\s+|\Z)"
-    m = re.search(pattern, text)
-    if not m:
-        return ""
-    section = m.group(1)
-    ans = re.search(r"(?ms)^###\s+Answer\s*$\n(.*?)(?=^###\s+|\Z)", section)
-    body = ans.group(1) if ans else section
-    body = "\n".join(ln for ln in body.splitlines() if not ln.strip().startswith("<!--")).strip()
-    if body.lower() in ("(fill this in)", "(none)", "(skip)"):
-        return ""
-    return body
 
 
 def _parse_keyword_lines(body: str) -> List[str]:
@@ -406,8 +323,6 @@ def pull_trending_posts(keywords: List[str], max_per_keyword: int, days_back: in
 
 def pull_signal_posts(keywords: List[str], max_per_keyword: int, days_back: int) -> List[dict]:
     """Search by signal keywords (date sort), filter to recent."""
-    global _SEARCH_MAX_POSTS
-    _SEARCH_MAX_POSTS = max_per_keyword
     results = _search_keywords(keywords, sort="date_posted", max_posts=max_per_keyword)
     posts: List[dict] = []
     for r in results:
@@ -437,21 +352,6 @@ def dedupe_posts(posts: List[dict]) -> List[dict]:
 # ---------------------------------------------------------------------------
 # Relevance scoring (Claude + project context from the context/ folder)
 # ---------------------------------------------------------------------------
-
-def _strip_json_fence(text: str) -> str:
-    text = text.strip()
-    if text.startswith("```"):
-        lines = text.split("\n")
-        text = "\n".join(lines[1:-1]).strip()
-    # Tolerate prose preamble/suffix around the JSON: carve out the outermost
-    # object or array. Models sometimes reason in prose before emitting JSON.
-    if text and text[0] not in "{[":
-        starts = [i for i in (text.find("{"), text.find("[")) if i != -1]
-        ends = [i for i in (text.rfind("}"), text.rfind("]")) if i != -1]
-        if starts and ends and max(ends) > min(starts):
-            text = text[min(starts):max(ends) + 1].strip()
-    return text
-
 
 def score_relevance(posts: List[dict], project_context: str, client: anthropic.Anthropic) -> List[Optional[dict]]:
     if not posts:
@@ -486,7 +386,13 @@ Return only valid JSON, no explanation."""
         model=CLAUDE_MODEL, max_tokens=8000,
         messages=[{"role": "user", "content": prompt}],
     )
-    parsed = json.loads(_strip_json_fence(resp.content[0].text))
+    try:
+        parsed = json.loads(_strip_json_fence(resp.content[0].text))
+    except json.JSONDecodeError:
+        # One malformed reply shouldn't discard every scraped post; score nothing
+        # this run and let the caller report zero matches.
+        print("  ! Couldn't parse the relevance scores from Claude — skipping scoring this run.")
+        return [None] * len(posts)
     result: List[Optional[dict]] = [None] * len(posts)
     for item in parsed:
         i = item.get("index", 0) - 1
@@ -652,6 +558,32 @@ def main():
 
     all_posts: List[dict] = []
 
+    # ICP profile URLs are read up front so the spend estimate below can size
+    # the (expensive) profile-posts fan-out before anything is billed.
+    icp_urls: List[str] = []
+    if not args.skip_icp:
+        if "TODO" in icp_sheet_id:
+            print("[ICP] Sheet ID not configured in config.json — skipping ICP source.")
+        else:
+            print(f"[ICP] Reading profile URLs from sheet '{icp_sheet_name}'...")
+            raw_urls = read_icp_profile_urls(icp_sheet_id, icp_sheet_name, icp_url_col)
+            # Dedupe — duplicate URLs would otherwise pay for the same run twice.
+            icp_urls = list(dict.fromkeys(raw_urls))
+            dropped = len(raw_urls) - len(icp_urls)
+            note = f" ({dropped} duplicate(s) skipped)" if dropped else ""
+            print(f"  Found {len(icp_urls)} ICP profile URLs{note}.")
+
+    # ---- Spend preview. Worst case = every requested item returned + billed.
+    if not preview_and_confirm([
+        ("ICP profile posts",  "linkedin_profile_posts", len(icp_urls) * max_per_profile),
+        ("Trending post search", "linkedin_post_search",
+         (0 if args.skip_trending else len(genre_keywords) * max_per_keyword)),
+        ("Signal post search",   "linkedin_post_search",
+         (0 if args.skip_signal else len(signal_keywords) * max_per_keyword)),
+    ], interactive=interactive):
+        print("Aborted — no Apify runs were started.")
+        return
+
     # ---- Sources. ICP uses the profile-posts actor; trending + signal share
     # the posts-search actor. Each source below handles its own skip/config and
     # returns its posts. In auto mode the ICP stream and the search stream run
@@ -660,25 +592,10 @@ def main():
     # between-source pauses still make sense.
 
     def run_icp() -> List[dict]:
-        if args.skip_icp:
-            return []
-        if "TODO" in icp_sheet_id:
-            print("[ICP] Sheet ID not configured in config.json — skipping ICP source.")
-            return []
-        print(f"[ICP] Reading profile URLs from sheet '{icp_sheet_name}'...")
-        urls = read_icp_profile_urls(icp_sheet_id, icp_sheet_name, icp_url_col)
-        # Dedupe — duplicate URLs in the sheet would otherwise pay for the same
-        # profile-posts run more than once.
-        deduped = list(dict.fromkeys(urls))
-        if len(deduped) < len(urls):
-            print(f"  Found {len(urls)} URLs ({len(urls) - len(deduped)} duplicate(s) skipped).")
-        else:
-            print(f"  Found {len(deduped)} ICP profile URLs.")
-        urls = deduped
-        if not urls:
+        if not icp_urls:
             return []
         print(f"[ICP] Pulling posts (≥{SLEEP_BETWEEN_PROFILES}s between starts, up to {ICP_CONCURRENCY} in flight)...")
-        icp_posts = pull_icp_posts(urls, max_per_profile, days_back)
+        icp_posts = pull_icp_posts(icp_urls, max_per_profile, days_back)
         print(f"  Got {len(icp_posts)} ICP posts.")
         return icp_posts
 

@@ -45,13 +45,13 @@ def scrape_linkedin_profile_posts(
     """
     Fetches posts from a LinkedIn user's profile.
 
-    Defaults to the last 60 days, capped at 10 posts. Both limits apply together —
-    you get at most 10 posts from the last 60 days. Override either explicitly.
+    Defaults to the last 90 days, capped at 15 posts. Both limits apply together —
+    you get at most 15 posts from the last 90 days. Override either explicitly.
 
     Args:
         profile_url:  LinkedIn profile URL (e.g. https://www.linkedin.com/in/username/)
-        max_posts:    Maximum number of posts to return (default 10).
-        days_back:    Return only posts from the last N days (default 60).
+        max_posts:    Maximum number of posts to return (default 15).
+        days_back:    Return only posts from the last N days (default 90).
                       Pass None to remove the date limit entirely.
         since_date:   Return only posts on or after this date (YYYY-MM-DD).
                       Used only when days_back is None.
@@ -238,8 +238,6 @@ def _extract_username(profile_url: str) -> str:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    import sys
-
     input_file = sys.argv[1] if len(sys.argv) > 1 else "example_input.json"
 
     with open(input_file) as f:

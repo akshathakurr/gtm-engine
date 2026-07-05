@@ -129,14 +129,19 @@ def search_web_batch(
     Returns a list of results in the same order as the input queries.
     """
     def _fetch(query):
-        return search_web(
-            query=query,
-            num_results=num_results,
-            days_back=days_back,
-            include_domains=include_domains,
-            exclude_domains=exclude_domains,
-            summary_question=summary_question,
-        )
+        # Isolate failures per query: one bad search (rate limit, timeout) must
+        # not abort the whole batch, so return the standard error shape instead.
+        try:
+            return search_web(
+                query=query,
+                num_results=num_results,
+                days_back=days_back,
+                include_domains=include_domains,
+                exclude_domains=exclude_domains,
+                summary_question=summary_question,
+            )
+        except Exception as e:
+            return {"query": query, "total": 0, "results": [], "errors": [str(e)]}
 
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         return list(pool.map(_fetch, queries))

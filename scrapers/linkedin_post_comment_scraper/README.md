@@ -35,6 +35,6 @@ python3 scraper.py example_input.json
 
 ## Notes
 
-- Actor returns 100 comments per page. Scraper auto-paginates until `max_comments` is reached.
+- The actor bills per returned comment, so the scraper passes `limit=max_comments` (capped at the 100/page max) instead of buying a full 100-comment page to keep 20. It paginates via `page_number` only when replies are excluded and it still needs more top-level comments, and stops at `MAX_PAGES` (5) so a reply-heavy post can't run up unbounded spend.
 - Top-level comments only by default — set `include_replies=true` to include nested replies.
 - Post URL formats accepted: full URL (`https://www.linkedin.com/posts/..._activity-ID-...`) or bare numeric ID.

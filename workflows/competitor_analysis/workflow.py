@@ -38,9 +38,11 @@ from urllib.parse import urlparse
 
 import anthropic
 
-import subprocess
-
 from config import CLAUDE_MODEL, CONTEXT_DIR
+from workflows._common import (
+    strip_json_fence as _strip_json_fence,
+    gws_read_sheet, gws_write_range, col_letter, find_col, ensure_col, cell, load_icp,
+)
 from scrapers.web_search.scraper import search_web
 from scrapers.website_scraper import scraper as _website_mod
 from scrapers.linkedin_profile_post_scraper import scraper as _li_posts_mod
@@ -53,7 +55,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 
 # ---------------------------------------------------------------------------
-# Inlined helpers (kept here so each workflow is self-contained)
+# Per-competitor concurrency + small local helpers
+# (shared sheet/context/JSON helpers live in workflows/_common.py)
 # ---------------------------------------------------------------------------
 
 # Each competitor's independent enrichment lookups (Claude + Exa) run together
@@ -86,81 +89,9 @@ def _run_parallel(tasks: Dict[str, "callable"], max_workers: int = COMPETITOR_EN
             fut.result()
     return out
 
-def gws_read_sheet(sheet_id: str, sheet_name: str) -> List[List[str]]:
-    result = subprocess.run(
-        ["gws", "sheets", "spreadsheets", "values", "get",
-         "--params", json.dumps({"spreadsheetId": sheet_id, "range": sheet_name})],
-        capture_output=True, text=True, check=True,
-    )
-    return json.loads(result.stdout).get("values", [])
-
-
-def gws_write_range(sheet_id: str, range_: str, values: List[List[str]]) -> None:
-    subprocess.run(
-        ["gws", "sheets", "spreadsheets", "values", "update",
-         "--params", json.dumps({"spreadsheetId": sheet_id, "range": range_,
-                                  "valueInputOption": "USER_ENTERED"}),
-         "--json", json.dumps({"values": values})],
-        capture_output=True, text=True, check=True,
-    )
-
-
-def col_letter(idx: int) -> str:
-    result, n = "", idx + 1
-    while n > 0:
-        n, rem = divmod(n - 1, 26)
-        result = chr(65 + rem) + result
-    return result
-
-
-def find_col(headers: List[str], *names: str) -> Optional[int]:
-    lower = [n.lower() for n in names]
-    for i, h in enumerate(headers):
-        if h.strip().lower() in lower:
-            return i
-    return None
-
-
-def ensure_col(headers: List[str], name: str) -> int:
-    idx = find_col(headers, name)
-    if idx is not None:
-        return idx
-    headers.append(name)
-    return len(headers) - 1
-
-
-def cell(row: List[str], idx: Optional[int]) -> str:
-    return row[idx].strip() if idx is not None and idx < len(row) else ""
-
-
-def load_icp(*_args, **_kwargs) -> str:
-    """Concatenate all .md files in context/ (excluding .example templates)."""
-    parts = []
-    for fname in sorted(os.listdir(CONTEXT_DIR)):
-        if fname.endswith(".md") and ".example" not in fname:
-            with open(os.path.join(CONTEXT_DIR, fname)) as f:
-                parts.append(f.read())
-    if not parts:
-        raise FileNotFoundError(
-            f"No context .md files found in {CONTEXT_DIR}. "
-            f"Copy context/context.md.example to context/context.md and fill it in."
-        )
-    return "\n\n---\n\n".join(parts)
-
-
-def _strip_json_fence(text: str) -> str:
-    text = text.strip()
-    if text.startswith("```"):
-        lines = text.split("\n")
-        text = "\n".join(lines[1:-1]).strip()
-    # Tolerate prose preamble/suffix around the JSON: carve out the outermost
-    # object or array. Models sometimes reason in prose before emitting JSON.
-    if text and text[0] not in "{[":
-        starts = [i for i in (text.find("{"), text.find("[")) if i != -1]
-        ends = [i for i in (text.rfind("}"), text.rfind("]")) if i != -1]
-        if starts and ends and max(ends) > min(starts):
-            text = text[min(starts):max(ends) + 1].strip()
-    return text
+def _strip_www(netloc: str) -> str:
+    """Drop a leading 'www.' (str.lstrip('www.') would strip stray w/./3 chars)."""
+    return netloc[4:] if netloc.startswith("www.") else netloc
 
 
 # ---------------------------------------------------------------------------
@@ -357,14 +288,14 @@ def scrape_website(url: str) -> dict:
 # Step 2: Company LinkedIn URL
 # ---------------------------------------------------------------------------
 
-def find_linkedin_url(company_name: str, website: str, scraped: dict,
+def find_linkedin_url(company_name: str, website: str,
                       client: anthropic.Anthropic) -> str:
     """Extract LinkedIn company URL by fetching the homepage via Jina Reader
     (which includes href link URLs in its markdown output). Falls back to web search."""
     import requests as _requests
 
     pattern = r'https?://(?:[\w-]+\.)?linkedin\.com/company/([A-Za-z0-9_-]+)'
-    domain  = urlparse(website).netloc.lstrip("www.") if website else ""
+    domain  = _strip_www(urlparse(website).netloc) if website else ""
     dp      = re.sub(r"[^a-z0-9]", "", domain.split(".")[0].lower()) if domain else ""
 
     # --- Pass 1: Jina Reader on homepage (includes href attributes) ---
@@ -531,7 +462,7 @@ CRITICAL: Respond with ONLY the raw JSON object — start with {{ and end with }
 # ---------------------------------------------------------------------------
 
 def get_recent_news(company_name: str, website: str, client: anthropic.Anthropic) -> str:
-    domain = urlparse(website).netloc.lstrip("www.") if website else ""
+    domain = _strip_www(urlparse(website).netloc) if website else ""
     # Anchor search to the domain to avoid generic name collisions
     query = (
         f'"{domain}" funding launch announcement event customer 2024 2025'
@@ -623,7 +554,7 @@ def _find_linkedin_in_url(founder_name: str, company_name: str) -> str:
 
 def find_founders(company_name: str, website: str, client: anthropic.Anthropic) -> List[Dict[str, str]]:
     """Return up to 2 founders with name, linkedin, twitter."""
-    domain = urlparse(website).netloc.lstrip("www.") if website else ""
+    domain = _strip_www(urlparse(website).netloc) if website else ""
     name_query = f'"{company_name}" {domain}' if domain else company_name
 
     # ── Step 1: Identify founder names ───────────────────────────────────────
@@ -689,7 +620,7 @@ Return only valid JSON."""}],
                 f["linkedin"] = li_url
                 print(f"      → {li_url}")
             else:
-                print(f"      → (not found)")
+                print("      → (not found)")
 
     # ── Step 3: Twitter — dedicated search for any founder still missing it ───
     for f in founders:
@@ -944,7 +875,7 @@ def get_customer_reviews(
     # Trustpilot fallback
     trustpilot_url = ""
     if not g2_url and website:
-        domain = urlparse(website).netloc.lstrip("www.")
+        domain = _strip_www(urlparse(website).netloc)
         trustpilot_url = f"https://www.trustpilot.com/review/{domain}"
 
     platform   = "g2" if g2_url else ("trustpilot" if trustpilot_url else "")
@@ -1240,7 +1171,7 @@ def main() -> None:
 
         tasks: Dict[str, "callable"] = {}
         if not get_col("Company LinkedIn URL"):
-            tasks["li_url"] = lambda: find_linkedin_url(competitor, website, scraped, client)
+            tasks["li_url"] = lambda: find_linkedin_url(competitor, website, client)
         if not get_col("Company Description") and scraped:
             tasks["desc"] = lambda: draft_description(competitor, scraped, client)
         if firm_missing:

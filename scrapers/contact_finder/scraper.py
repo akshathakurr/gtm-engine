@@ -23,7 +23,6 @@ import os
 import sys
 import json
 import time
-import contextlib
 from typing import Optional, List
 
 import requests
@@ -32,15 +31,6 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))
 APOLLO_API_KEY = os.getenv("APOLLO_API_KEY")
 BASE_URL = "https://api.apollo.io/api/v1"
-
-
-@contextlib.contextmanager
-def _suppress_logs():
-    # No-op, kept for call-site compatibility. Previously redirected sys.stderr
-    # to an in-memory buffer, but a global stream swap corrupts output when
-    # email lookups run on worker threads. These calls use raw `requests`
-    # (Apollo REST), so there is nothing streaming to suppress.
-    yield
 
 
 def _headers() -> dict:

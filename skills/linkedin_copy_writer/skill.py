@@ -48,17 +48,17 @@ the skill writes a follow-up using the follow-up tactics instead of a first touc
 from __future__ import annotations
 
 import json
-import re
 from typing import Any, Dict, List, Optional, Union
 
-from anthropic import Anthropic
-
-from config import ANTHROPIC_API_KEY, CLAUDE_MODEL
-
-_client = Anthropic(api_key=ANTHROPIC_API_KEY)
-
-MAX_POSTS_IN_PROMPT = 5
-MAX_POST_CHARS = 500
+from config import CLAUDE_MODEL
+from skills._copy_core import (
+    client,
+    extract_json,
+    extract_signals,
+    build_lead_data_block,
+    audit_copy,
+    repair_copy,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -93,28 +93,6 @@ OUTPUT (JSON only):
   "strength": "strong | moderate | weak | none",
   "notes": "optional — what additional data would make this stronger"
 }"""
-
-
-def _extract_signals(lead_data_block: str, icp_context: str) -> Dict[str, Any]:
-    user_msg = (
-        f"## Sender Context\n{icp_context.strip() or '(none)'}\n\n"
-        f"## All Lead Data\n{lead_data_block}\n\n"
-        "Identify the 1-2 strongest signals. Return only the JSON object."
-    )
-    resp = _client.messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=500,
-        system=_SIGNAL_SYSTEM,
-        messages=[{"role": "user", "content": user_msg}],
-    )
-    text = "".join(b.text for b in resp.content if hasattr(b, "text"))
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if not match:
-        return {"signals": [], "strength": "none", "notes": ""}
-    try:
-        return json.loads(match.group(0))
-    except json.JSONDecodeError:
-        return {"signals": [], "strength": "none", "notes": ""}
 
 
 # ---------------------------------------------------------------------------
@@ -201,58 +179,6 @@ def _join_competitors(competitors: Union[str, List[str], None]) -> str:
     return ", ".join(str(c).strip() for c in competitors if str(c).strip())
 
 
-def _build_lead_data_block(
-    name: str,
-    company: str,
-    position: str,
-    buyer_persona: str,
-    priority: str,
-    matching_posts: List[Dict[str, Any]],
-    small_talk: str,
-    personalisation_hook: str,
-    employee_count: str,
-    est_revenue: str,
-    total_funding: str,
-    hq: str,
-    competitors: str,
-) -> str:
-    parts = [
-        f"Name: {name}",
-        f"Company: {company}",
-        f"Position: {position or '(unknown)'}",
-        f"Buyer persona: {buyer_persona or '(unknown)'}",
-        f"Priority: {priority or '(unknown)'}",
-        f"Employee count: {employee_count or '(unknown)'}",
-        f"Est revenue: {est_revenue or '(unknown)'}",
-        f"Total funding: {total_funding or '(unknown)'}",
-        f"HQ: {hq or '(unknown)'}",
-        f"Competitors: {competitors or '(none)'}",
-    ]
-    block = "\n".join(parts)
-
-    if small_talk and small_talk.strip():
-        block += f"\n\nSmall talk / personal signals:\n{small_talk.strip()}"
-
-    if personalisation_hook and personalisation_hook.strip():
-        block += f"\n\nPre-researched hooks (angles):\n{personalisation_hook.strip()}"
-
-    if matching_posts:
-        posts_lines = []
-        for p in matching_posts[:MAX_POSTS_IN_PROMPT]:
-            text = (p.get("text") or "").strip()
-            if len(text) > MAX_POST_CHARS:
-                text = text[:MAX_POST_CHARS].rstrip() + "…"
-            date = (p.get("posted_at") or "")[:10]
-            posts_lines.append(f"[{date}] {text}" if date else text)
-        block += "\n\nMatching LinkedIn posts:\n" + "\n\n".join(posts_lines)
-
-    return block
-
-
-def _first_name(name: str) -> str:
-    return (name or "").strip().split()[0] if (name or "").strip() else ""
-
-
 def _build_message_prompt(
     lead_data_block: str,
     signals: List[Dict[str, Any]],
@@ -285,56 +211,6 @@ def _build_message_prompt(
 
 
 # ---------------------------------------------------------------------------
-# Self-review audit + repair
-# ---------------------------------------------------------------------------
-
-def _leading_token(value: Any) -> str:
-    """First word of a review answer, lowercased. The model often appends a
-    justification ("no — opens with a direct quote..."); we gate on the verdict,
-    not the prose."""
-    return re.split(r"[^a-z]+", str(value or "").strip().lower(), maxsplit=1)[0]
-
-
-def _audit_copy(parsed: Dict[str, Any]) -> List[str]:
-    """Extract violations from the model's three-question self-review."""
-    issues = []
-    review = parsed.get("review") or {}
-    if _leading_token(review.get("mass_sent_feel")) != "no":
-        issues.append("feels mass-sent")
-    if _leading_token(review.get("would_hook_reply")) != "yes":
-        issues.append("weak hook")
-    if _leading_token(review.get("reads_human")) != "yes":
-        issues.append("not human")
-    return issues
-
-
-def _repair_copy(message_prompt: str, draft: str, violations: List[str]) -> Dict[str, Any]:
-    """One repair call. Sends draft + violations back and asks for a fix."""
-    violation_list = "\n".join(f"- {v}" for v in violations)
-    repair_msg = (
-        f"{message_prompt}\n\n"
-        "---\n\n"
-        f"FIRST DRAFT (needs revision):\n{draft}\n\n"
-        f"SELF-REVIEW VIOLATIONS:\n{violation_list}\n\n"
-        "Fix each violation. Return the corrected message in the same JSON format."
-    )
-    try:
-        resp = _client.messages.create(
-            model=CLAUDE_MODEL,
-            max_tokens=800,
-            system=_MESSAGE_SYSTEM,
-            messages=[{"role": "user", "content": repair_msg}],
-        )
-        text = "".join(b.text for b in resp.content if hasattr(b, "text"))
-        match = re.search(r"\{.*\}", text, re.DOTALL)
-        if not match:
-            return {"copy": draft, "review": {}, "signal_used": "", "errors": []}
-        return json.loads(match.group(0))
-    except Exception as e:
-        return {"copy": draft, "review": {}, "signal_used": "", "errors": [f"repair_failed: {e}"]}
-
-
-# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -359,7 +235,7 @@ def write_copy(
     if not name or not company:
         return {"copy": "", "signal_used": "", "review": {}, "errors": ["missing required fields: name and company"]}
 
-    lead_data_block = _build_lead_data_block(
+    lead_data_block = build_lead_data_block(
         name=name, company=company, position=position,
         buyer_persona=buyer_persona, priority=priority,
         matching_posts=matching_posts or [],
@@ -374,7 +250,7 @@ def write_copy(
 
     # Call 1: extract signals
     try:
-        signal_result = _extract_signals(lead_data_block, icp_context)
+        signal_result = extract_signals(_SIGNAL_SYSTEM, lead_data_block, icp_context)
     except Exception as e:
         signal_result = {"signals": [], "strength": "none", "notes": str(e)}
 
@@ -391,17 +267,16 @@ def write_copy(
     )
 
     try:
-        resp = _client.messages.create(
+        resp = client.messages.create(
             model=CLAUDE_MODEL,
             max_tokens=800,
             system=_MESSAGE_SYSTEM,
             messages=[{"role": "user", "content": message_prompt}],
         )
         text = "".join(b.text for b in resp.content if hasattr(b, "text"))
-        match = re.search(r"\{.*\}", text, re.DOTALL)
-        if not match:
+        parsed = extract_json(text)
+        if parsed is None:
             raise ValueError(f"No JSON in output: {text[:200]}")
-        parsed = json.loads(match.group(0))
     except Exception as e:
         return {"copy": "", "signal_used": "", "review": {}, "errors": [f"llm_call_failed: {e}"]}
 
@@ -411,12 +286,12 @@ def write_copy(
 
     # Gate on self-review; repair once if violations exist
     copy = (parsed.get("copy") or "").strip()
-    audit = _audit_copy(parsed)
+    audit = audit_copy(parsed)
     if audit:
         errors.extend(f"review_fail: {v}" for v in audit)
-        parsed = _repair_copy(message_prompt, copy, audit)
+        parsed = repair_copy(_MESSAGE_SYSTEM, message_prompt, copy, audit, max_tokens=800)
         copy = (parsed.get("copy") or copy).strip()
-        post_audit = _audit_copy(parsed)
+        post_audit = audit_copy(parsed)
         errors.extend(f"unresolved: {v}" for v in post_audit)
 
     return {

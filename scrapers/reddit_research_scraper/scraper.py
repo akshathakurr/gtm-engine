@@ -1,8 +1,12 @@
 """
 Reddit Research Scraper — search Reddit posts by keyword, subreddit, or both.
 
-No Apify, no API key required. Uses Reddit's free public JSON API.
-Rate limit: ~60 requests/minute unauthenticated. More than enough for GTM workflows.
+Uses Reddit's free public JSON API (no Apify, no API key).
+
+NOTE: Reddit IP-blocks datacenter/cloud ranges (HTTP 403), so this often returns
+only errors from CI or a server. When that happens, fall back to the Apify
+`trudax/reddit-scraper-lite` actor, which uses residential proxies. Errors are
+returned in the result's `errors` list rather than raised.
 
 Input:  query, subreddit (optional), sort, time_filter, max_posts
 Output: list of posts with title, text, author, subreddit, score, comments, url, date

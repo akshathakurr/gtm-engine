@@ -14,7 +14,7 @@ import json
 import re
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
-from typing import Optional, List
+from typing import Optional
 
 import requests
 

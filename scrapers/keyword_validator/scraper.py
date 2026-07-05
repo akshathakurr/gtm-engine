@@ -20,7 +20,7 @@ import os
 import sys
 import json
 import time
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 try:
     from pytrends.request import TrendReq  # type: ignore

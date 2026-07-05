@@ -13,7 +13,6 @@ import sys
 import time
 import contextlib
 from typing import Optional, List
-from datetime import datetime
 
 import requests
 from dotenv import load_dotenv
@@ -133,6 +132,7 @@ def search_linkedin_posts(
     """
     errors = []
     posts = []
+    total_available = 0
 
     payload: dict = {
         "keyword": keyword,
@@ -156,7 +156,6 @@ def search_linkedin_posts(
             raw_items = _fetch_dataset(dataset_id, limit=max_posts)
 
             # Extract total_available from the first item's metadata
-            total_available = 0
             if raw_items:
                 meta = raw_items[0].get("metadata") or {}
                 total_available = meta.get("total_count", 0)

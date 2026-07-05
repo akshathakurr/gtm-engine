@@ -10,10 +10,9 @@ Date filtering is done server-side via numericFilters (cheap — avoids over-fet
 
 import sys
 import json
-import re
 import time
 from datetime import datetime, timezone, timedelta
-from typing import Optional, List
+from typing import Optional
 from urllib.parse import urlencode
 
 import requests

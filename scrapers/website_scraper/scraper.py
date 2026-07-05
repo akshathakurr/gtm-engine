@@ -6,11 +6,10 @@ Falls back to Jina Reader (r.jina.ai) for JS-heavy sites — free, no API key.
 Fetches homepage + key subpages (about, product, pricing, careers, customers).
 """
 
-import os
 import sys
 import json
 import re
-import time
+from datetime import datetime
 from typing import Optional, List, Dict
 from urllib.parse import urljoin, urlparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -222,7 +221,7 @@ def _extract_customers_from_images(soup: BeautifulSoup) -> List[str]:
                 names.add(raw)
 
     # Final filter: remove obvious UI strings and multi-word noise
-    UI_NOISE = {"Glean", "Overview", "Platform", "Product", "Solution", "Feature",
+    UI_NOISE = {"Overview", "Platform", "Product", "Solution", "Feature",
                 "Pricing", "About", "Home", "Nav", "Header", "Footer", "Cta",
                 "Hero", "Section", "Card", "Button", "Link", "Page", "Billing",
                 "Payments", "Spend", "Accounts", "Business Accounts", "Platform APIs"}
@@ -285,7 +284,7 @@ def _extract_founded_year(text: str) -> Optional[str]:
     m = re.search(r"(?:founded|established|started|since)\s+(?:in\s+)?(\d{4})", text, re.IGNORECASE)
     if m:
         year = int(m.group(1))
-        if 1900 <= year <= 2026:
+        if 1900 <= year <= datetime.now().year:
             return str(year)
     return None
 

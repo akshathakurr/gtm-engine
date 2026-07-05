@@ -6,10 +6,10 @@ credentials. Import this from any scraper or workflow:
 
     from config import CLAUDE_MODEL, APIFY_TOKEN, CONTEXT_DIR
 
-Repo layout (post-cleanup):
-    /Context     — flat .md files describing ICP, product, etc.
-    /Scrapers    — one folder per data source (snake_case)
-    /Workflows   — one folder per GTM play (snake_case)
+Repo layout:
+    context/     — flat .md files describing ICP, product, etc.
+    scrapers/    — one folder per data source (snake_case)
+    workflows/   — one folder per GTM play (snake_case)
 """
 
 import os

@@ -17,7 +17,7 @@ import os
 import sys
 import json
 from datetime import datetime, timezone, timedelta
-from typing import Optional, List
+from typing import List
 from contextlib import contextmanager
 
 from dotenv import load_dotenv
@@ -33,7 +33,6 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))
 ACTOR_ID = "kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest"
 TWITTER_DATE_FORMAT = "%a %b %d %H:%M:%S +0000 %Y"  # "Sun Apr 05 15:36:19 +0000 2026"
 MIN_ITEMS = 20  # actor's minimum billable items per run
-COST_PER_TWEET_USD = 0.00025  # ~$0.25 / 1,000 tweets
 
 
 import logging

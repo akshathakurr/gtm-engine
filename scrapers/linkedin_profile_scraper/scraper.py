@@ -128,8 +128,6 @@ def _format_date(date_obj: Optional[dict]) -> Optional[str]:
 
 
 if __name__ == "__main__":
-    import sys
-
     # Accept input JSON file as argument, or fall back to example_input.json
     input_file = sys.argv[1] if len(sys.argv) > 1 else "example_input.json"
 

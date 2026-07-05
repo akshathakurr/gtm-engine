@@ -5,15 +5,15 @@ Steps:
   1  — Classify each lead: Decision Maker / Champion / Non Decision Maker
   2  — Enrich Decision Maker companies with firmographic data via Web Search
   3  — Score all leads P0 / P1 / P2 with 1-2 line reasoning
-  4  — Select outreach batch: all P0; if P0 < 100 also include P1 until we reach 100
+  4  — Select outreach batch: P0 only by default (--include-p1 / --include-p2 widen it)
   5  — Find 3-4 direct competitors for each filtered lead's company (Web Search)
   6  — Scrape LinkedIn posts for each filtered lead; filter by ICP criteria; write post URLs
   7  — Gather small talk details for each filtered lead (Small Talk Scraper)
   8  — Generate personalisation talking points (Personalisation Hook Skill)
   9  — Write personalised LinkedIn copy (LinkedIn Copy Writer Skill)
 
-Buyer criteria, ICP scoring, and post filtering criteria come from Context/{project}/icp.md.
-Post scraping config (max_posts, days_back) is also read from that file — with scraper defaults
+Buyer criteria, ICP scoring, and post filtering criteria come from the context/*.md files.
+Post scraping config (max_posts, days_back) is also read from those files — with scraper defaults
 as fallback if the fields are not filled in.
 
 Usage:
@@ -34,12 +34,15 @@ import csv
 import json
 import time
 import argparse
-import subprocess
 from typing import Optional, List, Dict
 
 import anthropic
 
 from config import CLAUDE_MODEL
+from workflows._common import (
+    strip_json_fence as _strip_json_fence,
+    gws_read_sheet, gws_write_range, col_letter, ensure_col, cell, load_icp,
+)
 from scrapers.web_search.scraper import search_web
 from scrapers.linkedin_profile_post_scraper import scraper as _post_scraper
 
@@ -160,36 +163,6 @@ def _map_rate_limited(fn, items: list, *, min_interval: float = 0.0, max_workers
 
 
 # ---------------------------------------------------------------------------
-# Google Sheets helpers
-# ---------------------------------------------------------------------------
-
-def gws_read_sheet(sheet_id: str, sheet_name: str) -> List[List[str]]:
-    result = subprocess.run(
-        [
-            "gws", "sheets", "spreadsheets", "values", "get",
-            "--params", json.dumps({"spreadsheetId": sheet_id, "range": sheet_name}),
-        ],
-        capture_output=True, text=True, check=True,
-    )
-    return json.loads(result.stdout).get("values", [])
-
-
-def gws_write_range(sheet_id: str, range_: str, values: List[List[str]]) -> None:
-    subprocess.run(
-        [
-            "gws", "sheets", "spreadsheets", "values", "update",
-            "--params", json.dumps({
-                "spreadsheetId": sheet_id,
-                "range": range_,
-                "valueInputOption": "USER_ENTERED",
-            }),
-            "--json", json.dumps({"values": values}),
-        ],
-        capture_output=True, text=True, check=True,
-    )
-
-
-# ---------------------------------------------------------------------------
 # Sheet backends — same interface for Google Sheets and CSV
 # ---------------------------------------------------------------------------
 # Both backends expose:
@@ -276,74 +249,9 @@ class CsvBackend:
 # Sheet column utilities
 # ---------------------------------------------------------------------------
 
-def col_letter(idx: int) -> str:
-    result = ""
-    n = idx + 1
-    while n > 0:
-        n, rem = divmod(n - 1, 26)
-        result = chr(65 + rem) + result
-    return result
-
-
-def find_col(headers: List[str], *names: str) -> Optional[int]:
-    lower = [n.lower() for n in names]
-    for i, h in enumerate(headers):
-        if h.strip().lower() in lower:
-            return i
-    return None
-
-
-def ensure_col(headers: List[str], name: str) -> int:
-    idx = find_col(headers, name)
-    if idx is not None:
-        return idx
-    headers.append(name)
-    return len(headers) - 1
-
-
-def cell(row: List[str], idx: int) -> str:
-    return row[idx].strip() if idx < len(row) else ""
-
-
 # ---------------------------------------------------------------------------
-# Context loader + ICP parsers
+# ICP parsers
 # ---------------------------------------------------------------------------
-
-def _strip_scaffolding(text: str) -> str:
-    """For each `## Section`, if it contains `### Answer`, keep only the
-    answer body. Otherwise leave the section as-is (legacy context files)."""
-    import re
-    out = []
-    for m in re.finditer(r"(?ms)^(##\s+[^\n]+)\n(.*?)(?=^##\s+|\Z)", text):
-        header, body = m.group(1), m.group(2)
-        ans = re.search(r"(?ms)^###\s+Answer\s*$\n(.*?)(?=^###\s+|\Z)", body)
-        if ans:
-            kept = "\n".join(ln for ln in ans.group(1).splitlines()
-                             if not ln.strip().startswith("<!--")).strip()
-            if kept and kept.lower() not in ("(fill this in)", "(none)", "(skip)"):
-                out.append(f"{header}\n{kept}")
-        else:
-            stripped = body.strip()
-            if stripped:
-                out.append(f"{header}\n{stripped}")
-    return "\n\n".join(out) if out else text
-
-
-def load_icp() -> str:
-    """Concatenate all .md files in context/ (excluding .example templates)."""
-    from config import CONTEXT_DIR
-    parts = []
-    for fname in sorted(os.listdir(CONTEXT_DIR)):
-        if fname.endswith(".md") and ".example" not in fname:
-            with open(os.path.join(CONTEXT_DIR, fname)) as f:
-                parts.append(_strip_scaffolding(f.read()))
-    if not parts:
-        raise FileNotFoundError(
-            f"No context .md files found in {CONTEXT_DIR}. "
-            f"Copy context/context.md.example to context/context.md and fill it in."
-        )
-    return "\n\n---\n\n".join(parts)
-
 
 def parse_post_config(icp_context: str) -> Dict:
     """
@@ -365,25 +273,6 @@ def parse_post_config(icp_context: str) -> Dict:
                 days_back = int(m.group())
 
     return {"max_posts": max_posts, "days_back": days_back}
-
-
-# ---------------------------------------------------------------------------
-# LLM helpers
-# ---------------------------------------------------------------------------
-
-def _strip_json_fence(text: str) -> str:
-    text = text.strip()
-    if text.startswith("```"):
-        lines = text.split("\n")
-        text = "\n".join(lines[1:-1]).strip()
-    # Tolerate prose preamble/suffix around the JSON: carve out the outermost
-    # object or array. Models sometimes reason in prose before emitting JSON.
-    if text and text[0] not in "{[":
-        starts = [i for i in (text.find("{"), text.find("[")) if i != -1]
-        ends = [i for i in (text.rfind("}"), text.rfind("]")) if i != -1]
-        if starts and ends and max(ends) > min(starts):
-            text = text[min(starts):max(ends) + 1].strip()
-    return text
 
 
 def detect_columns(

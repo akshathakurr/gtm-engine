@@ -17,7 +17,6 @@ import os
 import sys
 import re
 import json
-from typing import Optional, List
 from contextlib import contextmanager
 
 import requests
@@ -79,11 +78,8 @@ def _scrape_g2(product_url: str, max_reviews: int) -> dict:
         return _error_result("g2", product_url, f"Actor run failed: {e}")
 
     reviews = []
-    overall_rating = None
+    overall_rating = None  # G2 doesn't return an overall rating in items
     for item in raw_items[:max_reviews]:
-        if not overall_rating and item.get("starRating"):
-            pass  # G2 doesn't return overall rating in items
-
         reviews.append({
             "reviewer": item.get("reviewerName", ""),
             "reviewer_title": item.get("reviewerTitle", ""),

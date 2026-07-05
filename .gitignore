@@ -2,9 +2,12 @@
 .env
 .env.local
 
-# User context — keep .example committed, ignore the rest
+# User context — keep .example committed, ignore the rest (including archives
+# in subfolders, which hold private business data and must never be published)
 context/*.md
+context/**/*.md
 !context/*.md.example
+!context/**/*.md.example
 
 # User skills — same pattern (but keep the folder's own README + example)
 skills/*.md
@@ -14,6 +17,7 @@ skills/*.md
 # Workflow outputs
 outputs/
 workflows/*/outputs/
+workflows/**/results.json
 
 # Python
 __pycache__/

@@ -28,51 +28,14 @@ Usage examples:
 
 import json
 import argparse
-import subprocess
-from typing import Optional, List
 
 import config  # noqa: F401  side-effect: loads .env
+from workflows._common import (
+    gws_read_sheet as _gws_read, gws_write_range as _gws_write,
+    col_letter as _col_letter, find_col, cell,
+)
 from scrapers.web_search.scraper import search_web
 from scrapers.linkedin_profile_post_scraper import scraper as _post_scraper
-
-
-# ---------------------------------------------------------------------------
-# Sheet helpers
-# ---------------------------------------------------------------------------
-
-def _gws_read(sheet_id: str, sheet_name: str) -> List[List[str]]:
-    result = subprocess.run(
-        [
-            "gws", "sheets", "spreadsheets", "values", "get",
-            "--params", json.dumps({"spreadsheetId": sheet_id, "range": sheet_name}),
-        ],
-        capture_output=True, text=True, check=True,
-    )
-    return json.loads(result.stdout).get("values", [])
-
-
-def _gws_write(sheet_id: str, range_: str, values: List[List[str]]) -> None:
-    subprocess.run(
-        [
-            "gws", "sheets", "spreadsheets", "values", "update",
-            "--params", json.dumps({
-                "spreadsheetId": sheet_id,
-                "range": range_,
-                "valueInputOption": "USER_ENTERED",
-            }),
-            "--json", json.dumps({"values": values}),
-        ],
-        capture_output=True, text=True, check=True,
-    )
-
-
-def _col_letter(idx: int) -> str:
-    result = ""
-    n = idx + 1
-    while n > 0:
-        n, rem = divmod(n - 1, 26)
-        result = chr(65 + rem) + result
-    return result
 
 
 # ---------------------------------------------------------------------------
@@ -105,20 +68,10 @@ def cmd_read_sheet(args: argparse.Namespace) -> None:
     headers = rows[0]
     data_rows = rows[1:]
 
-    def find(name, *aliases):
-        targets = [name.lower()] + [a.lower() for a in aliases]
-        for i, h in enumerate(headers):
-            if h.strip().lower() in targets:
-                return i
-        return None
-
-    def cell(row, idx):
-        return row[idx].strip() if idx is not None and idx < len(row) else ""
-
-    name_col     = find("name", "full name")
-    company_col  = find("company", "company name")
-    linkedin_col = find("linkedin", "linkedin profile", "linkedin url")
-    position_col = find("position", "title", "job title", "role")
+    name_col     = find_col(headers, "name", "full name")
+    company_col  = find_col(headers, "company", "company name")
+    linkedin_col = find_col(headers, "linkedin", "linkedin profile", "linkedin url")
+    position_col = find_col(headers, "position", "title", "job title", "role")
 
     leads = []
     for i, row in enumerate(data_rows):
@@ -200,11 +153,7 @@ def cmd_write_column(args: argparse.Namespace) -> None:
     headers = list(rows[0])
 
     # Find or append column
-    col_idx = None
-    for i, h in enumerate(headers):
-        if h.strip().lower() == args.col_name.strip().lower():
-            col_idx = i
-            break
+    col_idx = find_col(headers, args.col_name)
     if col_idx is None:
         col_idx = len(headers)
         headers.append(args.col_name)
@@ -245,11 +194,7 @@ def cmd_write_cell(args: argparse.Namespace) -> None:
         col_name, row_num = cell_ref.split(":", 1)
         rows = _gws_read(args.sheet_id, args.sheet_name)
         headers = rows[0] if rows else []
-        col_idx = None
-        for i, h in enumerate(headers):
-            if h.strip().lower() == col_name.strip().lower():
-                col_idx = i
-                break
+        col_idx = find_col(headers, col_name)
         if col_idx is None:
             print(json.dumps({"error": f"Column '{col_name}' not found"}))
             return

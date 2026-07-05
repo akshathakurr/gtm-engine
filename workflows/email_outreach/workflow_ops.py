@@ -21,52 +21,11 @@ Usage:
 
 import json
 import argparse
-from typing import List
-
-import subprocess
 
 import config  # noqa: F401  side-effect: loads .env
+from workflows._common import gws_read_sheet, gws_write_range, col_letter, find_col, cell
 from scrapers.web_search.scraper import search_web
 from scrapers.contact_finder import scraper as _contact_scraper
-
-
-# ---------------------------------------------------------------------------
-# Inlined helpers
-# ---------------------------------------------------------------------------
-
-def gws_read_sheet(sheet_id: str, sheet_name: str) -> List[List[str]]:
-    result = subprocess.run(
-        ["gws", "sheets", "spreadsheets", "values", "get",
-         "--params", json.dumps({"spreadsheetId": sheet_id, "range": sheet_name})],
-        capture_output=True, text=True, check=True,
-    )
-    return json.loads(result.stdout).get("values", [])
-
-
-def gws_write_range(sheet_id: str, range_: str, values: List[List[str]]) -> None:
-    subprocess.run(
-        ["gws", "sheets", "spreadsheets", "values", "update",
-         "--params", json.dumps({"spreadsheetId": sheet_id, "range": range_,
-                                  "valueInputOption": "USER_ENTERED"}),
-         "--json", json.dumps({"values": values})],
-        capture_output=True, text=True, check=True,
-    )
-
-
-def col_letter(idx: int) -> str:
-    result, n = "", idx + 1
-    while n > 0:
-        n, rem = divmod(n - 1, 26)
-        result = chr(65 + rem) + result
-    return result
-
-
-def find_col(headers, *names):
-    lower = [n.lower() for n in names]
-    for i, h in enumerate(headers):
-        if h.strip().lower() in lower:
-            return i
-    return None
 
 
 def cmd_read_sheet(args):
@@ -77,31 +36,21 @@ def cmd_read_sheet(args):
     headers   = rows[0]
     data_rows = rows[1:]
 
-    def fc(*names):
-        lower = [n.lower() for n in names]
-        for i, h in enumerate(headers):
-            if h.strip().lower() in lower:
-                return i
-        return None
-
-    def c(row, idx):
-        return row[idx].strip() if idx is not None and idx < len(row) else ""
-
-    company_col  = fc("company", "company name")
-    name_col     = fc("name", "full name", "person name")
-    position_col = fc("position", "title", "job title", "role")
-    linkedin_col = fc("linkedin", "linkedin profile", "linkedin url")
-    email_col    = fc("email")
+    company_col  = find_col(headers, "company", "company name")
+    name_col     = find_col(headers, "name", "full name", "person name")
+    position_col = find_col(headers, "position", "title", "job title", "role")
+    linkedin_col = find_col(headers, "linkedin", "linkedin profile", "linkedin url")
+    email_col    = find_col(headers, "email")
 
     leads = []
     for i, row in enumerate(data_rows):
         lead = {
             "row":      i + 2,
-            "company":  c(row, company_col),
-            "name":     c(row, name_col),
-            "position": c(row, position_col),
-            "linkedin": c(row, linkedin_col),
-            "email":    c(row, email_col),
+            "company":  cell(row, company_col),
+            "name":     cell(row, name_col),
+            "position": cell(row, position_col),
+            "linkedin": cell(row, linkedin_col),
+            "email":    cell(row, email_col),
             "raw_row":  row,
         }
         if i == 0:
@@ -154,11 +103,7 @@ def cmd_write_column(args):
         return
 
     headers = list(rows[0])
-    col_idx = None
-    for i, h in enumerate(headers):
-        if h.strip().lower() == args.col_name.strip().lower():
-            col_idx = i
-            break
+    col_idx = find_col(headers, args.col_name)
     if col_idx is None:
         col_idx = len(headers)
 

@@ -32,7 +32,6 @@ Flags:
 """
 
 import os
-import re
 import sys
 import json
 import subprocess
@@ -43,7 +42,14 @@ from typing import Optional, List, Dict
 import anthropic
 from exa_py import Exa
 
-from config import CLAUDE_MODEL, CONTEXT_DIR
+from config import CLAUDE_MODEL, CONTEXT_DIR, EXA_API_KEY
+from workflows._common import (
+    strip_json_fence as _strip_json_fence,
+    col_letter, gws_read_sheet,
+    read_context_file as _read_context_file,
+    append_to_context_file as _append_to_context_file,
+    section_body as _section_body,
+)
 
 try:
     from scrapers.keyword_validator.scraper import validate_keywords as _validate_keywords  # type: ignore
@@ -89,24 +95,6 @@ _TERMINAL_STATUSES = {STATUS_DRAFT.lower(), STATUS_ASSET.lower(),
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def col_letter(idx: int) -> str:
-    result = ""
-    while True:
-        result = chr(ord("A") + idx % 26) + result
-        idx = idx // 26 - 1
-        if idx < 0:
-            break
-    return result
-
-
-def _strip_json_fence(text: str) -> str:
-    text = text.strip()
-    if text.startswith("```"):
-        lines = text.split("\n")
-        text = "\n".join(lines[1:-1]).strip()
-    return text
-
 
 def pad_row(row: List[str], n: int) -> List[str]:
     return list(row) + [""] * max(0, n - len(row))
@@ -157,46 +145,6 @@ def load_all_context() -> str:
             if content:
                 parts.append(f"=== {fname} ===\n{content}")
     return "\n\n".join(parts)
-
-
-def _read_context_file() -> str:
-    path = os.path.join(CONTEXT_DIR, _CONTEXT_FILE)
-    if not os.path.exists(path):
-        return ""
-    with open(path) as f:
-        return f.read()
-
-
-def _append_to_context_file(section_header: str, body: str) -> None:
-    path = os.path.join(CONTEXT_DIR, _CONTEXT_FILE)
-    body = body.strip()
-    if not body:
-        return
-    block = f"\n\n## {section_header}\n{body}\n"
-    if os.path.exists(path):
-        with open(path, "a") as f:
-            f.write(block)
-    else:
-        # Create a minimal context.md if one doesn't exist yet
-        with open(path, "w") as f:
-            f.write("# Context\n" + block)
-
-
-def _section_body(text: str, header: str) -> str:
-    """Return the body under a `## Header` section, stripping placeholders."""
-    if not text:
-        return ""
-    pattern = rf"(?ms)^##\s+{re.escape(header)}\s*$\n(.*?)(?=^##\s+|\Z)"
-    m = re.search(pattern, text)
-    if not m:
-        return ""
-    section = m.group(1)
-    ans = re.search(r"(?ms)^###\s+Answer\s*$\n(.*?)(?=^###\s+|\Z)", section)
-    body = ans.group(1) if ans else section
-    body = "\n".join(ln for ln in body.splitlines() if not ln.strip().startswith("<!--")).strip()
-    if body.lower() in ("(fill this in)", "(none)", "(skip)"):
-        return ""
-    return body
 
 
 def parse_reference_sources(text: str) -> List[Dict[str, str]]:
@@ -297,15 +245,6 @@ def ensure_context_complete(auto: bool) -> Dict[str, str]:
 # ---------------------------------------------------------------------------
 # Google Sheets helpers
 # ---------------------------------------------------------------------------
-
-def gws_read_sheet(sheet_id: str, sheet_name: str) -> List[List[str]]:
-    result = subprocess.run(
-        ["gws", "sheets", "spreadsheets", "values", "get",
-         "--params", json.dumps({"spreadsheetId": sheet_id, "range": sheet_name})],
-        capture_output=True, text=True, check=True,
-    )
-    return json.loads(result.stdout).get("values", [])
-
 
 def gws_append_rows(sheet_id: str, sheet_name: str, rows: List[List[str]]) -> None:
     result = subprocess.run(
@@ -756,7 +695,7 @@ def run_idea(
 ) -> None:
     print("\n=== Blog Builder | mode=idea ===\n")
 
-    sections     = ensure_context_complete(args.auto)
+    ensure_context_complete(args.auto)  # interactive backfill; idea mode reads full context below
     full_context = load_all_context()
     references   = parse_reference_sources(_read_context_file())
     if args.reference_companies:
@@ -946,13 +885,19 @@ def main() -> None:
         print("ERROR: --row is required for write mode")
         sys.exit(1)
 
-    client     = anthropic.Anthropic()
-    exa_client = Exa(api_key=os.environ["EXA_API_KEY"])
+    client = anthropic.Anthropic()
 
-    if args.mode == "daily":
-        run_daily(args, client, exa_client)
-    elif args.mode == "idea":
-        run_idea(args, client, exa_client)
+    # Exa is only used to research ideas (daily/idea); write mode drafts an
+    # existing row and needs no research, so don't require the key for it.
+    if args.mode == "daily" or args.mode == "idea":
+        if not EXA_API_KEY:
+            print("Exa key missing — add EXA_API_KEY to .env to research blog ideas.")
+            sys.exit(1)
+        exa_client = Exa(api_key=EXA_API_KEY)
+        if args.mode == "daily":
+            run_daily(args, client, exa_client)
+        else:
+            run_idea(args, client, exa_client)
     elif args.mode == "write":
         run_write(args, client)
 

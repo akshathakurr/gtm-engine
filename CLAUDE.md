@@ -135,9 +135,12 @@ End-to-end GTM plays. Each workflow folder orchestrates scrapers and uses contex
 - Workflows import scrapers from `/scrapers` rather than duplicating logic.
 - Workflows read context from `/context` to personalize output.
 - Each workflow folder has a `README.md` documenting inputs, scrapers used, output shape.
+- Shared Google Sheets I/O (`gws_read_sheet`, `gws_write_range`, `col_letter`, `find_col`, `ensure_col`, `cell`), `context.md` parsing (`load_icp`, `section_body`, `read_context_file`, `append_to_context_file`), and Claude-JSON handling (`strip_json_fence`) live in `workflows/_common.py`. Import them — don't re-inline (the old per-workflow copies drifted apart and one was a latent parse bug).
 
 #### `/skills`
 Reusable Claude prompt modules — markdown templates that workflows call into when they need an LLM to do something narrow (write a hook, classify a post, etc.).
+
+The two copy writers (`email_copy_writer`, `linkedin_copy_writer`) share their pipeline mechanics — signal extraction, self-review audit, repair, JSON parsing — via `skills/_copy_core.py`. Each skill keeps only its own prompts and orchestration; put shared logic in the core so a fix lands in both channels.
 
 ### How to work in this repo
 

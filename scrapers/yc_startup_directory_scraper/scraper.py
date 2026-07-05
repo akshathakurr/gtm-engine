@@ -13,7 +13,6 @@ Output: list of companies with name, description, website, batch, industries,
 import sys
 import json
 import re
-import time
 from typing import Optional, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 

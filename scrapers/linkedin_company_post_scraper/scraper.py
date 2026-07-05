@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import logging
 from contextlib import contextmanager
 from typing import Optional
 from apify_client import ApifyClient
@@ -24,18 +25,17 @@ POSTS_PER_PAGE = 100
 DEFAULT_MAX_POSTS = 10
 
 
+# Silence Apify's client logger once at import (thread-safe). Per-call actor-run
+# log streaming is disabled via logger=None.
+logging.getLogger("apify_client").setLevel(logging.WARNING)
+
+
 @contextmanager
 def _suppress_apify_logs():
-    """Redirects stdout and stderr to /dev/null to silence Apify actor log streaming."""
-    with open(os.devnull, "w") as devnull:
-        old_stdout, old_stderr = sys.stdout, sys.stderr
-        sys.stdout = devnull
-        sys.stderr = devnull
-        try:
-            yield
-        finally:
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
+    """No-op, kept for call-site compatibility. A global stdout/stderr swap
+    corrupts output when scrapers run on worker threads concurrently; log
+    streaming is disabled at the source via ``.call(logger=None)`` instead."""
+    yield
 
 
 def scrape_linkedin_company_posts(
@@ -83,7 +83,7 @@ def scrape_linkedin_company_posts(
             actor_input["pagination_token"] = pagination_token
 
         with _suppress_apify_logs():
-            run = client.actor(ACTOR_ID).call(run_input=actor_input)
+            run = client.actor(ACTOR_ID).call(run_input=actor_input, logger=None)
         try:
             items = dataset_items(client, run)
         except ApifyRunError as e:
@@ -216,8 +216,6 @@ def _extract_slug(company_url: str) -> str:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    import sys
-
     # Discovery mode: run 1 post, dump raw item to raw_sample.json
     if len(sys.argv) > 1 and sys.argv[1] == "--discover":
         company_url = sys.argv[2] if len(sys.argv) > 2 else "https://www.linkedin.com/company/anthropic/"
@@ -234,7 +232,7 @@ if __name__ == "__main__":
         }
         print(f"Discovery call for {slug}...")
         with _suppress_apify_logs():
-            run = client.actor(ACTOR_ID).call(run_input=actor_input)
+            run = client.actor(ACTOR_ID).call(run_input=actor_input, logger=None)
         items = dataset_items(client, run)
         output_path = os.path.join(os.path.dirname(__file__), "raw_sample.json")
         with open(output_path, "w") as f:

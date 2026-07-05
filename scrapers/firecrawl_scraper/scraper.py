@@ -20,15 +20,18 @@ import os
 import sys
 import json
 import time
-from typing import Optional, Dict
+from typing import Optional
 from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 from bs4 import BeautifulSoup
 
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 # Reuse the (fetch-agnostic) parsing helpers from the static scraper.
-from scrapers.website_scraper import scraper as _ws
+from scrapers.website_scraper import scraper as _ws  # noqa: E402
 
 FIRECRAWL_SCRAPE_URL = "https://api.firecrawl.dev/v2/scrape"
 DEFAULT_WAIT_MS = 3000      # let JS-rendered content settle before capture
