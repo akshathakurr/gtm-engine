@@ -113,8 +113,9 @@ def _scrape_trustpilot(product_url: str, max_reviews: int) -> dict:
     except Exception as e:
         return _error_result("trustpilot", product_url, f"Jina fetch failed: {e}")
 
-    # Overall rating and total count
-    rating_match = re.search(r"TrustScore ([\d.]+) out of 5", text)
+    # Overall rating and total count (two known Jina renderings of the page)
+    rating_match = re.search(r"TrustScore ([\d.]+) out of 5", text) \
+        or re.search(r"rated \"[^\"]+\" with ([\d.]+) / 5", text)
     overall_rating = float(rating_match.group(1)) if rating_match else None
 
     count_match = re.search(r"Reviews\s+(\d[\d,]+)", text)
@@ -153,6 +154,32 @@ def _scrape_trustpilot(product_url: str, max_reviews: int) -> dict:
             "verified": False,
             "incentivized": False,
         })
+
+    if not reviews:
+        # Newer Jina rendering: "## [title](…/reviews/<id>)" blocks ending in a
+        # bare "Month DD, YYYY" date line; no per-review star rating or reviewer
+        # name is exposed in this format.
+        block_pattern = re.compile(
+            r"^## \[([^\]]+)\]\(https://www\.trustpilot\.com/reviews/[a-f0-9]+\)\n+"
+            r"(.*?)\n+"
+            r"((?:January|February|March|April|May|June|July|August|September|October|November|December)"
+            r"\s+\d{1,2},\s+\d{4})\s*$",
+            re.DOTALL | re.MULTILINE,
+        )
+        for m in block_pattern.finditer(text):
+            if len(reviews) >= max_reviews:
+                break
+            title, review_text, date = m.groups()
+            reviews.append({
+                "reviewer": "",
+                "reviewer_title": "",
+                "rating": None,
+                "title": title.strip(),
+                "text": re.sub(r"\s+", " ", review_text).strip(),
+                "date": date.strip(),
+                "verified": False,
+                "incentivized": False,
+            })
 
     return {
         "platform": "trustpilot",

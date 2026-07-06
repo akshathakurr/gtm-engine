@@ -9,9 +9,12 @@ reasons in prose before emitting JSON). They now live here once.
 
 import os
 import re
+import csv
 import json
+import shutil
 import subprocess
-from typing import List, Optional
+import time
+from typing import Dict, List, Optional, Sequence
 
 from config import CONTEXT_DIR
 
@@ -46,23 +49,117 @@ def strip_json_fence(text: str) -> str:
 # Google Sheets (via the `gws` CLI)
 # ---------------------------------------------------------------------------
 
+# Sheets API throttles per-minute writes; concurrent workflows sharing one
+# account hit transient 429/5xx errors that used to kill a whole run on a
+# single cell. Retry with backoff; permanent errors (bad range, grid limits,
+# auth) are re-raised immediately.
+_GWS_NON_RETRIABLE = ("exceeds grid limits", "Unable to parse range", "PERMISSION_DENIED",
+                      "invalid_grant", "not found")
+
+
+def _gws_run_with_retry(cmd: List[str], attempts: int = 4) -> "subprocess.CompletedProcess":
+    for attempt in range(1, attempts + 1):
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            return result
+        err = (result.stderr or "") + (result.stdout or "")
+        if attempt == attempts or any(s.lower() in err.lower() for s in _GWS_NON_RETRIABLE):
+            raise subprocess.CalledProcessError(result.returncode, cmd,
+                                                output=result.stdout, stderr=result.stderr)
+        time.sleep(2 ** attempt)  # 2s, 4s, 8s
+    raise RuntimeError("unreachable")
+
+
 def gws_read_sheet(sheet_id: str, sheet_name: str) -> List[List[str]]:
-    result = subprocess.run(
+    result = _gws_run_with_retry(
         ["gws", "sheets", "spreadsheets", "values", "get",
          "--params", json.dumps({"spreadsheetId": sheet_id, "range": sheet_name})],
-        capture_output=True, text=True, check=True,
     )
     return json.loads(result.stdout).get("values", [])
 
 
 def gws_write_range(sheet_id: str, range_: str, values: List[List[str]]) -> None:
-    subprocess.run(
+    _gws_run_with_retry(
         ["gws", "sheets", "spreadsheets", "values", "update",
          "--params", json.dumps({"spreadsheetId": sheet_id, "range": range_,
                                  "valueInputOption": "USER_ENTERED"}),
          "--json", json.dumps({"values": values})],
-        capture_output=True, text=True, check=True,
     )
+
+
+def _parse_gws_json(stdout: str):
+    """Parse the JSON body from gws stdout, tolerating a preamble line.
+
+    gws may print a banner (e.g. "Using keyring backend: ...") before the JSON.
+    ``strip_json_fence`` can mis-carve if that preamble contains a ``{``/``[``,
+    so instead we find the first line that opens a JSON value and parse from
+    there. Returns the parsed value, or ``None`` if nothing parses.
+    """
+    lines = (stdout or "").splitlines()
+    for i, ln in enumerate(lines):
+        if ln.lstrip()[:1] in ("{", "["):
+            try:
+                return json.loads("\n".join(lines[i:]))
+            except ValueError:
+                continue
+    return None
+
+
+def gws_available(timeout: int = 15) -> bool:
+    """Return True if the ``gws`` CLI is installed *and* usably authenticated.
+
+    Used to decide output routing: a usable ``gws`` means we can create/write a
+    Google Sheet; otherwise the caller falls back to a CSV. This is deliberately
+    conservative — it checks ``gws auth status`` (no API call, no scope needed)
+    rather than a live request, so it never has side effects.
+
+    Note ``gws`` exits 0 even on errors (it signals failure via an ``error`` key
+    or ``token_error`` in its JSON), so we inspect the payload, not the exit code.
+    A merely-expired access token is fine (a valid refresh token mints a new one);
+    a *revoked* refresh token is not — that needs a fresh ``gws auth login``.
+    """
+    if shutil.which("gws") is None:
+        return False
+    try:
+        result = subprocess.run(
+            ["gws", "auth", "status"],
+            capture_output=True, text=True, timeout=timeout,
+        )
+        data = _parse_gws_json(result.stdout)
+    except (subprocess.SubprocessError, OSError):
+        return False
+    if not isinstance(data, dict) or "error" in data:
+        return False
+    if data.get("token_valid"):
+        return True
+    # Access token stale but refreshable — usable unless the grant was revoked.
+    if data.get("has_refresh_token"):
+        return "revok" not in (data.get("token_error") or "").lower()
+    return False
+
+
+def gws_create_sheet(title: str, sheet_name: str = "Sheet1") -> str:
+    """Create a new Google Spreadsheet and return its spreadsheet ID.
+
+    The workflows all accept a ``--sheet-id``; this is the "make one for them"
+    path when the user has no sheet but ``gws`` is available. Populate it after
+    creation with :func:`gws_write_range`.
+    """
+    result = subprocess.run(
+        ["gws", "sheets", "spreadsheets", "create",
+         "--json", json.dumps({
+             "properties": {"title": title},
+             "sheets": [{"properties": {"title": sheet_name}}],
+         })],
+        capture_output=True, text=True, timeout=30,
+    )
+    data = _parse_gws_json(result.stdout)
+    if not isinstance(data, dict):
+        raise RuntimeError(f"gws returned no parseable response creating '{title}'")
+    if "error" in data or "spreadsheetId" not in data:
+        msg = data.get("error", {}).get("message") if isinstance(data.get("error"), dict) else data.get("error")
+        raise RuntimeError(f"Could not create Google Sheet '{title}': {msg or 'unknown error'}")
+    return data["spreadsheetId"]
 
 
 def col_letter(idx: int) -> str:
@@ -95,6 +192,128 @@ def ensure_col(headers: List[str], name: str) -> int:
 def cell(row: List[str], idx: Optional[int]) -> str:
     """Return the stripped value at ``idx``, or '' if out of range / ``idx`` is None."""
     return row[idx].strip() if idx is not None and idx < len(row) else ""
+
+
+# ---------------------------------------------------------------------------
+# Input files — turn a pasted list into a workflow's expected input
+# ---------------------------------------------------------------------------
+#
+# When a user hands over a raw list ("here are 6 companies") with no sheet or
+# CSV, we build the input file for them in the structure the target workflow
+# reads. ``rows`` is a list of dicts keyed by ``fieldnames``; missing keys write
+# blank. Route to CSV (no gws) or Sheet (gws available) with the two helpers.
+
+def rows_to_values(fieldnames: Sequence[str], rows: List[Dict[str, str]]) -> List[List[str]]:
+    """Header row + data rows as list-of-lists, ready for :func:`gws_write_range`."""
+    values = [list(fieldnames)]
+    for row in rows:
+        values.append([str(row.get(f, "") or "") for f in fieldnames])
+    return values
+
+
+def write_input_csv(path: str, fieldnames: Sequence[str], rows: List[Dict[str, str]]) -> str:
+    """Write ``rows`` to ``path`` as a CSV with ``fieldnames`` as the header.
+
+    Returns ``path``. Extra keys not in ``fieldnames`` are ignored; missing
+    keys write blank — so the file always matches the workflow's expected shape.
+    """
+    with open(path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(fieldnames), extrasaction="ignore")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({f: row.get(f, "") for f in fieldnames})
+    return path
+
+
+# ---------------------------------------------------------------------------
+# TabularStore — one row store, backed by a Google Sheet OR a local CSV
+# ---------------------------------------------------------------------------
+#
+# The three "generated from scratch" workflows (content_idea_finder,
+# linkedin_comment_helper, blog_builder) used to be Sheets-only. This gives them
+# a CSV fallback for when the user won't connect Google, without each workflow
+# re-implementing read/append/update twice. Construct with exactly one target:
+# a ``sheet_id`` (+ ``sheet_name``) or a ``csv_path``.
+
+class TabularStore:
+    def __init__(self, sheet_id: Optional[str] = None, sheet_name: str = "Sheet1",
+                 csv_path: Optional[str] = None):
+        if bool(sheet_id) == bool(csv_path):
+            raise ValueError("TabularStore needs exactly one of sheet_id or csv_path")
+        self.sheet_id = sheet_id
+        self.sheet_name = sheet_name
+        self.csv_path = csv_path
+
+    @property
+    def is_csv(self) -> bool:
+        return self.csv_path is not None
+
+    def label(self) -> str:
+        return f"CSV '{self.csv_path}'" if self.is_csv else f"sheet tab '{self.sheet_name}'"
+
+    def read_all(self) -> List[List[str]]:
+        """Return every row as a list of lists (empty list if nothing yet)."""
+        if self.is_csv:
+            if not os.path.exists(self.csv_path):
+                return []
+            with open(self.csv_path, newline="") as f:
+                return [row for row in csv.reader(f)]
+        return gws_read_sheet(self.sheet_id, self.sheet_name)
+
+    @staticmethod
+    def _raise_on_gws_error(result, action: str) -> None:
+        """Surface a gws failure as a clean message. gws exits 0 even on errors
+        (signalling via an ``error`` key), so check the payload too, not just rc.
+        """
+        out = (result.stdout or "").strip()
+        data = _parse_gws_json(out)
+        err_obj = data.get("error") if isinstance(data, dict) else None
+        if result.returncode != 0 or err_obj is not None:
+            msg = err_obj.get("message") if isinstance(err_obj, dict) else err_obj
+            detail = msg or (result.stderr or "").strip() or out[:300] or "unknown error"
+            raise RuntimeError(f"Google Sheets {action} failed: {detail}")
+
+    def append(self, rows: List[List[str]]) -> None:
+        """Append ``rows`` to the end. Caller is responsible for headers."""
+        if not rows:
+            return
+        if self.is_csv:
+            with open(self.csv_path, "a", newline="") as f:
+                csv.writer(f).writerows([[str(c) for c in r] for r in rows])
+            return
+        result = subprocess.run(
+            ["gws", "sheets", "spreadsheets", "values", "append",
+             "--params", json.dumps({
+                 "spreadsheetId": self.sheet_id, "range": self.sheet_name,
+                 "valueInputOption": "USER_ENTERED", "insertDataOption": "INSERT_ROWS",
+             }),
+             "--json", json.dumps({"values": [[str(c) for c in r] for r in rows]})],
+            capture_output=True, text=True,
+        )
+        self._raise_on_gws_error(result, "append")
+
+    def update_row(self, row_idx: int, values: List[str]) -> None:
+        """Overwrite the 1-indexed row ``row_idx`` with ``values``."""
+        vals = [str(c) for c in values]
+        if self.is_csv:
+            rows = self.read_all()
+            while len(rows) < row_idx:
+                rows.append([])
+            rows[row_idx - 1] = vals
+            # Atomic rewrite: write a temp file then replace, so a crash mid-write
+            # can't truncate the existing CSV.
+            tmp = f"{self.csv_path}.tmp"
+            with open(tmp, "w", newline="") as f:
+                csv.writer(f).writerows(rows)
+            os.replace(tmp, self.csv_path)
+            return
+        rng = f"{self.sheet_name}!A{row_idx}:{col_letter(len(vals) - 1)}{row_idx}"
+        gws_write_range(self.sheet_id, rng, [vals])
+
+    def ensure_headers(self, headers: List[str]) -> None:
+        """Write ``headers`` as row 1 if the store is empty."""
+        if not self.read_all():
+            self.append([headers])
 
 
 # ---------------------------------------------------------------------------

@@ -12,6 +12,7 @@ Input:  query, subreddit (optional), sort, time_filter, max_posts
 Output: list of posts with title, text, author, subreddit, score, comments, url, date
 """
 
+import os
 import sys
 import json
 import time
@@ -23,6 +24,11 @@ import requests
 REDDIT_API_BASE = "https://www.reddit.com"
 USER_AGENT = "GTMEngine/1.0"
 PAGE_SIZE = 100  # Reddit max per request
+
+# Fallback when Reddit IP-blocks the free JSON API (HTTP 403 from datacenter/
+# cloud ranges). Field names confirmed from raw_sample_apify.json.
+APIFY_FALLBACK_ACTOR = "trudax/reddit-scraper-lite"
+_APIFY_SORT_ALLOWED = {"relevance", "hot", "top", "new", "rising", "comments"}
 
 
 def _fetch_page(
@@ -75,6 +81,78 @@ def _parse_post(raw: dict) -> dict:
     }
 
 
+def _search_via_apify(
+    query: str,
+    subreddit: Optional[str],
+    sort: str,
+    time_filter: str,
+    max_posts: int,
+) -> list:
+    """Search via the Apify fallback actor. Returns parsed posts; raises on failure."""
+    from apify_client import ApifyClient
+
+    _repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    if _repo_root not in sys.path:
+        sys.path.insert(0, _repo_root)
+    from scrapers._apify import dataset_items
+
+    api_token = os.environ.get("APIFY_API_TOKEN")
+    if not api_token:
+        raise EnvironmentError("APIFY_API_TOKEN is not set (needed for the Reddit fallback).")
+
+    actor_input = {
+        "searches": [query],
+        "searchPosts": True,
+        "searchComments": False,
+        "searchCommunities": False,
+        "searchUsers": False,
+        "skipComments": True,
+        # NOTE: do not set includeMediaLinks — it makes the actor return 0 items
+        # (verified 2026-07-06). Engagement counts are unavailable in fallback mode.
+        "sort": sort if sort in _APIFY_SORT_ALLOWED else "new",
+        "maxItems": max_posts,
+        "maxPostCount": max_posts,
+        "proxy": {"useApifyProxy": True, "apifyProxyGroups": ["RESIDENTIAL"]},
+    }
+    if subreddit:
+        actor_input["searchCommunityName"] = subreddit
+    if time_filter and time_filter != "all":
+        actor_input["time"] = time_filter
+
+    client = ApifyClient(api_token)
+    run = client.actor(APIFY_FALLBACK_ACTOR).call(run_input=actor_input, logger=None)
+    items = dataset_items(client, run)
+
+    posts = []
+    for item in items:
+        if item.get("dataType") not in (None, "post"):
+            continue
+        created_raw = item.get("createdAt", "")
+        created_at = ""
+        if created_raw:
+            try:
+                dt = datetime.fromisoformat(created_raw.replace("Z", "+00:00"))
+                created_at = dt.strftime("%Y-%m-%d %H:%M:%S UTC")
+            except ValueError:
+                created_at = created_raw
+        posts.append({
+            "id": item.get("id", ""),
+            "title": item.get("title", ""),
+            "text": item.get("body", ""),
+            "url": item.get("url", ""),
+            "external_url": "",
+            "author": item.get("username", ""),
+            "subreddit": item.get("parsedCommunityName", ""),
+            "score": item.get("upVotes", 0) or 0,
+            "upvote_ratio": item.get("upVoteRatio", 0) or 0,
+            "num_comments": item.get("numberOfComments", 0) or 0,
+            "created_at": created_at,
+            "flair": "",
+            "is_self": bool(item.get("body")),
+        })
+    return posts[:max_posts]
+
+
 def search_reddit(
     query: str,
     subreddit: Optional[str] = None,
@@ -113,7 +191,16 @@ def search_reddit(
         try:
             data = _fetch_page(query, subreddit, sort, time_filter, after, min(remaining, PAGE_SIZE))
         except Exception as e:
-            errors.append(f"Fetch failed: {e}")
+            print(f"  Free JSON API failed ({e}); falling back to Apify {APIFY_FALLBACK_ACTOR}", file=sys.stderr)
+            try:
+                fallback_posts = _search_via_apify(query, subreddit, sort, time_filter, max_posts)
+                for post in fallback_posts:
+                    if post["id"] not in seen_ids:
+                        seen_ids.add(post["id"])
+                        all_posts.append(post)
+            except Exception as fe:
+                errors.append(f"Fetch failed: {e}")
+                errors.append(f"Apify fallback failed: {fe}")
             break
 
         children = data.get("data", {}).get("children", [])

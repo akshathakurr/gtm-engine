@@ -9,12 +9,26 @@ your goals     ──┼── idea ───────► fill metadata for i
    + references   └── write ──────► turn one researched row into a Google Doc
 ```
 
-The workflow keeps everything in **one Google Sheet** (one row per blog),
+The workflow keeps everything in **one Google Sheet** — or a **local CSV**
+(`--output-csv`) when you don't want to connect Google, in which case `write`
+mode saves each draft as a local `.md` file and links it in Main Content —
+(one row per blog),
 so you can see the funnel at a glance:
 
 ```
 Idea → Draft Ready → Need Asset → Ready to launch → Published - live
 ```
+
+## What I can fill for you
+
+This is the menu of what the workflow tracks for every blog in the pipeline, so
+you can tell someone what they'll get back. **Every field below is filled by
+default** (across the daily → idea → write modes). One row per blog.
+
+- **The idea** — blog idea, why this blog, reference posts it drew from
+- **The plan** — talking points, SEO target, keywords, keyword score, assets needed
+- **The draft** — the full post, written into a Google Doc (write mode)
+- **Tracking** — status and posting date
 
 ## What you need before running
 
@@ -134,7 +148,8 @@ python -m workflows.blog_builder.workflow --mode {daily|idea|write} --sheet-id I
 | Flag | Used by | What it does |
 |---|---|---|
 | `--mode` | all | Required. `daily` / `idea` / `write`. |
-| `--sheet-id ID` | all | Required. Google Sheet ID. |
+| `--sheet-id ID` | all | Google Sheet ID (pass this **or** `--output-csv`). |
+| `--output-csv PATH` | all | Track blogs in a local CSV instead of a Sheet; `write` mode saves drafts as local `.md` files. |
 | `--sheet-name NAME` | all | Sheet tab name. Default `Blogs`. |
 | `--num-ideas N` | daily | How many ideas to generate. Default 3. |
 | `--row N` | write | Required for `write` mode. Sheet row to draft. |

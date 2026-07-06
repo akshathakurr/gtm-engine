@@ -32,6 +32,7 @@ Flags:
 """
 
 import os
+import re
 import sys
 import json
 import subprocess
@@ -45,7 +46,7 @@ from exa_py import Exa
 from config import CLAUDE_MODEL, CONTEXT_DIR, EXA_API_KEY
 from workflows._common import (
     strip_json_fence as _strip_json_fence,
-    col_letter, gws_read_sheet,
+    TabularStore,
     read_context_file as _read_context_file,
     append_to_context_file as _append_to_context_file,
     section_body as _section_body,
@@ -253,42 +254,13 @@ def ensure_context_complete(auto: bool) -> Dict[str, str]:
 
 
 # ---------------------------------------------------------------------------
-# Google Sheets helpers
+# Row store helpers (Google Sheet or local CSV, via TabularStore)
 # ---------------------------------------------------------------------------
 
-def gws_append_rows(sheet_id: str, sheet_name: str, rows: List[List[str]]) -> None:
-    result = subprocess.run(
-        ["gws", "sheets", "spreadsheets", "values", "append",
-         "--params", json.dumps({
-             "spreadsheetId": sheet_id, "range": sheet_name,
-             "valueInputOption": "USER_ENTERED", "insertDataOption": "INSERT_ROWS",
-         }),
-         "--json", json.dumps({"values": rows}, ensure_ascii=False)],
-        capture_output=True, text=True,
-    )
-    if result.returncode != 0:
-        print(f"gws append error:\nstdout: {result.stdout[:500]}\nstderr: {result.stderr[:500]}")
-        result.check_returncode()
-
-
-def gws_update_row(sheet_id: str, sheet_name: str, row_idx: int, values: List[str]) -> None:
-    last_col = col_letter(len(values) - 1)
-    range_str = f"{sheet_name}!A{row_idx}:{last_col}{row_idx}"
-    subprocess.run(
-        ["gws", "sheets", "spreadsheets", "values", "update",
-         "--params", json.dumps({
-             "spreadsheetId": sheet_id, "range": range_str,
-             "valueInputOption": "USER_ENTERED",
-         }),
-         "--json", json.dumps({"values": [values]})],
-        capture_output=True, text=True, check=True,
-    )
-
-
-def ensure_headers(sheet_id: str, sheet_name: str) -> None:
-    rows = gws_read_sheet(sheet_id, sheet_name)
+def ensure_headers(store: TabularStore) -> None:
+    rows = store.read_all()
     if not rows:
-        gws_append_rows(sheet_id, sheet_name, [SHEET_HEADERS])
+        store.append([SHEET_HEADERS])
         return
     if rows[0] == SHEET_HEADERS:
         return
@@ -297,11 +269,11 @@ def ensure_headers(sheet_id: str, sheet_name: str) -> None:
     # heads-up; new rows will append with the workflow's column order, and
     # the user can reconcile schemas manually.
     if len(rows) > 1:
-        print(f"  Note: '{sheet_name}' has data rows under a different header schema. "
+        print(f"  Note: {store.label()} has data rows under a different header schema. "
               f"Keeping existing header; new rows append with the workflow's column order "
               f"(may not align with existing labels).")
         return
-    gws_update_row(sheet_id, sheet_name, 1, SHEET_HEADERS)
+    store.update_row(1, SHEET_HEADERS)
 
 
 # ---------------------------------------------------------------------------
@@ -608,6 +580,7 @@ def run_daily(
     args: argparse.Namespace,
     client: anthropic.Anthropic,
     exa_client: Exa,
+    store: TabularStore,
 ) -> None:
     print(f"\n=== Blog Builder | mode=daily | ideas={args.num_ideas} ===\n")
 
@@ -663,7 +636,7 @@ def run_daily(
     ideas = generate_daily_ideas(ref_posts, topic_posts, full_context, args.num_ideas, client)
     print(f"Generated {len(ideas)} idea(s)")
 
-    ensure_headers(args.sheet_id, args.sheet_name)
+    ensure_headers(store)
 
     rows: List[List[str]] = []
     for idea in ideas:
@@ -686,9 +659,9 @@ def run_daily(
         row[COL_DATE]      = _to_str(idea.get("posting_date", ""))
         rows.append(row)
 
-    gws_append_rows(args.sheet_id, args.sheet_name, rows)
+    store.append(rows)
 
-    print(f"\n✓ Added {len(rows)} row(s) to '{args.sheet_name}':")
+    print(f"\n✓ Added {len(rows)} row(s) to {store.label()}:")
     for r in rows:
         print(f"  • {r[COL_IDEA]}")
         print(f"    SEO target: {r[COL_SEO]}  |  Post date: {r[COL_DATE]}")
@@ -702,6 +675,7 @@ def run_idea(
     args: argparse.Namespace,
     client: anthropic.Anthropic,
     exa_client: Exa,
+    store: TabularStore,
 ) -> None:
     print("\n=== Blog Builder | mode=idea ===\n")
 
@@ -715,9 +689,9 @@ def run_idea(
             if len(parts) == 2:
                 references.append({"name": parts[0], "domain": parts[1]})
 
-    all_rows = gws_read_sheet(args.sheet_id, args.sheet_name)
+    all_rows = store.read_all()
     if not all_rows:
-        print("Sheet is empty.")
+        print(f"{store.label()} is empty.")
         return
 
     data_rows = all_rows[1:]
@@ -766,7 +740,7 @@ def run_idea(
         if args.project_name and not updated[COL_PROJECT].strip():
             updated[COL_PROJECT] = args.project_name
 
-        gws_update_row(args.sheet_id, args.sheet_name, row_idx, updated)
+        store.update_row(row_idx, updated)
         print(f"  ✓ Updated — SEO target: {meta.get('seo_target', '')}  |  Post date: {meta.get('posting_date', '')}\n")
 
 
@@ -823,15 +797,16 @@ def create_blog_doc(
 def run_write(
     args: argparse.Namespace,
     client: anthropic.Anthropic,
+    store: TabularStore,
 ) -> None:
     print(f"\n=== Blog Builder | mode=write | row={args.row} ===\n")
 
     ensure_context_complete(args.auto)
     full_context = load_all_context()
 
-    all_rows = gws_read_sheet(args.sheet_id, args.sheet_name)
+    all_rows = store.read_all()
     if args.row < 2 or args.row > len(all_rows):
-        print(f"Row {args.row} is out of range (sheet has {len(all_rows)} rows).")
+        print(f"Row {args.row} is out of range ({store.label()} has {len(all_rows)} rows).")
         return
 
     row         = pad_row(all_rows[args.row - 1], NUM_COLS)
@@ -849,14 +824,25 @@ def run_write(
 
     draft = write_blog_post(idea, talking_pts, keywords, seo_target, full_context, client)
 
-    print("Creating Google Doc...")
-    doc_url = create_blog_doc(args.blogs_folder_id, idea, seo_target, keywords, draft)
-    print(f"Doc created: {doc_url}")
+    if store.is_csv:
+        # No Google Doc without gws — write the draft to a local Markdown file
+        # next to the CSV and record its path in Main Content.
+        out_dir = os.path.dirname(os.path.abspath(store.csv_path)) or "."
+        slug = re.sub(r"[^a-z0-9]+", "-", idea.lower()).strip("-")[:60] or f"row-{args.row}"
+        md_path = os.path.join(out_dir, f"{slug}.md")
+        with open(md_path, "w") as f:
+            f.write(f"# {idea}\n\nSEO Target: {seo_target}\nKeywords: {keywords}\n\n---\n\n{draft}\n")
+        main_content = md_path
+        print(f"Draft written locally: {md_path}")
+    else:
+        print("Creating Google Doc...")
+        main_content = create_blog_doc(args.blogs_folder_id, idea, seo_target, keywords, draft)
+        print(f"Doc created: {main_content}")
 
-    row[COL_MAIN]   = doc_url
+    row[COL_MAIN]   = main_content
     row[COL_STATUS] = STATUS_DRAFT
-    gws_update_row(args.sheet_id, args.sheet_name, args.row, row)
-    print("Sheet updated — Status: Draft Ready, Main Content: Doc URL")
+    store.update_row(args.row, row)
+    print(f"Updated — Status: Draft Ready, Main Content: {main_content}")
 
 
 # ---------------------------------------------------------------------------
@@ -866,10 +852,13 @@ def run_write(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Blog Builder Workflow")
     parser.add_argument("--mode", choices=["daily", "idea", "write"], required=True)
-    parser.add_argument("--sheet-id",   required=True,
-                        help="Google Sheet ID (from the URL).")
+    parser.add_argument("--sheet-id",   default=None,
+                        help="Google Sheet ID (from the URL). Or use --output-csv.")
     parser.add_argument("--sheet-name", default="Blogs",
                         help="Sheet tab name. Default: Blogs")
+    parser.add_argument("--output-csv", default=None,
+                        help="Track blogs in a local CSV instead of a Google Sheet. "
+                             "In write mode the draft is saved as a local .md file.")
     parser.add_argument("--num-ideas",  type=int, default=3,
                         help="(daily mode) Number of ideas to generate. Default: 3")
     parser.add_argument("--row",        type=int, default=None,
@@ -895,6 +884,12 @@ def main() -> None:
         print("ERROR: --row is required for write mode")
         sys.exit(1)
 
+    if bool(args.sheet_id) == bool(args.output_csv):
+        print("ERROR: pass exactly one of --sheet-id or --output-csv")
+        sys.exit(1)
+    store = TabularStore(sheet_id=args.sheet_id, sheet_name=args.sheet_name,
+                         csv_path=args.output_csv)
+
     client = anthropic.Anthropic()
 
     # Exa is only used to research ideas (daily/idea); write mode drafts an
@@ -905,11 +900,11 @@ def main() -> None:
             sys.exit(1)
         exa_client = Exa(api_key=EXA_API_KEY)
         if args.mode == "daily":
-            run_daily(args, client, exa_client)
+            run_daily(args, client, exa_client, store)
         else:
-            run_idea(args, client, exa_client)
+            run_idea(args, client, exa_client, store)
     elif args.mode == "write":
-        run_write(args, client)
+        run_write(args, client, store)
 
 
 if __name__ == "__main__":

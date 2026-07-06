@@ -3,8 +3,15 @@
   "max_per_profile": 10,
   "max_per_keyword": 25,
   "trending_top_n": 30,
+  "authority_top_n": 30,
+  "commentable_max_comments": 150,
   "icp_sheet": {
     "id": "TODO_PASTE_ICP_SHEET_ID",
+    "tab": "Sheet1",
+    "url_column": "LinkedIn URL"
+  },
+  "authority_sheet": {
+    "id": "TODO_PASTE_AUTHORITY_SHEET_ID",
     "tab": "Sheet1",
     "url_column": "LinkedIn URL"
   },

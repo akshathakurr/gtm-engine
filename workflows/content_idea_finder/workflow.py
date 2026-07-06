@@ -35,7 +35,6 @@ import sys
 import json
 import time
 import argparse
-import subprocess
 from datetime import datetime, timezone
 from typing import List, Dict
 
@@ -43,11 +42,11 @@ import anthropic
 
 from config import CLAUDE_MODEL, CONTEXT_DIR
 from workflows._common import (
-    strip_json_fence as _strip_json_fence, gws_read_sheet, CONTEXT_FILE,
+    strip_json_fence as _strip_json_fence, CONTEXT_FILE,
     read_context_file as _read_context_file,
     append_to_context_file as _append_to_context_file,
     section_body as _section_body,
-    preview_and_confirm,
+    preview_and_confirm, TabularStore,
 )
 from scrapers.twitter_profile_scraper.scraper import scrape_twitter_profiles_batch
 from scrapers.twitter_research_scraper.scraper import search_tweets
@@ -69,32 +68,6 @@ SHEET_HEADERS = [
 def load_json(filename: str) -> Dict:
     with open(os.path.join(_HERE, filename)) as f:
         return json.load(f)
-
-
-# ---------------------------------------------------------------------------
-# Google Sheets helpers
-# ---------------------------------------------------------------------------
-
-def gws_append_rows(sheet_id: str, sheet_name: str, rows: List[List[str]]) -> None:
-    subprocess.run(
-        [
-            "gws", "sheets", "spreadsheets", "values", "append",
-            "--params", json.dumps({
-                "spreadsheetId": sheet_id,
-                "range": sheet_name,
-                "valueInputOption": "USER_ENTERED",
-                "insertDataOption": "INSERT_ROWS",
-            }),
-            "--json", json.dumps({"values": rows}),
-        ],
-        capture_output=True, text=True, check=True,
-    )
-
-
-def gws_write_headers(sheet_id: str, sheet_name: str) -> None:
-    existing = gws_read_sheet(sheet_id, sheet_name)
-    if not existing:
-        gws_append_rows(sheet_id, sheet_name, [SHEET_HEADERS])
 
 
 # ---------------------------------------------------------------------------
@@ -634,7 +607,7 @@ def make_idea_id(date_str: str, n: int) -> str:
     return f"{date_str}-{n:02d}"
 
 
-def write_outputs(ideas: List[Dict], sheet_id: str, sheet_name: str, run_date: str) -> str:
+def write_outputs(ideas: List[Dict], store: TabularStore, run_date: str) -> str:
     os.makedirs(_OUTPUTS, exist_ok=True)
     local_path = os.path.join(_OUTPUTS, f"{run_date}.json")
 
@@ -642,7 +615,7 @@ def write_outputs(ideas: List[Dict], sheet_id: str, sheet_name: str, run_date: s
         json.dump({"date": run_date, "ideas": ideas}, f, indent=2, ensure_ascii=False)
     print(f"  Local JSON → {local_path}")
 
-    gws_write_headers(sheet_id, sheet_name)
+    store.ensure_headers(SHEET_HEADERS)
 
     rows: List[List[str]] = []
     for idea in ideas:
@@ -663,8 +636,8 @@ def write_outputs(ideas: List[Dict], sheet_id: str, sheet_name: str, run_date: s
             idea.get("hook", ""),
             idea.get("body", ""),
         ])
-    gws_append_rows(sheet_id, sheet_name, rows)
-    print(f"  Sheet → {sheet_id} / {sheet_name} ({len(rows)} rows appended)")
+    store.append(rows)
+    print(f"  {store.label()} ← {len(rows)} rows appended")
 
     return local_path
 
@@ -677,8 +650,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Content Idea Finder")
     parser.add_argument("--mode", choices=["daily", "idea"], required=True)
     parser.add_argument("--idea", default=None, help="Seed idea (required for --mode idea)")
-    parser.add_argument("--sheet-id", required=True)
+    parser.add_argument("--sheet-id", default=None, help="Google Sheet ID (or use --output-csv)")
     parser.add_argument("--sheet-name", default="Sheet1")
+    parser.add_argument("--output-csv", default=None,
+                        help="Write ideas to a local CSV instead of a Google Sheet")
     parser.add_argument("--num-ideas", type=int, default=5)
     parser.add_argument("--lookback-days", type=int, default=3, help="Days back for Twitter trends + creators")
     parser.add_argument("--hn-lookback-days", type=int, default=7)
@@ -692,6 +667,12 @@ def main() -> None:
     if args.mode == "idea" and not args.idea:
         print("ERROR: --idea is required when --mode=idea")
         sys.exit(1)
+
+    if bool(args.sheet_id) == bool(args.output_csv):
+        print("ERROR: pass exactly one of --sheet-id or --output-csv")
+        sys.exit(1)
+    store = TabularStore(sheet_id=args.sheet_id, sheet_name=args.sheet_name,
+                         csv_path=args.output_csv)
 
     client   = anthropic.Anthropic()
     run_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -903,7 +884,7 @@ def main() -> None:
     # OUTPUT
     # ======================================================================
     print("\n--- Writing outputs ---")
-    write_outputs(ideas, args.sheet_id, args.sheet_name, run_date)
+    write_outputs(ideas, store, run_date)
 
     print("\n======= Done =======")
     print(f"  {len(ideas)} idea card(s) generated.")
