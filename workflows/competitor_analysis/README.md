@@ -2,6 +2,20 @@
 
 Deep competitive intelligence pipeline. Reads competitor names + URLs from a Google Sheet (or CSV) and fills firmographic, product, GTM, and founder columns, then runs a final Claude analysis scoring each competitor against your ICP.
 
+## What I can fill for you
+
+When someone hands over a raw list and a rough ask ("here are 6 competitors,
+break them down"), this is the full menu of what this workflow fills in — read
+it out up front so they see what's possible. **By default every column below is
+filled; they can ask for a focused subset instead.** One row per competitor.
+
+- **Company** — LinkedIn URL, one-line description, employee count, founded year, HQ, recent news
+- **Funding** — last funding stage, total funding, estimated revenue
+- **Competitive read** — competitor score vs your ICP, key strength, key weakness
+- **Founders (top 2)** — name, LinkedIn, Twitter, and what each one posts about
+- **Product & GTM** — target persona/user, target ICP, pricing, primary CTA, sales motion, deal size, product features
+- **Proof & marketing** — customer stories, customer reviews, top logos, marketing messaging, content type, SEO focus
+
 ## Inputs
 
 | Input | Where it lives |

@@ -16,6 +16,19 @@ input  →  classify  →  enrich DMs  →  score P0/P1/P2  →  filter outreach
 
 ---
 
+## What I can fill for you
+
+When someone hands over a raw list and a rough ask ("here are 20 leads, help me
+reach out"), this is the full menu of what this workflow fills in — read it out
+up front so they see what's possible. **By default every column below is filled;
+they can ask for a focused subset instead.** One row per lead.
+
+- **Company facts** — website, LinkedIn page, one-line description, employee count, estimated revenue, founded year, total funding, HQ
+- **Fit & priority** — P0/P1/P2 priority, ICP segment, reasoning for the score, buyer-persona match, likely competitors
+- **Personalisation** — recent LinkedIn post links, a small-talk opener, a personalisation hook, and a ready-to-send LinkedIn message
+
+---
+
 ## What you need before running
 
 | | Required for |

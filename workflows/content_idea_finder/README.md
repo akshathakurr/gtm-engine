@@ -2,6 +2,18 @@
 
 Generates daily content ideas for Twitter and LinkedIn. Pulls signals from three sources, clusters them into topics, and outputs N idea cards classified by genre, content type, and platform. Hook + body are left blank — those are written later by a separate writing skill.
 
+## What I can fill for you
+
+This workflow generates ideas from scratch (no input list needed) — this is the
+menu of what each idea card comes with, so you can tell someone what they'll get
+back. **Every field below is filled by default.** One row per idea.
+
+- **The idea** — topic, genre, content type, target platform
+- **Why & how** — why-now rationale, a suggested angle, the source URLs it came from
+- **Tracking** — date and an idea ID
+
+Hook and body are left blank on purpose — those are drafted later by a separate writing skill.
+
 ## Inputs (interactive on first run)
 
 This workflow is driven by four lists. On first run, it checks `context/context.md` for each. If a section is missing, it prompts you. If you skip a prompt, it falls back to built-in defaults and **prints them** so you know exactly what's being used.
@@ -65,7 +77,8 @@ python -m workflows.content_idea_finder.workflow --mode daily --sheet-id SHEET_I
 |---|---|---|
 | `--mode` | required | `daily` or `idea` |
 | `--idea` | — | Required when `--mode idea`. Seed string. |
-| `--sheet-id` | required | Google Sheet ID |
+| `--sheet-id` | one required | Google Sheet ID |
+| `--output-csv` | one required | Write ideas to a local CSV instead (use when you don't want to connect Google) |
 | `--sheet-name` | `Sheet1` | Tab name |
 | `--num-ideas` | 5 | Daily mode only |
 | `--lookback-days` | 3 | Creators + Twitter trends |

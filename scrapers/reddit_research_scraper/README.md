@@ -2,7 +2,13 @@
 
 Search Reddit posts by keyword, optionally scoped to a subreddit.
 
-**Free — no Apify, no API key required.** Uses Reddit's public JSON API.
+**Free first, paid fallback.** Uses Reddit's public JSON API (free, no key). Reddit
+IP-blocks datacenter/cloud ranges (HTTP 403), so when the free API fails the scraper
+automatically falls back to the Apify `trudax/reddit-scraper-lite` actor
+(residential proxy, ~$0.04/search, needs `APIFY_API_TOKEN`). In fallback mode
+`score` / `upvote_ratio` / `num_comments` come back as `0` — the lite actor can't
+return engagement counts (its `includeMediaLinks` option is broken and returns 0
+items; verified 2026-07-06).
 
 ---
 

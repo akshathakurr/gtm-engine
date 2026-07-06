@@ -21,6 +21,20 @@ who'd be filtered out anyway.
 
 ---
 
+## What I can fill for you
+
+When someone hands over a raw list and a rough ask ("here are 20 companies, help
+me email them"), this is the full menu of what this workflow fills in — read it
+out up front so they see what's possible. **By default every column below is
+filled; they can ask for a focused subset instead.** One row per company.
+
+- **Company facts** — website, LinkedIn page, one-line description, employee count, estimated revenue, founded year, total funding, HQ, direct competitors
+- **Fit & priority** — priority tier, ICP segment, reasoning for the score, buyer-persona match
+- **Buyer & contact** — the right buyer at each company and their email (via Apollo)
+- **Personalisation** — recent LinkedIn post links, a small-talk opener, a personalisation hook, and ready-to-send email copy
+
+---
+
 ## What you need before running
 
 | | Required for |

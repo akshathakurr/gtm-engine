@@ -30,11 +30,11 @@ import anthropic
 from config import CLAUDE_MODEL, CONTEXT_DIR
 from workflows._common import (
     strip_json_fence as _strip_json_fence,
-    gws_read_sheet, gws_write_range, find_col, cell, load_icp,
+    find_col, cell, load_icp,
     read_context_file as _read_context_file,
     append_to_context_file as _append_to_context_file,
     section_body as _section_body,
-    preview_and_confirm,
+    preview_and_confirm, TabularStore,
 )
 from scrapers.linkedin_profile_post_scraper import scraper as _post_scraper
 from scrapers.linkedin_post_research import scraper as _search_scraper
@@ -44,6 +44,7 @@ SLEEP_BETWEEN_PROFILES = 5  # apimaestro/linkedin-profile-posts throttles on bur
 SEARCH_MIN_INTERVAL = 2     # spacing between posts-search actor calls (was the batch sleep)
 ICP_CONCURRENCY = 3         # max in-flight profile-posts runs (bounded to stay well under free-plan limits)
 SEARCH_CONCURRENCY = 3      # max in-flight posts-search runs
+VELOCITY_MIN_HOURS = 2.0    # age floor for velocity so just-posted noise can't dominate the ranking
 
 
 # ---------------------------------------------------------------------------
@@ -130,12 +131,14 @@ REQUIRED_SECTIONS = [
         "header": "LinkedIn Comment Genre Keywords",
         "prompt": "What broad topics/genres do you want to comment on to build credibility? One per line (e.g. 'B2B SaaS', 'AI strategy', 'climate tech').",
         "multiline": True,
+        "intents": {"engagement"},  # only the reach play searches genre keywords
     },
     {
         "key": "signal_keywords",
         "header": "LinkedIn Comment Signal Keywords",
         "prompt": "What buying-intent / pain-point phrases should we hunt for? One per line (e.g. 'implementing AI in our org', 'switching CRMs').",
         "multiline": True,
+        "intents": {"prospect"},  # only the prospect play searches signal phrases
     },
 ]
 
@@ -166,13 +169,20 @@ def _read_multiline_input(prompt_text: str) -> str:
     return "\n".join(lines)
 
 
-def ensure_context_complete(auto: bool) -> Dict[str, str]:
-    """Walk REQUIRED_SECTIONS; prompt for missing ones; offer to save back."""
+def ensure_context_complete(auto: bool, intent: Optional[str] = None) -> Dict[str, str]:
+    """Walk REQUIRED_SECTIONS; prompt for missing ones; offer to save back.
+
+    Sections tagged with an `intents` set are only required when the current run's
+    intent is in it — so a prospect run never asks for genre keywords, and vice versa.
+    """
     text = _read_context_file()
     captured: Dict[str, str] = {}
     missing: List[Dict[str, str]] = []
 
     for spec in REQUIRED_SECTIONS:
+        wanted = spec.get("intents")
+        if wanted and intent is not None and intent not in wanted:
+            continue  # this section isn't used by the chosen intent
         body = _section_body(text, spec["header"])
         if not body:
             parts = [_section_body(text, h) for h in spec.get("fallback_headers", [])]
@@ -268,9 +278,15 @@ def _normalize_search_post(post: dict, source: str) -> dict:
 # Source pulls
 # ---------------------------------------------------------------------------
 
-def pull_icp_posts(profile_urls: List[str], max_per_profile: int, days_back: int) -> List[dict]:
-    # One profile-posts run per URL, starts spaced SLEEP_BETWEEN_PROFILES apart,
-    # run-times overlapped across a small pool.
+def pull_profile_posts(profile_urls: List[str], max_per_profile: int, days_back: int,
+                       source: str) -> List[dict]:
+    """Pull recent posts from a list of profile URLs, tagged with `source`.
+
+    Used for both the prospect (ICP) list and the authority-accounts list — same
+    actor, different `source` tag so downstream can tell the two plays apart.
+    One run per URL, starts spaced SLEEP_BETWEEN_PROFILES apart, run-times
+    overlapped across a small pool.
+    """
     def scrape_one(url: str) -> dict:
         return _post_scraper.scrape_linkedin_profile_posts(
             profile_url=url,
@@ -285,9 +301,9 @@ def pull_icp_posts(profile_urls: List[str], max_per_profile: int, days_back: int
     posts: List[dict] = []
     for url, res, err in zip(profile_urls, results, errors):
         if err:
-            print(f"  ICP profile {url} failed: {err}")
+            print(f"  {source} profile {url} failed: {err}")
             continue
-        posts.extend(_normalize_profile_post(p, "icp") for p in (res or {}).get("posts", []))
+        posts.extend(_normalize_profile_post(p, source) for p in (res or {}).get("posts", []))
     return posts
 
 
@@ -306,8 +322,51 @@ def _search_keywords(keywords: List[str], sort: str, max_posts: int) -> List[dic
     return [r for r in results if r]
 
 
-def pull_trending_posts(keywords: List[str], max_per_keyword: int, days_back: int) -> List[dict]:
-    """Search by genre keywords (relevance sort), filter to recent, re-rank by engagement."""
+def _hours_since(timestamp_ms: Optional[float]) -> Optional[float]:
+    if not timestamp_ms:
+        return None
+    now_ms = datetime.now(timezone.utc).timestamp() * 1000
+    return max((now_ms - timestamp_ms) / 3_600_000, 0.0)
+
+
+def _engagement_velocity(post: dict) -> float:
+    """Engagement per hour since posting — surfaces *rising* posts over already-
+    saturated ones. Age is floored (VELOCITY_MIN_HOURS) so a post from minutes ago
+    with a handful of reactions can't out-rank a genuinely hot one."""
+    hours = _hours_since(post.get("timestamp_ms"))
+    if hours is None:
+        return 0.0
+    return (post["reactions"] + post["comments"]) / max(hours, VELOCITY_MIN_HOURS)
+
+
+def _drop_saturated(posts: List[dict], max_comments: int) -> List[dict]:
+    """Posts past a comment threshold are 'buried' — a new comment won't be seen,
+    so they're poor targets no matter how high their engagement. <= 0 disables
+    (guards against a negative value silently dropping every post)."""
+    if max_comments <= 0:
+        return posts
+    return [p for p in posts if p["comments"] <= max_comments]
+
+
+def _rank_by_velocity(posts: List[dict]) -> List[dict]:
+    """Stamp each post with its engagement velocity and sort rising-first.
+
+    Shared by the two reach-play sources (trending + authority) so the ranking
+    rule lives in one place."""
+    for p in posts:
+        p["velocity"] = round(_engagement_velocity(p), 2)
+    posts.sort(key=lambda p: p["velocity"], reverse=True)
+    return posts
+
+
+def pull_trending_posts(keywords: List[str], max_per_keyword: int, days_back: int,
+                        commentable_max_comments: int = 0) -> List[dict]:
+    """Search genre keywords, keep recent + still-commentable, rank by engagement velocity.
+
+    Ranking by velocity (engagement / hours-since-posted) rather than absolute
+    engagement favors *rising* posts where an early comment is still visible,
+    instead of saturated posts where it lands at comment #300.
+    """
     results = _search_keywords(keywords, sort="relevance", max_posts=max_per_keyword)
     posts: List[dict] = []
     for r in results:
@@ -316,13 +375,13 @@ def pull_trending_posts(keywords: List[str], max_per_keyword: int, days_back: in
 
     cutoff_ms = (datetime.now(timezone.utc) - timedelta(days=days_back)).timestamp() * 1000
     posts = [p for p in posts if p.get("timestamp_ms") and p["timestamp_ms"] >= cutoff_ms]
+    posts = _drop_saturated(posts, commentable_max_comments)
+    return _rank_by_velocity(posts)
 
-    posts.sort(key=lambda p: p["reactions"] + p["comments"], reverse=True)
-    return posts
 
-
-def pull_signal_posts(keywords: List[str], max_per_keyword: int, days_back: int) -> List[dict]:
-    """Search by signal keywords (date sort), filter to recent."""
+def pull_signal_posts(keywords: List[str], max_per_keyword: int, days_back: int,
+                      commentable_max_comments: int = 0) -> List[dict]:
+    """Search signal keywords (date sort — intent recency matters), keep recent + commentable."""
     results = _search_keywords(keywords, sort="date_posted", max_posts=max_per_keyword)
     posts: List[dict] = []
     for r in results:
@@ -331,7 +390,20 @@ def pull_signal_posts(keywords: List[str], max_per_keyword: int, days_back: int)
 
     cutoff_ms = (datetime.now(timezone.utc) - timedelta(days=days_back)).timestamp() * 1000
     posts = [p for p in posts if p.get("timestamp_ms") and p["timestamp_ms"] >= cutoff_ms]
+    posts = _drop_saturated(posts, commentable_max_comments)
     return posts
+
+
+def pull_authority_posts(profile_urls: List[str], max_per_profile: int, days_back: int,
+                         commentable_max_comments: int = 0) -> List[dict]:
+    """Pull posts from the curated authority accounts, drop buried threads, rank by velocity.
+
+    Reach play: you want to comment *early* on a big account's rising post, so we
+    rank their recent posts by engagement velocity just like the trending source.
+    """
+    posts = pull_profile_posts(profile_urls, max_per_profile, days_back, "authority")
+    posts = _drop_saturated(posts, commentable_max_comments)
+    return _rank_by_velocity(posts)
 
 
 # ---------------------------------------------------------------------------
@@ -353,7 +425,28 @@ def dedupe_posts(posts: List[dict]) -> List[dict]:
 # Relevance scoring (Claude + project context from the context/ folder)
 # ---------------------------------------------------------------------------
 
-def score_relevance(posts: List[dict], project_context: str, client: anthropic.Anthropic) -> List[Optional[dict]]:
+# Per-intent guidance injected into the scoring prompt. The two plays want
+# fundamentally different comments, so the "angle" instruction differs.
+_INTENT_ANGLE_GUIDANCE = {
+    "prospect": (
+        "angle: ONE short sentence — how do I comment so THIS PERSON (a prospect I want a "
+        "reply from) notices and remembers me? Lead with a genuine, personal reaction that "
+        "shows I read their post and get their world; surface a hook from my past work only "
+        'if it fits naturally. Warm and human, NOT audience-grabbing or salesy. If nothing '
+        'specific applies, write "warm presence — <the genuine reaction I\'d leave>".'
+    ),
+    "engagement": (
+        "angle: ONE short sentence — what value-add or sharp take would make MY comment stand "
+        "out to THIS AUTHOR'S AUDIENCE and earn me reach/visibility? Aim to add an insight, a "
+        "concrete example, or a crisp question that their followers would upvote — not generic "
+        'praise. If a hook from my past work strengthens it, use it; else write '
+        '"value-add — <the insight/question I\'d contribute>".'
+    ),
+}
+
+
+def score_relevance(posts: List[dict], project_context: str, client: anthropic.Anthropic,
+                    intent: str = "prospect") -> List[Optional[dict]]:
     if not posts:
         return []
 
@@ -366,24 +459,37 @@ def score_relevance(posts: List[dict], project_context: str, client: anthropic.A
         for i, p in enumerate(posts)
     )
 
+    if intent == "engagement":
+        goal_line = ("My goal this run is REACH: I want to comment on posts so that the "
+                     "author's audience sees me and my own account gains engagement.")
+    else:
+        goal_line = ("My goal this run is to WARM UP PROSPECTS I'm already reaching out to: "
+                     "commenting on their posts so they recognize me and are more likely to reply.")
+    angle_guidance = _INTENT_ANGLE_GUIDANCE.get(intent, _INTENT_ANGLE_GUIDANCE["prospect"])
+
     prompt = f"""You are helping me decide which LinkedIn posts to comment on to build credibility in my space. Use my project context below to infer my genre, audience, and what kinds of posts are relevant — do NOT assume any specific industry.
+
+{goal_line}
 
 My project context (everything I have worked on, and what my project is about):
 {project_context}
 
 For each post below, answer:
 - worth_commenting: true/false. True if the post is substantive and a thoughtful comment would add value. False for vanity, generic platitudes, or pure self-promotion.
+- author_relevant: true/false. True if the AUTHOR is someone whose audience/network is worth being visible in — a potential buyer, a peer, or an influencer in my space (judge from their headline and what they post about). False for people outside my space who merely went viral (generic motivation, unrelated news, etc.). If Source is "icp" or "authority", the author is already a hand-picked target — set true unless the post is clearly off-topic personal content.
+- summary: ONE short sentence describing what the post itself is actually about (the gist), so I know what I'd be commenting on without opening it.
 - relevance: ONE short sentence — why is this post relevant to my work or audience?
-- angle: ONE short sentence — what specific hook from my past projects gives me something credible to say? If no specific project applies, write "general credibility — <how I'd add value, e.g. ask a sharp question about X>".
+- {angle_guidance}
 
 Posts:
 {posts_block}
 
-Return a JSON array — one object per post — with keys: index (1-based), worth_commenting, relevance, angle.
+Return a JSON array — one object per post — with keys: index (1-based), worth_commenting, author_relevant, summary, relevance, angle.
 Return only valid JSON, no explanation."""
 
     resp = client.messages.create(
         model=CLAUDE_MODEL, max_tokens=8000,
+        temperature=0,  # classification — keep verdicts stable run-to-run
         messages=[{"role": "user", "content": prompt}],
     )
     try:
@@ -406,13 +512,24 @@ Return only valid JSON, no explanation."""
 # ---------------------------------------------------------------------------
 
 SHEET_HEADERS = [
-    "Run Date", "Post URL", "Author", "Source", "Posted",
-    "Why relevant", "My angle", "Reactions", "Comments", "Status",
+    "Run Date", "Post URL", "Author", "Source", "Intent", "Posted",
+    "Why relevant", "My angle", "Reactions", "Comments", "Status", "About the post",
 ]
 
 
-def read_icp_profile_urls(sheet_id: str, sheet_name: str, url_column: str) -> List[str]:
-    rows = gws_read_sheet(sheet_id, sheet_name)
+def _author_ok(score: dict) -> bool:
+    """Whether a post's author passes the relevance gate.
+
+    Fail-open: a missing OR explicitly-null `author_relevant` counts as relevant
+    (a model omission must not silently drop every post). Only an explicit false
+    value filters the post out.
+    """
+    val = score.get("author_relevant", True)
+    return True if val is None else bool(val)
+
+
+def read_profile_urls(store: TabularStore, url_column: str) -> List[str]:
+    rows = store.read_all()
     if not rows:
         return []
     headers = rows[0]
@@ -423,8 +540,9 @@ def read_icp_profile_urls(sheet_id: str, sheet_name: str, url_column: str) -> Li
     return [cell(r, idx) for r in rows[1:] if cell(r, idx).startswith("http")]
 
 
-def append_to_sheet(sheet_id: str, sheet_name: str, posts: List[dict], scores: List[Optional[dict]]) -> int:
-    existing = gws_read_sheet(sheet_id, sheet_name) or []
+def append_to_sheet(store: TabularStore, posts: List[dict],
+                    scores: List[Optional[dict]], intent_label: str) -> int:
+    existing = store.read_all() or []
     is_new_sheet = not existing
     headers = existing[0] if existing else SHEET_HEADERS
 
@@ -432,7 +550,7 @@ def append_to_sheet(sheet_id: str, sheet_name: str, posts: List[dict], scores: L
     # different schema. Warn and append in workflow's column order — caller
     # should reconcile manually if alignment matters.
     if not is_new_sheet and headers != SHEET_HEADERS and len(existing) > 1:
-        print(f"  Note: '{sheet_name}' has data rows under a different header schema. "
+        print(f"  Note: {store.label()} has data rows under a different header schema. "
               f"Keeping existing header; new rows append in workflow's column order "
               f"(may not align with existing labels).")
 
@@ -450,29 +568,33 @@ def append_to_sheet(sheet_id: str, sheet_name: str, posts: List[dict], scores: L
     for p, s in zip(posts, scores):
         if not p["post_url"] or p["post_url"] in existing_urls:
             continue
-        if not s or not s.get("worth_commenting"):
+        # Gate on both axes: substantive post AND an author worth being seen by.
+        # _author_ok is fail-open so a model omission/null can't nuke the run —
+        # worth_commenting still filters.
+        if not s or not s.get("worth_commenting") or not _author_ok(s):
             continue
         new_rows.append([
             run_date,
             p["post_url"],
             p["author_name"],
             p["source"],
+            intent_label,
             p["posted_at"],
             s.get("relevance", ""),
             s.get("angle", ""),
             str(p["reactions"]),
             str(p["comments"]),
             "",
+            s.get("summary", ""),
         ])
 
     if not new_rows:
         return 0
 
     if is_new_sheet:
-        gws_write_range(sheet_id, f"{sheet_name}!A1", [headers] + new_rows)
+        store.append([headers] + new_rows)
     else:
-        start_row = len(existing) + 1
-        gws_write_range(sheet_id, f"{sheet_name}!A{start_row}", new_rows)
+        store.append(new_rows)
     return len(new_rows)
 
 
@@ -482,6 +604,27 @@ def append_to_sheet(sheet_id: str, sheet_name: str, posts: List[dict], scores: L
 
 def _pause(message: str) -> None:
     input(f"\n[INTERACTIVE] {message} — press Enter to continue, Ctrl+C to abort.\n")
+
+
+# The workflow runs ONE intent per run. Each maps to a curated profile list + a
+# discovery keyword source, and to the label written in the sheet's Intent column.
+INTENT_LABELS = {
+    "prospect": "prospect — warm for reply",
+    "engagement": "reach — borrow audience",
+}
+
+
+def _prompt_intent() -> str:
+    print("\nWhat's the intent for this run?")
+    print("  1) prospect   — warm up ICPs/prospects you're reaching out to (comment on THEIR posts so they reply)")
+    print("  2) engagement — get reach on your own account (comment on big accounts + trending topics)")
+    while True:
+        choice = input("> ").strip().lower()
+        if choice in ("1", "prospect", "p"):
+            return "prospect"
+        if choice in ("2", "engagement", "e"):
+            return "engagement"
+        print("Please enter 1 (prospect) or 2 (engagement).")
 
 
 def _load_keywords(workflow_dir: str, filename: str, ctx_section: Optional[str] = None) -> List[str]:
@@ -515,131 +658,186 @@ def _load_project_context() -> str:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=["auto", "interactive"], default="auto")
+    parser.add_argument("--intent", choices=["prospect", "engagement"],
+                        help="prospect = warm your ICPs/prospects for a reply; "
+                             "engagement = comment on big accounts + trends for reach. "
+                             "Required in auto mode; prompted in interactive mode.")
     parser.add_argument("--icp-sheet-id")
     parser.add_argument("--icp-sheet-name")
     parser.add_argument("--icp-url-column")
+    parser.add_argument("--authority-sheet-id")
+    parser.add_argument("--authority-sheet-name")
+    parser.add_argument("--authority-url-column")
     parser.add_argument("--output-sheet-id")
     parser.add_argument("--output-sheet-name")
+    parser.add_argument("--output-csv", default=None,
+                        help="Write results to a local CSV instead of a Google Sheet")
+    parser.add_argument("--curated-csv", default=None,
+                        help="Read curated profile URLs from a local CSV instead of a sheet")
+    parser.add_argument("--curated-url-column", default=None,
+                        help="Column holding profile URLs in --curated-csv (default 'LinkedIn URL')")
     parser.add_argument("--days-back", type=int)
     parser.add_argument("--max-per-profile", type=int)
     parser.add_argument("--max-per-keyword", type=int)
-    parser.add_argument("--skip-icp", action="store_true")
-    parser.add_argument("--skip-trending", action="store_true")
-    parser.add_argument("--skip-signal", action="store_true")
+    parser.add_argument("--commentable-max-comments", type=int,
+                        help="Drop posts with more comments than this (buried threads). 0 disables.")
+    parser.add_argument("--skip-icp", action="store_true", help="Prospect intent: skip the ICP profile source.")
+    parser.add_argument("--skip-authority", action="store_true", help="Engagement intent: skip the authority-accounts source.")
+    parser.add_argument("--skip-trending", action="store_true", help="Engagement intent: skip the genre-keyword search.")
+    parser.add_argument("--skip-signal", action="store_true", help="Prospect intent: skip the signal-keyword search.")
     parser.add_argument("--auto", action="store_true",
                         help="Run non-interactively. Errors out if context.md is missing required sections.")
     args = parser.parse_args()
 
-    # Pre-step: backfill any missing context sections before doing any work.
-    ensure_context_complete(auto=args.auto)
+    interactive = args.mode == "interactive"
+
+    # ---- Intent — one play per run. Prompted in interactive mode, required in auto.
+    # Resolved up front so context backfill only asks for the sections this intent uses.
+    intent = args.intent
+    if not intent:
+        if interactive:
+            intent = _prompt_intent()
+        else:
+            print("\nERROR: no --intent given. This workflow runs one intent per run:\n"
+                  "  --intent prospect    (warm your ICPs/prospects for a reply)\n"
+                  "  --intent engagement  (comment on big accounts + trends for reach)\n"
+                  "Pass one, or use --mode interactive to be asked.")
+            sys.exit(2)
+    intent_label = INTENT_LABELS[intent]
+
+    # Pre-step: backfill the context sections THIS intent needs before doing any work.
+    ensure_context_complete(auto=args.auto, intent=intent)
 
     workflow_dir = os.path.dirname(os.path.abspath(__file__))
 
     with open(os.path.join(workflow_dir, "config.json")) as f:
         cfg = json.load(f)
 
-    icp_sheet_id    = args.icp_sheet_id    or cfg["icp_sheet"]["id"]
-    icp_sheet_name  = args.icp_sheet_name  or cfg["icp_sheet"]["tab"]
-    icp_url_col     = args.icp_url_column  or cfg["icp_sheet"]["url_column"]
     out_sheet_id    = args.output_sheet_id or cfg["output_sheet"]["id"]
     out_sheet_name  = args.output_sheet_name or cfg["output_sheet"]["tab"]
     days_back       = args.days_back       or cfg["days_back"]
     max_per_profile = args.max_per_profile or cfg["max_per_profile"]
     max_per_keyword = args.max_per_keyword or cfg["max_per_keyword"]
     trending_top_n  = cfg.get("trending_top_n", 30)
+    authority_top_n = cfg.get("authority_top_n", trending_top_n)
+    # 0 is a meaningful value (disable the cap), so honor an explicit flag over the default.
+    commentable_max_comments = (args.commentable_max_comments
+                                if args.commentable_max_comments is not None
+                                else cfg.get("commentable_max_comments", 0))
 
-    genre_keywords = _load_keywords(workflow_dir, "genre_keywords.json",
-                                    ctx_section="LinkedIn Comment Genre Keywords")
-    signal_keywords = _load_keywords(workflow_dir, "signal_keywords.json",
-                                     ctx_section="LinkedIn Comment Signal Keywords")
+    print(f"Mode: {args.mode} | Intent: {intent} | Days back: {days_back}")
 
-    interactive = args.mode == "interactive"
-    print(f"Mode: {args.mode} | Days back: {days_back}")
+    # ---- Resolve this intent's curated profile list + discovery keyword source.
+    # Only the chosen intent's keyword list is loaded (the other is never used).
+    #   prospect   → ICP list (warm)           + signal phrases (find new prospects)
+    #   engagement → authority accounts (reach) + genre keywords (find big posts)
+    if intent == "prospect":
+        cur_id  = args.icp_sheet_id   or cfg["icp_sheet"]["id"]
+        cur_tab = args.icp_sheet_name or cfg["icp_sheet"]["tab"]
+        cur_col = args.icp_url_column or cfg["icp_sheet"]["url_column"]
+        cur_label = "ICP/prospect"
+        skip_curated   = args.skip_icp
+        disc_keywords  = _load_keywords(workflow_dir, "signal_keywords.json",
+                                        ctx_section="LinkedIn Comment Signal Keywords")
+        skip_discovery = args.skip_signal
+        disc_label     = "SIGNAL"
+    else:
+        acfg = cfg.get("authority_sheet", {})
+        cur_id  = args.authority_sheet_id   or acfg.get("id", "TODO_PASTE_AUTHORITY_SHEET_ID")
+        cur_tab = args.authority_sheet_name or acfg.get("tab", "Sheet1")
+        cur_col = args.authority_url_column or acfg.get("url_column", "LinkedIn URL")
+        cur_label = "authority"
+        skip_curated   = args.skip_authority
+        disc_keywords  = _load_keywords(workflow_dir, "genre_keywords.json",
+                                        ctx_section="LinkedIn Comment Genre Keywords")
+        skip_discovery = args.skip_trending
+        disc_label     = "TRENDING"
 
     all_posts: List[dict] = []
 
-    # ICP profile URLs are read up front so the spend estimate below can size
-    # the (expensive) profile-posts fan-out before anything is billed.
-    icp_urls: List[str] = []
-    if not args.skip_icp:
-        if "TODO" in icp_sheet_id:
-            print("[ICP] Sheet ID not configured in config.json — skipping ICP source.")
+    # Curated profile URLs are read up front so the spend estimate can size the
+    # (expensive) profile-posts fan-out before anything is billed.
+    curated_urls: List[str] = []
+    if not skip_curated:
+        if args.curated_csv:
+            cur_store = TabularStore(csv_path=args.curated_csv)
+            cur_col = args.curated_url_column or cur_col or "LinkedIn URL"
+        elif "TODO" not in cur_id:
+            cur_store = TabularStore(sheet_id=cur_id, sheet_name=cur_tab)
         else:
-            print(f"[ICP] Reading profile URLs from sheet '{icp_sheet_name}'...")
-            raw_urls = read_icp_profile_urls(icp_sheet_id, icp_sheet_name, icp_url_col)
+            cur_store = None
+        if cur_store is None:
+            print(f"[{cur_label}] No profile source configured — skipping the curated-profile source.")
+        else:
+            print(f"[{cur_label}] Reading profile URLs from {cur_store.label()}...")
+            raw_urls = read_profile_urls(cur_store, cur_col)
             # Dedupe — duplicate URLs would otherwise pay for the same run twice.
-            icp_urls = list(dict.fromkeys(raw_urls))
-            dropped = len(raw_urls) - len(icp_urls)
+            curated_urls = list(dict.fromkeys(raw_urls))
+            dropped = len(raw_urls) - len(curated_urls)
             note = f" ({dropped} duplicate(s) skipped)" if dropped else ""
-            print(f"  Found {len(icp_urls)} ICP profile URLs{note}.")
+            print(f"  Found {len(curated_urls)} {cur_label} profile URLs{note}.")
 
-    # ---- Spend preview. Worst case = every requested item returned + billed.
+    # ---- Spend preview (only this intent's two sources). Worst case = every
+    # requested item returned + billed.
+    disc_items = 0 if skip_discovery else len(disc_keywords) * max_per_keyword
     if not preview_and_confirm([
-        ("ICP profile posts",  "linkedin_profile_posts", len(icp_urls) * max_per_profile),
-        ("Trending post search", "linkedin_post_search",
-         (0 if args.skip_trending else len(genre_keywords) * max_per_keyword)),
-        ("Signal post search",   "linkedin_post_search",
-         (0 if args.skip_signal else len(signal_keywords) * max_per_keyword)),
+        (f"{cur_label} profile posts", "linkedin_profile_posts", len(curated_urls) * max_per_profile),
+        (f"{disc_label.title()} post search", "linkedin_post_search", disc_items),
     ], interactive=interactive):
         print("Aborted — no Apify runs were started.")
         return
 
-    # ---- Sources. ICP uses the profile-posts actor; trending + signal share
-    # the posts-search actor. Each source below handles its own skip/config and
-    # returns its posts. In auto mode the ICP stream and the search stream run
-    # concurrently (different actors → no shared throttle); within each stream
-    # calls stay rate-limited. Interactive mode runs them sequentially so the
-    # between-source pauses still make sense.
+    # ---- Sources for this intent. The curated list uses the profile-posts
+    # actor; discovery uses the posts-search actor. In auto mode both run
+    # concurrently (different actors → no shared throttle); interactive runs
+    # them sequentially so the between-source pauses make sense.
 
-    def run_icp() -> List[dict]:
-        if not icp_urls:
+    def run_curated() -> List[dict]:
+        if not curated_urls:
             return []
-        print(f"[ICP] Pulling posts (≥{SLEEP_BETWEEN_PROFILES}s between starts, up to {ICP_CONCURRENCY} in flight)...")
-        icp_posts = pull_icp_posts(icp_urls, max_per_profile, days_back)
-        print(f"  Got {len(icp_posts)} ICP posts.")
-        return icp_posts
+        print(f"[{cur_label}] Pulling posts (≥{SLEEP_BETWEEN_PROFILES}s between starts, up to {ICP_CONCURRENCY} in flight)...")
+        if intent == "engagement":
+            # Reach play — rank the big accounts' posts by velocity, comment early.
+            posts = pull_authority_posts(curated_urls, max_per_profile, days_back,
+                                         commentable_max_comments)[:authority_top_n]
+            print(f"  Got {len(posts)} authority posts (top {authority_top_n} by engagement velocity).")
+        else:
+            # Warm play — presence matters, so keep all recent posts (no velocity cull).
+            posts = pull_profile_posts(curated_urls, max_per_profile, days_back, "icp")
+            print(f"  Got {len(posts)} prospect posts.")
+        return posts
 
-    def run_trending() -> List[dict]:
-        if args.skip_trending:
+    def run_discovery() -> List[dict]:
+        if skip_discovery:
             return []
-        print(f"[TRENDING] Searching {len(genre_keywords)} genre keywords...")
-        trending = pull_trending_posts(genre_keywords, max_per_keyword, days_back)[:trending_top_n]
-        print(f"  Got {len(trending)} trending posts (top {trending_top_n} by engagement).")
-        return trending
-
-    def run_signal() -> List[dict]:
-        if args.skip_signal:
-            return []
-        print(f"[SIGNAL] Searching {len(signal_keywords)} signal keywords...")
-        signal_posts = pull_signal_posts(signal_keywords, max_per_keyword, days_back)
-        print(f"  Got {len(signal_posts)} signal posts.")
-        return signal_posts
+        print(f"[{disc_label}] Searching {len(disc_keywords)} {disc_label.lower()} keywords...")
+        if intent == "engagement":
+            posts = pull_trending_posts(disc_keywords, max_per_keyword, days_back,
+                                        commentable_max_comments)[:trending_top_n]
+            print(f"  Got {len(posts)} trending posts (top {trending_top_n} by engagement velocity).")
+        else:
+            posts = pull_signal_posts(disc_keywords, max_per_keyword, days_back,
+                                      commentable_max_comments)
+            print(f"  Got {len(posts)} signal posts.")
+        return posts
 
     if interactive:
-        all_posts.extend(run_icp())
-        if not args.skip_icp:
-            _pause("ICP pull complete")
-        all_posts.extend(run_trending())
-        if not args.skip_trending:
-            _pause("Trending pull complete")
-        all_posts.extend(run_signal())
-        if not args.skip_signal:
-            _pause("Signal pull complete")
+        all_posts.extend(run_curated())
+        if not skip_curated:
+            _pause(f"{cur_label} pull complete")
+        all_posts.extend(run_discovery())
+        if not skip_discovery:
+            _pause(f"{disc_label.lower()} pull complete")
     else:
-        # Search stream keeps trending → signal sequential (one stream on the
-        # shared posts-search actor), running alongside the ICP stream.
-        def search_stream() -> List[dict]:
-            return run_trending() + run_signal()
-
         with ThreadPoolExecutor(max_workers=2) as ex:
-            icp_fut = ex.submit(run_icp)
-            search_fut = ex.submit(search_stream)
-            all_posts.extend(icp_fut.result())
-            all_posts.extend(search_fut.result())
+            curated_fut = ex.submit(run_curated)
+            discovery_fut = ex.submit(run_discovery)
+            all_posts.extend(curated_fut.result())
+            all_posts.extend(discovery_fut.result())
 
     # ---- Dedupe
     all_posts = dedupe_posts(all_posts)
-    print(f"\n[DEDUPE] {len(all_posts)} unique posts across all sources.")
+    print(f"\n[DEDUPE] {len(all_posts)} unique posts across both sources.")
 
     # Save raw locally
     with open(os.path.join(workflow_dir, "results.json"), "w") as f:
@@ -653,9 +851,10 @@ def main():
     print(f"\n[SCORE] Scoring {len(all_posts)} posts via Claude...")
     project_context = _load_project_context()
     client = anthropic.Anthropic()
-    scores = score_relevance(all_posts, project_context, client)
-    worth = sum(1 for s in scores if s and s.get("worth_commenting"))
-    print(f"  {worth} of {len(all_posts)} posts marked worth commenting.")
+    scores = score_relevance(all_posts, project_context, client, intent=intent)
+    surfaced = sum(1 for s in scores
+                   if s and s.get("worth_commenting") and _author_ok(s))
+    print(f"  {surfaced} of {len(all_posts)} posts worth commenting AND by a relevant author.")
 
     # Save scores alongside posts
     with open(os.path.join(workflow_dir, "results.json"), "w") as f:
@@ -668,13 +867,20 @@ def main():
     if interactive:
         _pause("Scoring complete — review results.json before sheet write")
 
-    # ---- Append to sheet
-    if "TODO" in out_sheet_id:
-        print("\n[OUTPUT] Output sheet ID not configured. Saved to results.json only.")
+    # ---- Append to sheet (or CSV)
+    if args.output_csv and args.output_sheet_id:
+        print("ERROR: pass either --output-csv or --output-sheet-id, not both.")
+        sys.exit(1)
+    if args.output_csv:
+        out_store = TabularStore(csv_path=args.output_csv)
+    elif "TODO" not in out_sheet_id:
+        out_store = TabularStore(sheet_id=out_sheet_id, sheet_name=out_sheet_name)
+    else:
+        print("\n[OUTPUT] No output sheet or CSV configured. Saved to results.json only.")
         return
 
-    print(f"\n[OUTPUT] Appending to sheet '{out_sheet_name}'...")
-    n = append_to_sheet(out_sheet_id, out_sheet_name, all_posts, scores)
+    print(f"\n[OUTPUT] Appending to {out_store.label()}...")
+    n = append_to_sheet(out_store, all_posts, scores, intent_label)
     print(f"  Appended {n} new rows.")
 
 

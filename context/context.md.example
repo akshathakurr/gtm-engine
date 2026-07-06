@@ -2,10 +2,10 @@
 
 This file is the questionnaire behind the workflows — but you don't fill
 most of it in yourself. Open this folder in Claude Code and say "help me
-get started" — Claude asks just **two** questions (your **product** and
-**who it's for**), then researches your website and **drafts every other
-section for you**, into the `### Answer` blocks, for you to review and
-edit. Two questions in, a complete draft out.
+get started" — Claude asks for just your **company name and website**,
+then researches your site and **drafts every section for you** (including
+who it's for), into the `### Answer` blocks, for you to review and edit.
+One input in, a complete draft out.
 
 You can still fill any section in by hand — workflows read the `### Answer`
 blocks and ignore the question / format / example scaffolding.
