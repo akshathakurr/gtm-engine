@@ -35,18 +35,20 @@ Design rules:
 from __future__ import annotations
 
 import json
-import re
+import time
 from typing import Any, Dict, List, Optional
 
-from anthropic import Anthropic
+from anthropic import Anthropic, APIConnectionError, InternalServerError, RateLimitError
 
 from config import ANTHROPIC_API_KEY, CLAUDE_MODEL
+from skills._copy_core import extract_json
 
 _client = Anthropic(api_key=ANTHROPIC_API_KEY)
 
 MAX_HOOKS = 3
 MAX_POSTS_IN_PROMPT = 8
 MAX_POST_CHARS = 600
+_RETRYABLE = (RateLimitError, InternalServerError, APIConnectionError)
 
 
 SYSTEM_PROMPT = """You are an SDR research assistant. Your job is to surface 2-3 SPECIFIC talking points an SDR can use as the angle for a personalised outreach message.
@@ -143,15 +145,12 @@ def _build_user_payload(
     )
 
 
-def _extract_json(text: str) -> Dict[str, Any]:
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if not match:
-        raise ValueError(f"No JSON object in model output: {text[:200]}")
-    return json.loads(match.group(0))
-
-
-def _normalize_hooks(raw: str) -> str:
-    if not raw or not raw.strip():
+def _normalize_hooks(raw: Any) -> str:
+    # The model occasionally returns hooks as a list instead of a newline string.
+    if isinstance(raw, (list, tuple)):
+        raw = "\n".join(str(item) for item in raw)
+    raw = str(raw or "")
+    if not raw.strip():
         return ""
     lines = [ln.strip() for ln in raw.splitlines() if ln.strip()]
     cleaned: List[str] = []
@@ -197,17 +196,28 @@ def generate_hooks(
         hq=hq,
     )
 
-    try:
-        resp = _client.messages.create(
-            model=CLAUDE_MODEL,
-            max_tokens=600,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_msg}],
-        )
-        text = "".join(block.text for block in resp.content if hasattr(block, "text"))
-        parsed = _extract_json(text)
-    except Exception as e:
-        return {"hooks": "", "errors": [f"llm_call_failed: {e}"]}
+    text = ""
+    for attempt in range(3):
+        try:
+            resp = _client.messages.create(
+                model=CLAUDE_MODEL,
+                temperature=0,
+                max_tokens=800,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_msg}],
+            )
+            text = "".join(block.text for block in resp.content if hasattr(block, "text"))
+            break
+        except _RETRYABLE as e:
+            if attempt == 2:
+                return {"hooks": "", "errors": [f"llm_call_failed: {e}"]}
+            time.sleep(2 * (attempt + 1))  # 2s, 4s — transient rate-limit/overload
+        except Exception as e:
+            return {"hooks": "", "errors": [f"llm_call_failed: {e}"]}
+
+    parsed = extract_json(text)
+    if parsed is None:
+        return {"hooks": "", "errors": [f"unparseable model output: {text[:200]}"]}
 
     hooks = _normalize_hooks(parsed.get("hooks", ""))
     errors = parsed.get("errors", []) or []
