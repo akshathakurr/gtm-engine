@@ -758,7 +758,11 @@ def generate_personalisation_hooks(
             employee_count=employee_count, est_revenue=est_revenue,
             total_funding=total_funding, hq=hq,
         )
-        return result.get("hooks", "")
+        hooks = result.get("hooks", "")
+        skill_errors = result.get("errors") or []
+        if skill_errors and not hooks:
+            print(f"    No hook for {name}: {'; '.join(skill_errors)}")
+        return hooks
     except Exception as e:
         print(f"    Personalisation hook failed for {name}: {e}")
         return ""

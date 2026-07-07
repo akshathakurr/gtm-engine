@@ -52,6 +52,9 @@ Empty + error if no usable signal.
 
 One Sonnet 4.6 call per lead. ~$0.005-0.01 per call.
 
+Calls run at temperature 0 (same lead → same hooks) and retry twice (2s/4s
+backoff) on transient rate-limit/overload errors before giving up.
+
 ## Usage
 
 From a workflow:
