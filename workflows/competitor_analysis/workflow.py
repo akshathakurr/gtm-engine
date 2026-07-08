@@ -288,6 +288,74 @@ def scrape_website(url: str) -> dict:
 # Step 2: Company LinkedIn URL
 # ---------------------------------------------------------------------------
 
+# LinkedIn's own company page ("linkedin.com/company/linkedin") and a few other
+# generic slugs are common false positives from the co-mention search — never a
+# competitor's real page.
+_JUNK_LI_SLUGS = {"linkedin", "company", "companies", "school"}
+
+
+def _is_real_company_li(url: str) -> bool:
+    slug = url.split("/company/")[-1].strip("/").lower()
+    return bool(slug) and slug not in _JUNK_LI_SLUGS
+
+
+# Social / aggregator domains that are never a company's own homepage — used to
+# reject noise when searching for an official site from just a name.
+_NON_OFFICIAL_DOMAINS = (
+    "linkedin.com", "twitter.com", "x.com", "facebook.com", "instagram.com",
+    "youtube.com", "tiktok.com", "crunchbase.com", "wikipedia.org", "g2.com",
+    "capterra.com", "glassdoor.com", "bloomberg.com", "medium.com",
+    "github.com", "reddit.com", "pitchbook.com", "apollo.io",
+)
+
+
+def find_official_site(company_name: str, client: anthropic.Anthropic) -> str:
+    """Best-effort official homepage for a company given only its name — used when
+    the input row has no URL, so the website scrape and every website-derived step
+    (description, product info, CTA…) have something to work with. Returns '' if
+    nothing confident turns up."""
+    try:
+        result = search_web(
+            query=f"{company_name} official website",
+            num_results=6,
+            summary_question=f"What is the official company homepage URL for {company_name}?",
+        )
+    except Exception as e:
+        print(f"    Official-site lookup failed: {e}")
+        return ""
+
+    seen, unique = set(), []
+    for r in result.get("results", []):
+        parsed = urlparse((r.get("url", "") or "").split("?")[0])
+        domain = _strip_www(parsed.netloc).lower()
+        if not domain or any(domain == d or domain.endswith("." + d)
+                             for d in _NON_OFFICIAL_DOMAINS):
+            continue
+        home = f"{parsed.scheme or 'https'}://{parsed.netloc}"
+        if home not in seen:
+            seen.add(home); unique.append(home)
+
+    if not unique:
+        return ""
+    if len(unique) == 1:
+        return unique[0]
+    # Multiple candidates — let Claude pick the one that's actually this company.
+    try:
+        resp = client.messages.create(
+            model=CLAUDE_MODEL, max_tokens=100,
+            messages=[{"role": "user", "content": (
+                f"Which of these is the official homepage of the company {company_name!r}?\n"
+                f"Options: {unique}\n"
+                f'Return JSON: {{"url": "https://..."}} — or {{"url": ""}} if none clearly match.\n'
+                f"Return only valid JSON."
+            )}],
+        )
+        chosen = json.loads(_strip_json_fence(resp.content[0].text)).get("url", "")
+        return chosen if chosen in unique else unique[0]
+    except Exception:
+        return unique[0]
+
+
 def find_linkedin_url(company_name: str, website: str,
                       client: anthropic.Anthropic) -> str:
     """Extract LinkedIn company URL by fetching the homepage via Jina Reader
@@ -308,10 +376,10 @@ def find_linkedin_url(company_name: str, website: str,
             if resp.ok:
                 jina_text = resp.text
                 slugs = re.findall(pattern, jina_text)
-                # Remove duplicates, keep order
+                # Remove duplicates + generic junk slugs, keep order
                 seen, unique = set(), []
                 for s in slugs:
-                    if s not in seen:
+                    if s not in seen and s.lower() not in _JUNK_LI_SLUGS:
                         seen.add(s); unique.append(s)
                 if unique:
                     # Prefer slug that matches domain prefix
@@ -332,9 +400,12 @@ def find_linkedin_url(company_name: str, website: str,
             summary_question=f"What is the LinkedIn company page URL for {company_name} ({domain})?",
         )
         li_urls = [
-            r.get("url", "").split("?")[0].rstrip("/")
-            for r in result.get("results", [])
-            if "linkedin.com/company/" in r.get("url", "")
+            u for u in (
+                r.get("url", "").split("?")[0].rstrip("/")
+                for r in result.get("results", [])
+                if "linkedin.com/company/" in r.get("url", "")
+            )
+            if _is_real_company_li(u)
         ]
         if not li_urls:
             return ""
@@ -1144,6 +1215,18 @@ def main() -> None:
                 written[name] = value
 
         # ── Step 1: Website scrape ────────────────────────────────────────────
+        # No URL given? Find the official site from the name first, so every
+        # website-derived step below still has something to work with.
+        if not website:
+            print("  [1] No website URL — searching for the official site...")
+            website = find_official_site(competitor, client)
+            if website:
+                print(f"    → found {website}")
+                if url_col is not None:
+                    backend.write_cell(row_num, url_col, website)
+            else:
+                print("    → none found; continuing without a website")
+
         scraped: dict = {}
         if website:
             print("  [1] Scraping website...")
@@ -1151,7 +1234,7 @@ def main() -> None:
             pages = len(scraped.get("full_text_by_page", {}))
             print(f"    → {pages} pages scraped")
         else:
-            print("  [1] No website URL — skipping scrape")
+            print("  [1] Skipping scrape")
 
         # ── Steps 2–10: independent enrichment ────────────────────────────────
         # These depend only on the company name / website / scraped pages, not on

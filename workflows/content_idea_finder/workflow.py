@@ -615,28 +615,28 @@ def write_outputs(ideas: List[Dict], store: TabularStore, run_date: str) -> str:
         json.dump({"date": run_date, "ideas": ideas}, f, indent=2, ensure_ascii=False)
     print(f"  Local JSON → {local_path}")
 
-    store.ensure_headers(SHEET_HEADERS)
-
-    rows: List[List[str]] = []
+    rows: List[Dict[str, str]] = []
     for idea in ideas:
         all_urls = (
             [q["url"] for q in idea.get("source_quotes", []) if q.get("url")] +
             [cv["url"] for cv in idea.get("creator_views", []) if cv.get("url")]
         )
-        rows.append([
-            run_date,
-            idea.get("idea_id", ""),
-            idea.get("topic", ""),
-            idea.get("genre", ""),
-            idea.get("content_type", ""),
-            idea.get("platform", ""),
-            idea.get("why_now", ""),
-            idea.get("suggested_angle", ""),
-            "\n".join(all_urls),
-            idea.get("hook", ""),
-            idea.get("body", ""),
-        ])
-    store.append(rows)
+        rows.append({
+            "Date": run_date,
+            "Idea ID": idea.get("idea_id", ""),
+            "Topic": idea.get("topic", ""),
+            "Genre": idea.get("genre", ""),
+            "Content Type": idea.get("content_type", ""),
+            "Platform": idea.get("platform", ""),
+            "Why Now": idea.get("why_now", ""),
+            "Suggested Angle": idea.get("suggested_angle", ""),
+            "Source URLs": "\n".join(all_urls),
+            "Hook": idea.get("hook", ""),
+            "Body": idea.get("body", ""),
+        })
+    # Map by header name (not fixed position) so rows land in the right columns
+    # even if the target tab already has a different column order.
+    store.append_mapped(SHEET_HEADERS, rows)
     print(f"  {store.label()} ← {len(rows)} rows appended")
 
     return local_path
