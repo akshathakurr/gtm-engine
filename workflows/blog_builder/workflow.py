@@ -297,13 +297,12 @@ def fetch_reference_posts(
             print(f"  {name}: skipped (no domain)")
             continue
         try:
-            results = exa_client.search_and_contents(
+            results = exa_client.search(
                 topic_hint,
                 include_domains=[domain],
                 num_results=num_per_company,
                 type="fast",
-                text=True,
-                highlights=True,
+                contents={"text": True, "highlights": True},
                 start_published_date=cutoff,
             )
             for r in results.results:
@@ -332,11 +331,11 @@ def fetch_topic_posts(
 
     for q in queries:
         try:
-            results = exa_client.search_and_contents(
+            results = exa_client.search(
                 q,
                 num_results=num_per_query,
                 type="fast",
-                text=True,
+                contents={"text": True},
                 start_published_date=cutoff,
             )
             for r in results.results:
