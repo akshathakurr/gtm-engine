@@ -8,9 +8,9 @@ Search LinkedIn posts by keyword. Useful for intent signals, competitor monitori
 
 ## Actor
 
-`apimaestro/linkedin-posts-search-scraper-no-cookies`
+`harvestapi/linkedin-post-search`
 
-**Cost:** $0.005/post on Apify free tier. For 20 posts = ~$0.10/search.
+**Cost:** $0.002/post on Apify free tier. For 20 posts = ~$0.10/search.
 
 ---
 
@@ -21,7 +21,7 @@ Search LinkedIn posts by keyword. Useful for intent signals, competitor monitori
 | `keyword` | string | required | Search term. Supports hashtags (`#saas`), phrases, keywords. |
 | `sort` | string | `"date_posted"` | `"date_posted"` (newest first) or `"relevance"` |
 | `max_posts` | int | 20 | Max posts to return |
-| `date_filter` | string \| null | null | Optional date filter (undocumented by actor — leave null) |
+| `date_filter` | string \| null | null | Optional time window — one of `1h`, `24h`, `week`, `month` (leave null for no filter) |
 
 ## Outputs
 
@@ -56,6 +56,6 @@ results = search_linkedin_posts_batch(
 
 - `sort="date_posted"` gives newest posts first — best for intent signal monitoring.
 - `sort="relevance"` gives best match — best for research on a topic.
-- The actor paginates in pages of 50. `max_posts` caps client-side.
-- Each post costs $0.005. Keep `max_posts` ≤ 20 for day-to-day use.
+- `max_posts` is enforced server-side via the actor's `maxPosts` input (no pagination loop).
+- Each post costs $0.002. Keep `max_posts` ≤ 20 for day-to-day use.
 - `total_available` shows how many posts LinkedIn has for the query (often hundreds).

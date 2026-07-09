@@ -13,7 +13,14 @@ from scrapers._apify import dataset_items, ApifyRunError  # noqa: E402
 # Suppress verbose Apify actor log streaming
 logging.getLogger("apify_client").setLevel(logging.WARNING)
 
-ACTOR_ID = "supreme_coder/linkedin-profile-scraper"
+# Swapped 2026-07-09 (twice): supreme_coder died actor-side → apimaestro batch
+# ($5/1k) → harvestapi ($4/1k, 27k+ users, no cookies). Same output contract.
+ACTOR_ID = "harvestapi/linkedin-profile-scraper"
+_SCRAPER_MODE = "Profile details no email ($4 per 1k)"
+
+_MONTHS = {m: i for i, m in enumerate(
+    ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], 1)}
 
 
 def scrape_linkedin_profiles(profile_urls: list[str], max_profiles: int = 10) -> dict:
@@ -35,9 +42,7 @@ def scrape_linkedin_profiles(profile_urls: list[str], max_profiles: int = 10) ->
 
     client = ApifyClient(api_token)
 
-    actor_input = {
-        "urls": [{"url": u} for u in urls],
-    }
+    actor_input = {"queries": urls, "profileScraperMode": _SCRAPER_MODE}
 
     print(f"Scraping {len(urls)} LinkedIn profile(s)...")
     run = client.actor(ACTOR_ID).call(run_input=actor_input)
@@ -55,53 +60,51 @@ def scrape_linkedin_profiles(profile_urls: list[str], max_profiles: int = 10) ->
     errors = []
 
     for item in raw_items:
-        if item.get("error") or not item.get("inputUrl"):
+        if item.get("error") or not item.get("linkedinUrl"):
             errors.append({
-                "url": item.get("inputUrl", "unknown"),
+                "url": item.get("linkedinUrl") or item.get("query", "unknown"),
                 "reason": item.get("error", "No data returned")
             })
             continue
 
-        # Current role
-        positions_raw = item.get("positions") or []
+        # Current role — the actor exposes it directly.
+        current = (item.get("currentPosition") or [{}])[0]
         current_company = None
-        if positions_raw:
-            first = positions_raw[0]
+        if current.get("companyName") or current.get("position"):
             current_company = {
-                "name": first.get("company", {}).get("name") or item.get("companyName"),
-                "title": first.get("title") or item.get("jobTitle")
+                "name": current.get("companyName"),
+                "title": current.get("position") or item.get("headline"),
             }
 
         work_history = [
             {
-                "title": pos.get("title"),
-                "company": pos.get("company", {}).get("name"),
-                "location": pos.get("locationName"),
-                "start_date": _format_date(pos.get("timePeriod", {}).get("startDate")),
-                "end_date": _format_date(pos.get("timePeriod", {}).get("endDate")),
+                "title": pos.get("position"),
+                "company": pos.get("companyName"),
+                "location": pos.get("location"),
+                "start_date": _format_date(pos.get("startDate")),
+                "end_date": _format_date(pos.get("endDate")),
                 "description": pos.get("description")
             }
-            for pos in positions_raw
+            for pos in (item.get("experience") or [])
         ]
 
-        education_raw = item.get("educations") or []
         education = [
             {
                 "school": edu.get("schoolName"),
-                "degree": edu.get("degreeName"),
+                "degree": edu.get("degree"),
                 "field_of_study": edu.get("fieldOfStudy"),
-                "start_date": _format_date(edu.get("timePeriod", {}).get("startDate")),
-                "end_date": _format_date(edu.get("timePeriod", {}).get("endDate"))
+                "start_date": _format_date(edu.get("startDate")),
+                "end_date": _format_date(edu.get("endDate"))
             }
-            for edu in education_raw
+            for edu in (item.get("education") or [])
         ]
 
         profiles.append({
-            "url": item.get("inputUrl"),
+            "url": item.get("linkedinUrl"),
             "full_name": f"{item.get('firstName', '')} {item.get('lastName', '')}".strip(),
             "headline": item.get("headline"),
-            "about": item.get("summary"),
-            "location": item.get("geoLocationName"),
+            "about": item.get("about"),
+            "location": (item.get("location") or {}).get("linkedinText"),
             "current_company": current_company,
             "work_history": work_history,
             "education": education
@@ -115,11 +118,16 @@ def scrape_linkedin_profiles(profile_urls: list[str], max_profiles: int = 10) ->
 
 
 def _format_date(date_obj: Optional[dict]) -> Optional[str]:
-    """Converts Apify date object {year, month} to 'YYYY-MM' string."""
+    """Converts actor date object {year, month} to 'YYYY-MM' string.
+
+    The actor returns month as a short name ("Feb") — older actors used ints;
+    accept both."""
     if not date_obj:
         return None
     year = date_obj.get("year")
     month = date_obj.get("month")
+    if isinstance(month, str):
+        month = _MONTHS.get(month[:3].title())
     if year and month:
         return f"{year}-{int(month):02d}"
     if year:

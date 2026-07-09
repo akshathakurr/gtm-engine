@@ -1,33 +1,229 @@
 [
-  {
-    "activity_urn": "7447507829911056384",
-    "full_urn": "urn:li:activity:7447455996010004480",
-    "post_url": "https://www.linkedin.com/posts/sarah-friar_3m-people-are-now-using-codex-every-week-activity-7447455996010004480-vsYO?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGRcdJMB1mKykUlBV3BXU2S1RXX9oearzPg",
-    "text": "3M people are now using Codex every week, up from 2M just last month.\nThat pace of growth says something important: software creation is changing fast. Codex is helping developers move faster, but it’s also making it possible for many more people to build. Agents are no longer just writing snippets of code. They’re taking on real work, handling longer-running tasks, and giving builders more leverage from idea to implementation.\n\nTo celebrate this milestone, we’re resetting Codex rate limits today so builders can keep building. And we’ll do it again for every additional 1M weekly users until we reach 10M.\n\nThis is one of the advantages of OpenAI’s long-term investment in compute: we can be more generous with builders, and pass that capacity on to the people creating with our tools.\n\nHuge kudos to Thibault Sottiaux and the incredible Codex team at OpenAI.\n\nLet’s go build!",
-    "posted_at": {
-      "relative": "1d",
-      "is_edited": false,
-      "date": "2026-04-08 06:57:14",
-      "timestamp": 1775624234655
+ {
+  "type": "post",
+  "id": "7480629847501828096",
+  "linkedinUrl": "https://www.linkedin.com/posts/google_meet-irakli-a-recent-university-graduate-activity-7480629847501828096-ctdU",
+  "content": "Meet Irakli, a recent university graduate who works as a Software Engineer for Google Health in London. His team works on Fitbit\u2019s Personal Health Assistant, a Gemini-powered AI coach designed to create deeply customized fitness, sleep and nutrition plans for users worldwide.\n\nFor him, finding your niche is all about having the flexibility to explore different spaces early on. \u201cThe best thing here is the opportunity to work on different things, which is really nice for helping you find yourself at the start of your career,\u201d he explains.\n\nWant to build AI that impacts everyday well-being like Irakli does? Explore our open student and early career roles \u2192 https://goo.gle/4vOpWSf",
+  "contentAttributes": [
+   {
+    "start": 662,
+    "length": 23,
+    "type": "TEXT_LINK",
+    "hyperlink": null,
+    "textLink": "https://goo.gle/4vOpWSf"
+   }
+  ],
+  "author": {
+   "id": "1441",
+   "universalName": "google",
+   "publicIdentifier": null,
+   "type": "company",
+   "name": "Google",
+   "linkedinUrl": "https://www.linkedin.com/company/google/posts",
+   "info": "42,068,326 followers",
+   "website": null,
+   "websiteLabel": null,
+   "avatar": {
+    "url": "https://media.licdn.com/dms/image/v2/D4E0BAQGv3cqOuUMY7g/company-logo_400_400/B4EZmhegXHGcAc-/0/1759350753990/google_logo?e=1785369600&v=beta&t=p7A1YBgSuGT4exdCSB34OAm9zcQb_oPBvtUwBRsctZM",
+    "width": 400,
+    "height": 400
+   },
+   "urn": "1441"
+  },
+  "postedAt": {
+   "timestamp": 1783521139026,
+   "date": "2026-07-08T14:32:19.026Z",
+   "postedAgoShort": "20h",
+   "postedAgoText": "20 hours ago \u2022 Edited \u2022 Visible to anyone on or off LinkedIn"
+  },
+  "postImages": [
+   {
+    "url": "https://media.licdn.com/dms/image/v2/D4E10AQEJQbReRQ7kAA/image-shrink_1280/B4EZ9CJKs3HkAc-/0/1783521127828?e=1784203200&v=beta&t=_6lwuIKKWS7ooXy_iIV7h0D5raTGVRB9fi7bogcUZeQ",
+    "width": 1280,
+    "height": 1706
+   },
+   {
+    "url": "https://media.licdn.com/dms/image/v2/D4E10AQGFFkT8UlMuVw/image-shrink_1280/B4EZ9CJK3HKoAg-/0/1783521128500?e=1784203200&v=beta&t=DYOw2kOfcSNKm47eU2i7tKT0y7kxbcskYKYpb_W7Gnc",
+    "width": 1280,
+    "height": 2269
+   }
+  ],
+  "socialContent": {
+   "hideCommentsCount": false,
+   "hideReactionsCount": false,
+   "hideSocialActivityCounts": false,
+   "hideShareAction": true,
+   "hideSendAction": true,
+   "hideRepostsCount": false,
+   "hideViewsCount": false,
+   "trustInterventionBanner": null,
+   "hideReactAction": false,
+   "hideCommentAction": false,
+   "shareUrl": "https://www.linkedin.com/posts/google_meet-irakli-a-recent-university-graduate-activity-7480629847501828096-ctdU?",
+   "showContributionExperience": false,
+   "showSocialDetail": true
+  },
+  "comments": [],
+  "header": {
+   "text": null
+  },
+  "entityId": "7480629847501828096",
+  "shareUrn": "urn:li:ugcPost:7480629846730063872",
+  "shareLinkedinUrl": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7480629846730063872",
+  "engagement": {
+   "id": "7480629846730063872",
+   "likes": 828,
+   "comments": 58,
+   "shares": 12,
+   "reactions": [
+    {
+     "type": "LIKE",
+     "count": 744
     },
-    "post_language_code": "en",
-    "post_type": "repost",
-    "author": {
-      "name": "Sarah Friar",
-      "company_url": "https://www.linkedin.com/in/sarah-friar?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAADgJCoBRsbjab0VxrIp_ohQlgMVypXBA60"
+    {
+     "type": "EMPATHY",
+     "count": 40
     },
-    "stats": {
-      "total_reactions": 1265,
-      "like": 1024,
-      "support": 7,
-      "love": 120,
-      "insight": 10,
-      "celebrate": 104,
-      "comments": 95,
-      "reposts": 62
+    {
+     "type": "PRAISE",
+     "count": 31
     },
-    "media": {},
-    "document": null,
-    "source_company": "openai"
+    {
+     "type": "APPRECIATION",
+     "count": 11
+    },
+    {
+     "type": "INTEREST",
+     "count": 2
+    }
+   ]
+  },
+  "reactions": [],
+  "reactionIds": [],
+  "commentIds": [],
+  "query": {
+   "sortBy": "date",
+   "page": "1",
+   "targetUrl": "https://www.linkedin.com/company/google",
+   "sessionId": "1a48987a-388b-4938-a5bd-950b34979923"
   }
+ },
+ {
+  "type": "post",
+  "id": "7480375037418565632",
+  "linkedinUrl": "https://www.linkedin.com/posts/google_meet-wei-a-forward-deployed-engineer-fde-activity-7480375037418565632-5vVV",
+  "content": "Meet Wei, a Forward Deployed Engineer (FDE) at Google Singapore. Wei built his career in AI by teaching himself machine learning with open-source tools. Today, he uses that proactive curiosity to bring advanced cloud technology directly to global businesses \u2014 like a recent project co-building safety guardrails for a bank\u2019s generative AI financial products. \n\nBy collaborating with internal Product and Engineering teams, Wei turns customer feedback into upgraded product features. He credits his supportive Singapore office community with keeping his well-being balanced and confidence high. \"I might not know everything, but knowing there is always someone around who can help gives me the confidence to tackle new technical challenges,\u201d he says. And to stay ahead in a fast-moving field, he shares that continuous learning is non-negotiable. \n\nWant to build cutting-edge AI tools with a team that always has your back? Join our collaborative community in Singapore and explore open Forward Deployed Engineering positions today \u2192 https://goo.gle/3PUwMWc",
+  "contentAttributes": [
+   {
+    "start": 1033,
+    "length": 23,
+    "type": "TEXT_LINK",
+    "hyperlink": null,
+    "textLink": "https://goo.gle/3PUwMWc"
+   }
+  ],
+  "author": {
+   "id": "1441",
+   "universalName": "google",
+   "publicIdentifier": null,
+   "type": "company",
+   "name": "Google",
+   "linkedinUrl": "https://www.linkedin.com/company/google/posts",
+   "info": "42,068,326 followers",
+   "website": null,
+   "websiteLabel": null,
+   "avatar": {
+    "url": "https://media.licdn.com/dms/image/v2/D4E0BAQGv3cqOuUMY7g/company-logo_400_400/B4EZmhegXHGcAc-/0/1759350753990/google_logo?e=1785369600&v=beta&t=p7A1YBgSuGT4exdCSB34OAm9zcQb_oPBvtUwBRsctZM",
+    "width": 400,
+    "height": 400
+   },
+   "urn": "1441"
+  },
+  "postedAt": {
+   "timestamp": 1783460387568,
+   "date": "2026-07-07T21:39:47.568Z",
+   "postedAgoShort": "1d",
+   "postedAgoText": "1 day ago \u2022 Visible to anyone on or off LinkedIn"
+  },
+  "postImages": [
+   {
+    "url": "https://media.licdn.com/dms/image/v2/D4E10AQEIOmSF-tVfCQ/image-shrink_1280/B4EZ8.hc_fKoAo-/0/1783460385061?e=1784203200&v=beta&t=_gga4U_x68kHWNRKK15iKOOkB-rimqeMOGgDieu3sec",
+    "width": 1080,
+    "height": 1350
+   },
+   {
+    "url": "https://media.licdn.com/dms/image/v2/D4E10AQFbrRhIz9z9Tg/image-shrink_1280/B4EZ8.hdKAIAAc-/0/1783460385799?e=1784203200&v=beta&t=eY7U8YGAj-ED816geNzEj14zNNvjeJtk72AmiekE_Yk",
+    "width": 1080,
+    "height": 1350
+   },
+   {
+    "url": "https://media.licdn.com/dms/image/v2/D4E10AQHApzbYA1tMiw/image-shrink_1280/B4EZ8.hdP.HoAc-/0/1783460386045?e=1784203200&v=beta&t=OpIKSvYUbv6SWsN2zjtqOLqN9Z7cs6hU0fp0DAqNXkE",
+    "width": 1080,
+    "height": 1350
+   }
+  ],
+  "socialContent": {
+   "hideCommentsCount": false,
+   "hideReactionsCount": false,
+   "hideSocialActivityCounts": false,
+   "hideShareAction": true,
+   "hideSendAction": true,
+   "hideRepostsCount": false,
+   "hideViewsCount": false,
+   "trustInterventionBanner": null,
+   "hideReactAction": false,
+   "hideCommentAction": false,
+   "shareUrl": "https://www.linkedin.com/posts/google_meet-wei-a-forward-deployed-engineer-fde-activity-7480375037418565632-5vVV?",
+   "showContributionExperience": false,
+   "showSocialDetail": true
+  },
+  "comments": [],
+  "header": {
+   "text": null
+  },
+  "entityId": "7480375037418565632",
+  "shareUrn": "urn:li:ugcPost:7480375034847465472",
+  "shareLinkedinUrl": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7480375034847465472",
+  "engagement": {
+   "id": "7480375034847465472",
+   "likes": 305,
+   "comments": 48,
+   "shares": 11,
+   "reactions": [
+    {
+     "type": "LIKE",
+     "count": 278
+    },
+    {
+     "type": "EMPATHY",
+     "count": 10
+    },
+    {
+     "type": "PRAISE",
+     "count": 8
+    },
+    {
+     "type": "APPRECIATION",
+     "count": 4
+    },
+    {
+     "type": "INTEREST",
+     "count": 3
+    },
+    {
+     "type": "ENTERTAINMENT",
+     "count": 2
+    }
+   ]
+  },
+  "reactions": [],
+  "reactionIds": [],
+  "commentIds": [],
+  "query": {
+   "sortBy": "date",
+   "page": "1",
+   "targetUrl": "https://www.linkedin.com/company/google",
+   "sessionId": "1a48987a-388b-4938-a5bd-950b34979923"
+  }
+ }
 ]

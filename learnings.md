@@ -33,10 +33,10 @@ Every scraper folder must have these 7 files before it's considered done:
 ## Scrapers Built
 
 ### LinkedIn Profile Scraper ✅
-- **Apify actor:** `supreme_coder/linkedin-profile-scraper`
-- **Cost:** $0.003/profile
-- **Key fields:** `inputUrl`, `firstName`, `lastName`, `headline`, `summary`, `geoLocationName`, `jobTitle`, `companyName`, `positions[]`, `educations[]`
-- **Position date format:** `timePeriod.startDate` / `timePeriod.endDate` → `{year, month}`
+- **Apify actor:** `harvestapi/linkedin-profile-scraper` (swapped 2026-07-09 from `apimaestro`, itself from `supreme_coder`; apimaestro is the known-good fallback)
+- **Cost:** $4/1k profiles (~$0.004/profile)
+- **Key fields:** `firstName`, `lastName`, `headline`, `location`, `about`, `experience[]`, `education[]`
+- **Position date format:** actor returns month as short name ("Feb"); parsed to `YYYY-MM`
 - **No cookies required**
 
 ---

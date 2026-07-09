@@ -11,8 +11,8 @@ Fetches posts and activity from a LinkedIn user's profile, ordered newest to old
 - Unique `urn` per post for deduplication across runs
 
 ## Apify Actor
-**ID:** `apimaestro/linkedin-profile-posts`
-**Cost:** ~$5 per 1,000 posts
+**ID:** `harvestapi/linkedin-profile-posts`
+**Cost:** ~$2 per 1,000 posts
 **Login required:** No — works on public profiles without LinkedIn cookies
 **Posts per API call:** 100
 
@@ -91,5 +91,5 @@ Key output fields per post:
 ## Notes
 - Only scrapes publicly visible posts
 - Posts are returned newest → oldest
-- The actor fetches 100 posts per page; the scraper paginates automatically
+- The actor caps results server-side via `maxPosts` (and an optional date cutoff), so there's no pagination loop
 - To avoid duplicate posts across runs, track seen `urn` values

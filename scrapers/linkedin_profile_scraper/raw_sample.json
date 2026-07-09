@@ -1,221 +1,829 @@
-{
-  "connectionType": "",
-  "pictureUrl": {
-    "100x100": "https://media.licdn.com/dms/image/v2/C5603AQHHUuOSlRVA1w/profile-displayphoto-shrink_100_100/profile-displayphoto-shrink_100_100/0/1579726625423?e=1784764800&v=beta&t=w5eNTh36A2PSL_SFxqEIgzg6yg8dlR8fkmNRHRPCprw",
-    "200x200": "https://media.licdn.com/dms/image/v2/C5603AQHHUuOSlRVA1w/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1579726625398?e=1784764800&v=beta&t=V03wpOnoxLwK32J-rOChBlPQiGITn_h6eqZT5mPRHRo",
-    "400x400": "https://media.licdn.com/dms/image/v2/C5603AQHHUuOSlRVA1w/profile-displayphoto-shrink_400_400/profile-displayphoto-shrink_400_400/0/1579726625448?e=1784764800&v=beta&t=V5yn3kuFjuKqmWJJ_fm2JTqOdlu4nNTNJDOIWebfPsc",
-    "800x800": "https://media.licdn.com/dms/image/v2/C5603AQHHUuOSlRVA1w/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1579726625483?e=1784764800&v=beta&t=7VP31YKWPD8fOz2x3jnSbNBAxMxqW_1KJUhKIJaV3yw"
+[
+ {
+  "id": "ACoAAAEkwwAB9KEc2TrQgOLEQ-vzRyZeCDyc6DQ",
+  "publicIdentifier": "satyanadella",
+  "linkedinUrl": "https://www.linkedin.com/in/satyanadella",
+  "firstName": "Satya",
+  "lastName": "Nadella",
+  "emails": [],
+  "headline": "Chairman and CEO at Microsoft",
+  "openToWork": false,
+  "hiring": false,
+  "premium": true,
+  "influencer": true,
+  "memorialized": false,
+  "creator": true,
+  "location": {
+   "linkedinText": "Redmond, Washington, United States",
+   "countryCode": "US",
+   "parsed": {
+    "text": "Redmond, WA, United States",
+    "countryCode": "US",
+    "regionCode": null,
+    "country": "United States",
+    "countryFull": "United States of America",
+    "state": "Washington",
+    "city": "Redmond"
+   }
   },
-  "coverImageUrl": {},
-  "jobTitle": "Chairman and CEO",
-  "summary": "As chairman and CEO of Microsoft, I define my mission and that of my company as empowering every person and every organization on the planet to achieve more.",
-  "positions": [
-    {
-      "title": "Chairman and CEO",
-      "locationName": "Greater Seattle Area",
-      "timePeriod": {
-        "startDate": {
-          "month": 2,
-          "year": 2014
-        },
-        "endDate": null
-      },
-      "totalDuration": "12 yrs 6 mos",
-      "description": "",
-      "company": {
-        "url": "https://www.linkedin.com/company/1035/",
-        "name": "Microsoft",
-        "logo": {
-          "100x100": "https://media.licdn.com/dms/image/v2/D560BAQH32RJQCl3dDQ/company-logo_100_100/B56ZYQ0mrGGoAU-/0/1744038948046/microsoft_logo?e=1784764800&v=beta&t=3MVeFwy4IE8doZUZRN7vVxkvvHNe0SWwwlz7Qm4RhSs",
-          "200x200": "https://media.licdn.com/dms/image/v2/D560BAQH32RJQCl3dDQ/company-logo_200_200/B56ZYQ0mrGGoAM-/0/1744038948046/microsoft_logo?e=1784764800&v=beta&t=I54vEQDfZhkhNp4TWJPG3VvUk8uLYMv3oOR3y5JPQyA",
-          "400x400": "https://media.licdn.com/dms/image/v2/D560BAQH32RJQCl3dDQ/company-logo_400_400/B56ZYQ0mrGGoAc-/0/1744038948046/microsoft_logo?e=1784764800&v=beta&t=DhpFophiVi5zm0ne4pSzjITIw6oQBW7rWKHeyyqLl9k"
-        }
-      }
+  "objectUrn": "19186432",
+  "registeredAt": "2007-12-14T20:35:02.000Z",
+  "topSkills": [],
+  "connectionsCount": 831,
+  "followerCount": 12059446,
+  "verified": true,
+  "about": "As chairman and CEO of Microsoft, I define my mission and that of my company as empowering every person and every organization on the planet to achieve more.",
+  "currentPosition": [
+   {
+    "position": "Chairman and CEO",
+    "location": "Greater Seattle Area",
+    "employmentType": null,
+    "workplaceType": null,
+    "companyName": "Microsoft",
+    "companyLinkedinUrl": "https://www.linkedin.com/company/microsoft/",
+    "companyId": "1035",
+    "duration": "12 yrs 6 mos",
+    "description": null,
+    "skills": null,
+    "startDate": {
+     "month": "Feb",
+     "year": 2014,
+     "text": "Feb 2014"
     },
-    {
-      "title": "Member Board Of Trustees",
-      "locationName": "",
-      "timePeriod": {
-        "startDate": {
-          "year": 2018
-        },
-        "endDate": null
-      },
-      "totalDuration": "8 yrs 7 mos",
-      "description": "",
-      "company": {
-        "url": "https://www.linkedin.com/company/3881/",
-        "name": "University of Chicago",
-        "logo": {
-          "200x200": "https://media.licdn.com/dms/image/v2/C4D0BAQHbp_dv8CAlpQ/company-logo_200_200/company-logo_200_200/0/1630577480920/uchicago_logo?e=1784764800&v=beta&t=yloxXGV23yK3-4fXzo_yfUn-Rgn1t8bZ2_J_dcpdeXw",
-          "100x100": "https://media.licdn.com/dms/image/v2/C4D0BAQHbp_dv8CAlpQ/company-logo_100_100/company-logo_100_100/0/1630577480920/uchicago_logo?e=1784764800&v=beta&t=OaSe5Mszl3f0DcZm4f6wOcBfc-X64qyDml7vTVEXuII",
-          "400x400": "https://media.licdn.com/dms/image/v2/C4D0BAQHbp_dv8CAlpQ/company-logo_400_400/company-logo_400_400/0/1630577480920/uchicago_logo?e=1784764800&v=beta&t=fmyidjj2cPNCSaaYovlZsc6SjK_XUPEGXNFCa3xASDI"
-        }
-      }
+    "endDate": {
+     "text": "Present"
     },
-    {
-      "title": "Board Member",
-      "locationName": "",
-      "timePeriod": {
-        "startDate": {
-          "year": 2017
-        },
-        "endDate": {
-          "year": 2024
-        }
+    "companyLogo": {
+     "url": "https://media.licdn.com/dms/image/v2/D560BAQH32RJQCl3dDQ/company-logo_400_400/B56ZYQ0mrGGoAc-/0/1744038948046/microsoft_logo?e=1785369600&v=beta&t=MEO7A07bWVt_6bI4K3NG45Resuli18UBtd6dnfPA-Bg",
+     "sizes": [
+      {
+       "url": "https://media.licdn.com/dms/image/v2/D560BAQH32RJQCl3dDQ/company-logo_400_400/B56ZYQ0mrGGoAc-/0/1744038948046/microsoft_logo?e=1785369600&v=beta&t=MEO7A07bWVt_6bI4K3NG45Resuli18UBtd6dnfPA-Bg",
+       "width": 400,
+       "height": 400
       },
-      "totalDuration": "7 yrs",
-      "description": "",
-      "company": {
-        "url": "https://www.linkedin.com/company/2271/",
-        "name": "Starbucks",
-        "logo": {
-          "200x200": "https://media.licdn.com/dms/image/v2/C4D0BAQEQxk9y2rk7Hw/company-logo_200_200/company-logo_200_200/0/1631316692275?e=1784764800&v=beta&t=ud6fuU5CkhaK-9WKz4iC1IpnAFAGsawzPecxg5NaPW0",
-          "100x100": "https://media.licdn.com/dms/image/v2/C4D0BAQEQxk9y2rk7Hw/company-logo_100_100/company-logo_100_100/0/1631316692276?e=1784764800&v=beta&t=CG7ZkomEE1KUi2UXCCMcs9ziyon2GS06vZcjRUtP3HQ",
-          "400x400": "https://media.licdn.com/dms/image/v2/C4D0BAQEQxk9y2rk7Hw/company-logo_400_400/company-logo_400_400/0/1631316692276?e=1784764800&v=beta&t=yVQAc5AfTbxzUbNFIN392m_dGr5q1eGFtCyhd1KrcIU"
-        }
+      {
+       "url": "https://media.licdn.com/dms/image/v2/D560BAQH32RJQCl3dDQ/company-logo_200_200/B56ZYQ0mrGGoAM-/0/1744038948046/microsoft_logo?e=1785369600&v=beta&t=wxIRk-EOnob_BmK6NsbuSHr3BF7j8jAWtCyWDu5ejdE",
+       "width": 200,
+       "height": 200
+      },
+      {
+       "url": "https://media.licdn.com/dms/image/v2/D560BAQH32RJQCl3dDQ/company-logo_100_100/B56ZYQ0mrGGoAU-/0/1744038948046/microsoft_logo?e=1785369600&v=beta&t=oxZAgoQl4mecoj3294rBVrWXzb70WFdVYdIbGOe6ZnE",
+       "width": 100,
+       "height": 100
       }
+     ]
     },
-    {
-      "title": "Chairman",
-      "locationName": "",
-      "timePeriod": {
-        "startDate": {
-          "year": 2021
-        },
-        "endDate": {
-          "year": 2023
-        }
-      },
-      "totalDuration": "2 yrs",
-      "description": "",
-      "company": {
-        "url": "https://www.linkedin.com/company/5301945/",
-        "name": "The Business Council U.S.",
-        "logo": {
-          "200x200": "https://media.licdn.com/dms/image/v2/C4D0BAQGcnaZNpjMvrw/company-logo_200_200/company-logo_200_200/0/1630557702704/the_business_council_us_logo?e=1784764800&v=beta&t=p9NmH-GP-gkivwPX1th4NQLSHU4YkdHExb_rH6mDGNM",
-          "100x100": "https://media.licdn.com/dms/image/v2/C4D0BAQGcnaZNpjMvrw/company-logo_100_100/company-logo_100_100/0/1630557702704/the_business_council_us_logo?e=1784764800&v=beta&t=EqeJAk3xmEm-mCWkCICULcfARUgLo3p4ix9wNFwOvoc",
-          "400x400": "https://media.licdn.com/dms/image/v2/C4D0BAQGcnaZNpjMvrw/company-logo_400_400/company-logo_400_400/0/1630557702704/the_business_council_us_logo?e=1784764800&v=beta&t=IvboOkmArNg6WdsRTTqoArHekZETST2nXAYIdl3sDKQ"
-        }
-      }
-    },
-    {
-      "title": "Board Member",
-      "locationName": "",
-      "timePeriod": {
-        "startDate": {
-          "year": 2016
-        },
-        "endDate": {
-          "year": 2022
-        }
-      },
-      "totalDuration": "6 yrs",
-      "description": "",
-      "company": {
-        "url": "https://www.linkedin.com/company/7158/",
-        "name": "Fred Hutch",
-        "logo": {
-          "200x200": "https://media.licdn.com/dms/image/v2/D4D0BAQGF4eOou62nvQ/company-logo_200_200/company-logo_200_200/0/1664795263764/fredhutch_logo?e=1784764800&v=beta&t=Qggp7RUiNNhPHduGZmFhs-2m5ewcu1kogohDorPKOVg",
-          "100x100": "https://media.licdn.com/dms/image/v2/D4D0BAQGF4eOou62nvQ/company-logo_100_100/company-logo_100_100/0/1664795263764/fredhutch_logo?e=1784764800&v=beta&t=KbEj6kQgSlKTGPxNw2hMy9zZ-MZMDoePaq1QcYZX4aE",
-          "400x400": "https://media.licdn.com/dms/image/v2/D4D0BAQGF4eOou62nvQ/company-logo_400_400/company-logo_400_400/0/1664795263764/fredhutch_logo?e=1784764800&v=beta&t=EPyxGjNPTOsnz8Mxj_h8TDuRyhT9nTaaGYfG1Db8wvc"
-        }
-      }
-    }
+    "companyUniversalName": "microsoft"
+   }
   ],
-  "educations": [
-    {
-      "schoolLogo": {
-        "200x200": "https://media.licdn.com/dms/image/v2/D560BAQFZO05jhYKSkw/company-logo_200_200/company-logo_200_200/0/1692627816910/universityofchicagoboothschoolofbusiness_logo?e=1784764800&v=beta&t=U3j8cyFRUrdsf75XZCz62QsrsCDQmtDKkhgS888wWVs",
-        "100x100": "https://media.licdn.com/dms/image/v2/D560BAQFZO05jhYKSkw/company-logo_100_100/company-logo_100_100/0/1692627816910/universityofchicagoboothschoolofbusiness_logo?e=1784764800&v=beta&t=qE_Tjez_5LqZbmRd6WWBySRr4NY-UVoOeseqNxoJ0ww",
-        "400x400": "https://media.licdn.com/dms/image/v2/D560BAQFZO05jhYKSkw/company-logo_400_400/company-logo_400_400/0/1692627816910/universityofchicagoboothschoolofbusiness_logo?e=1784764800&v=beta&t=KCtQn4pwJ4FVTpx3Ofm_bizialg4X5bTDtGQV6SNgVw"
+  "profileTopEducation": [
+   {
+    "schoolName": "The University of Chicago Booth School of Business",
+    "schoolLinkedinUrl": "https://www.linkedin.com/company/8398/",
+    "schoolId": "8398",
+    "degree": null,
+    "fieldOfStudy": null,
+    "period": "1994 - 1996",
+    "startDate": {
+     "year": 1994,
+     "text": "1994"
+    },
+    "endDate": {
+     "year": 1996,
+     "text": "1996"
+    },
+    "schoolLogo": {
+     "url": "https://media.licdn.com/dms/image/v2/D560BAQFZO05jhYKSkw/company-logo_400_400/company-logo_400_400/0/1692627816910/universityofchicagoboothschoolofbusiness_logo?e=1785369600&v=beta&t=wpcOuH2M79opuKh0raxNvH1X_iJs0FGgD3a-Cla_cRM",
+     "sizes": [
+      {
+       "url": "https://media.licdn.com/dms/image/v2/D560BAQFZO05jhYKSkw/company-logo_400_400/company-logo_400_400/0/1692627816910/universityofchicagoboothschoolofbusiness_logo?e=1785369600&v=beta&t=wpcOuH2M79opuKh0raxNvH1X_iJs0FGgD3a-Cla_cRM",
+       "width": 400,
+       "height": 400
       },
-      "schoolUrl": "https://www.linkedin.com/company/8398/",
-      "schoolName": "The University of Chicago Booth School of Business",
-      "degreeName": "",
-      "fieldOfStudy": "",
-      "timePeriod": {
-        "startDate": {
-          "year": 1994
-        },
-        "endDate": {
-          "year": 1996
-        }
+      {
+       "url": "https://media.licdn.com/dms/image/v2/D560BAQFZO05jhYKSkw/company-logo_200_200/company-logo_200_200/0/1692627816910/universityofchicagoboothschoolofbusiness_logo?e=1785369600&v=beta&t=Xdx5sSM2sDY3X7Qfb8IZcaVoVCt31oLXqeoyRhZv6vo",
+       "width": 200,
+       "height": 200
+      },
+      {
+       "url": "https://media.licdn.com/dms/image/v2/D560BAQFZO05jhYKSkw/company-logo_100_100/company-logo_100_100/0/1692627816910/universityofchicagoboothschoolofbusiness_logo?e=1785369600&v=beta&t=_YUpaGaS5Mk-1zaNjPnkbaPwV-fFsnJP2eo3G77dYPM",
+       "width": 100,
+       "height": 100
       }
+     ]
+    }
+   }
+  ],
+  "profileActions": [],
+  "profilePicture": {
+   "url": "https://media.licdn.com/dms/image/v2/C5603AQHHUuOSlRVA1w/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1579726625483?e=1785369600&v=beta&t=G7psdTZPl61QfTucjqZ4voK2tEhze1qxpAMHjQxY9Ck",
+   "sizes": [
+    {
+     "url": "https://media.licdn.com/dms/image/v2/C5603AQHHUuOSlRVA1w/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1579726625483?e=1785369600&v=beta&t=G7psdTZPl61QfTucjqZ4voK2tEhze1qxpAMHjQxY9Ck",
+     "width": 800,
+     "height": 800
     },
     {
-      "schoolLogo": {
-        "400x400": "https://media.licdn.com/dms/image/v2/D4D0BAQHodG_7cUqs6w/company-logo_400_400/B4DZ8hC8AUJQAU-/0/1782965846315/manipal_institute_of_technology_logo?e=1784764800&v=beta&t=GckAFLvQqxlANlW7OQRzLhVGjhnETLJ7HoNJVsTX_Ls",
-        "200x200": "https://media.licdn.com/dms/image/v2/D4D0BAQHodG_7cUqs6w/company-logo_200_200/B4DZ8hC8AUJQAE-/0/1782965846314/manipal_institute_of_technology_logo?e=1784764800&v=beta&t=9QJVKOBj2ZGTUlePqb88Ldlqg7LYgLMZEK1cw035DA4",
-        "100x100": "https://media.licdn.com/dms/image/v2/D4D0BAQHodG_7cUqs6w/company-logo_100_100/B4DZ8hC8AUJQAI-/0/1782965846315/manipal_institute_of_technology_logo?e=1784764800&v=beta&t=TuVYbbThWuj9kdDwrlZKBJjXqCNsgVit8IlJNMl1AXA"
-      },
-      "schoolUrl": "https://www.linkedin.com/company/577550/",
-      "schoolName": "Manipal Institute of Technology",
-      "degreeName": "Bachelor’s Degree",
-      "fieldOfStudy": "Electrical Engineering",
-      "timePeriod": {}
+     "url": "https://media.licdn.com/dms/image/v2/C5603AQHHUuOSlRVA1w/profile-displayphoto-shrink_400_400/profile-displayphoto-shrink_400_400/0/1579726625448?e=1785369600&v=beta&t=wZiiZP8DQpzBNaZ060l1_QZ1uzK7YuL2JzDb_yUu1E4",
+     "width": 400,
+     "height": 400
+    },
+    {
+     "url": "https://media.licdn.com/dms/image/v2/C5603AQHHUuOSlRVA1w/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1579726625398?e=1785369600&v=beta&t=6N15KhZem0PP25v6J7OJzxL0Iiqr1wv4HpYvTzXULWA",
+     "width": 200,
+     "height": 200
+    },
+    {
+     "url": "https://media.licdn.com/dms/image/v2/C5603AQHHUuOSlRVA1w/profile-displayphoto-shrink_100_100/profile-displayphoto-shrink_100_100/0/1579726625423?e=1785369600&v=beta&t=z1c4M4zjjYaHbjcWcuDvQ4PmZ22RnQGf2zvn9fF1Fng",
+     "width": 100,
+     "height": 100
     }
+   ]
+  },
+  "coverPicture": {
+   "url": "https://media.licdn.com/dms/image/v2/D5616AQFVwYcBLAcPqQ/profile-displaybackgroundimage-shrink_350_1400/B56Z6tkWeBKAAU-/0/1781028448390?e=1785369600&v=beta&t=zgvTZD8Lx2NVCfYKGEJRk5NX8S_UB2x1SD7QzKzSY9Q",
+   "sizes": [
+    {
+     "url": "https://media.licdn.com/dms/image/v2/D5616AQFVwYcBLAcPqQ/profile-displaybackgroundimage-shrink_350_1400/B56Z6tkWeBKAAU-/0/1781028448390?e=1785369600&v=beta&t=zgvTZD8Lx2NVCfYKGEJRk5NX8S_UB2x1SD7QzKzSY9Q",
+     "width": 1400,
+     "height": 350
+    },
+    {
+     "url": "https://media.licdn.com/dms/image/v2/D5616AQFVwYcBLAcPqQ/profile-displaybackgroundimage-shrink_200_800/B56Z6tkWeBKAAQ-/0/1781028448390?e=1785369600&v=beta&t=C2PPtPYuOHFU-i6d6OURyzBk84clXk0ZIAfuUJefOTU",
+     "width": 800,
+     "height": 200
+    }
+   ]
+  },
+  "photo": "https://media.licdn.com/dms/image/v2/C5603AQHHUuOSlRVA1w/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1579726625483?e=1785369600&v=beta&t=G7psdTZPl61QfTucjqZ4voK2tEhze1qxpAMHjQxY9Ck",
+  "profileLocales": [
+   {
+    "country": "US",
+    "language": "en"
+   }
+  ],
+  "primaryLocale": {
+   "country": "US",
+   "language": "en"
+  },
+  "multiLocaleHeadline": [
+   {
+    "headline": "Chairman and CEO at Microsoft",
+    "locale": "en_US"
+   }
+  ],
+  "services": null,
+  "experience": [
+   {
+    "position": "Chairman and CEO",
+    "location": "Greater Seattle Area",
+    "employmentType": null,
+    "workplaceType": null,
+    "companyName": "Microsoft",
+    "companyLinkedinUrl": "https://www.linkedin.com/company/microsoft/",
+    "companyId": "1035",
+    "duration": "12 yrs 6 mos",
+    "description": null,
+    "skills": null,
+    "startDate": {
+     "month": "Feb",
+     "year": 2014,
+     "text": "Feb 2014"
+    },
+    "endDate": {
+     "text": "Present"
+    },
+    "companyLogo": {
+     "url": "https://media.licdn.com/dms/image/v2/D560BAQH32RJQCl3dDQ/company-logo_400_400/B56ZYQ0mrGGoAc-/0/1744038948046/microsoft_logo?e=1785369600&v=beta&t=MEO7A07bWVt_6bI4K3NG45Resuli18UBtd6dnfPA-Bg",
+     "sizes": [
+      {
+       "url": "https://media.licdn.com/dms/image/v2/D560BAQH32RJQCl3dDQ/company-logo_400_400/B56ZYQ0mrGGoAc-/0/1744038948046/microsoft_logo?e=1785369600&v=beta&t=MEO7A07bWVt_6bI4K3NG45Resuli18UBtd6dnfPA-Bg",
+       "width": 400,
+       "height": 400
+      },
+      {
+       "url": "https://media.licdn.com/dms/image/v2/D560BAQH32RJQCl3dDQ/company-logo_200_200/B56ZYQ0mrGGoAM-/0/1744038948046/microsoft_logo?e=1785369600&v=beta&t=wxIRk-EOnob_BmK6NsbuSHr3BF7j8jAWtCyWDu5ejdE",
+       "width": 200,
+       "height": 200
+      },
+      {
+       "url": "https://media.licdn.com/dms/image/v2/D560BAQH32RJQCl3dDQ/company-logo_100_100/B56ZYQ0mrGGoAU-/0/1744038948046/microsoft_logo?e=1785369600&v=beta&t=oxZAgoQl4mecoj3294rBVrWXzb70WFdVYdIbGOe6ZnE",
+       "width": 100,
+       "height": 100
+      }
+     ]
+    },
+    "companyUniversalName": "microsoft"
+   },
+   {
+    "position": "Member Board Of Trustees",
+    "location": null,
+    "employmentType": null,
+    "workplaceType": null,
+    "companyName": "University of Chicago",
+    "companyLinkedinUrl": "https://www.linkedin.com/company/3881/",
+    "companyId": "3881",
+    "duration": "8 yrs 7 mos",
+    "description": null,
+    "skills": null,
+    "startDate": {
+     "year": 2018,
+     "text": "2018"
+    },
+    "endDate": {
+     "text": "Present"
+    },
+    "companyLogo": {
+     "url": "https://media.licdn.com/dms/image/v2/C4D0BAQHbp_dv8CAlpQ/company-logo_400_400/company-logo_400_400/0/1630577480920/uchicago_logo?e=1785369600&v=beta&t=hNnHdbG-3ipmDdtYF5LkSwN6zynKzhwpTTgbGRQGTX4",
+     "sizes": [
+      {
+       "url": "https://media.licdn.com/dms/image/v2/C4D0BAQHbp_dv8CAlpQ/company-logo_400_400/company-logo_400_400/0/1630577480920/uchicago_logo?e=1785369600&v=beta&t=hNnHdbG-3ipmDdtYF5LkSwN6zynKzhwpTTgbGRQGTX4",
+       "width": 400,
+       "height": 400
+      },
+      {
+       "url": "https://media.licdn.com/dms/image/v2/C4D0BAQHbp_dv8CAlpQ/company-logo_200_200/company-logo_200_200/0/1630577480920/uchicago_logo?e=1785369600&v=beta&t=Uw4fQ_UZfGOculhOzZZgE9CmG1CxKesVWhGVZZoNcKM",
+       "width": 200,
+       "height": 200
+      },
+      {
+       "url": "https://media.licdn.com/dms/image/v2/C4D0BAQHbp_dv8CAlpQ/company-logo_100_100/company-logo_100_100/0/1630577480920/uchicago_logo?e=1785369600&v=beta&t=HesbeAVZUEOaW3Jy0bs4-vbqD7AalQE4RPWoJ3AFNx0",
+       "width": 100,
+       "height": 100
+      }
+     ]
+    }
+   },
+   {
+    "position": "Board Member",
+    "location": null,
+    "employmentType": null,
+    "workplaceType": null,
+    "companyName": "Starbucks",
+    "companyLinkedinUrl": "https://www.linkedin.com/company/starbucks/",
+    "companyId": "2271",
+    "duration": "7 yrs",
+    "description": null,
+    "skills": null,
+    "startDate": {
+     "year": 2017,
+     "text": "2017"
+    },
+    "endDate": {
+     "year": 2024,
+     "text": "2024"
+    },
+    "companyLogo": {
+     "url": "https://media.licdn.com/dms/image/v2/C4D0BAQEQxk9y2rk7Hw/company-logo_400_400/company-logo_400_400/0/1631316692276?e=1785369600&v=beta&t=xtQFAm7aPiPDUho7IP6fXkQ1BpLOMDXKwiL6MPrUYuA",
+     "sizes": [
+      {
+       "url": "https://media.licdn.com/dms/image/v2/C4D0BAQEQxk9y2rk7Hw/company-logo_400_400/company-logo_400_400/0/1631316692276?e=1785369600&v=beta&t=xtQFAm7aPiPDUho7IP6fXkQ1BpLOMDXKwiL6MPrUYuA",
+       "width": 400,
+       "height": 400
+      },
+      {
+       "url": "https://media.licdn.com/dms/image/v2/C4D0BAQEQxk9y2rk7Hw/company-logo_200_200/company-logo_200_200/0/1631316692275?e=1785369600&v=beta&t=QSqdnlvkElSXXtZSQ5ELO1jDyfsbQ3otVOam6JztV94",
+       "width": 200,
+       "height": 200
+      },
+      {
+       "url": "https://media.licdn.com/dms/image/v2/C4D0BAQEQxk9y2rk7Hw/company-logo_100_100/company-logo_100_100/0/1631316692276?e=1785369600&v=beta&t=9uifNvWZQRcj7XWbCuuZq5mAYj9R_pFeIErOLhvQP3k",
+       "width": 100,
+       "height": 100
+      }
+     ]
+    },
+    "companyUniversalName": "starbucks"
+   },
+   {
+    "position": "Chairman",
+    "location": null,
+    "employmentType": null,
+    "workplaceType": null,
+    "companyName": "The Business Council U.S.",
+    "companyLinkedinUrl": "https://www.linkedin.com/company/the-business-council-us/",
+    "companyId": "5301945",
+    "duration": "2 yrs",
+    "description": null,
+    "skills": null,
+    "startDate": {
+     "year": 2021,
+     "text": "2021"
+    },
+    "endDate": {
+     "year": 2023,
+     "text": "2023"
+    },
+    "companyLogo": {
+     "url": "https://media.licdn.com/dms/image/v2/C4D0BAQGcnaZNpjMvrw/company-logo_400_400/company-logo_400_400/0/1630557702704/the_business_council_us_logo?e=1785369600&v=beta&t=7GlxkHQaWi-SUoO7o9cxqctabC4Hpro3NsYSYagAr-A",
+     "sizes": [
+      {
+       "url": "https://media.licdn.com/dms/image/v2/C4D0BAQGcnaZNpjMvrw/company-logo_400_400/company-logo_400_400/0/1630557702704/the_business_council_us_logo?e=1785369600&v=beta&t=7GlxkHQaWi-SUoO7o9cxqctabC4Hpro3NsYSYagAr-A",
+       "width": 400,
+       "height": 400
+      },
+      {
+       "url": "https://media.licdn.com/dms/image/v2/C4D0BAQGcnaZNpjMvrw/company-logo_200_200/company-logo_200_200/0/1630557702704/the_business_council_us_logo?e=1785369600&v=beta&t=IRxGdAJ7XRnB5eiLiFD4KiUITit61fNjGvcPhvM9H1w",
+       "width": 200,
+       "height": 200
+      },
+      {
+       "url": "https://media.licdn.com/dms/image/v2/C4D0BAQGcnaZNpjMvrw/company-logo_100_100/company-logo_100_100/0/1630557702704/the_business_council_us_logo?e=1785369600&v=beta&t=KvNEC7VkTZydURSSOct4MVXQDDSo4goElpuQW2dQeTM",
+       "width": 100,
+       "height": 100
+      }
+     ]
+    },
+    "companyUniversalName": "the-business-council-us"
+   },
+   {
+    "position": "Board Member",
+    "location": null,
+    "employmentType": null,
+    "workplaceType": null,
+    "companyName": "Fred Hutch",
+    "companyLinkedinUrl": "https://www.linkedin.com/company/fredhutch/",
+    "companyId": "7158",
+    "duration": "6 yrs",
+    "description": null,
+    "skills": null,
+    "startDate": {
+     "year": 2016,
+     "text": "2016"
+    },
+    "endDate": {
+     "year": 2022,
+     "text": "2022"
+    },
+    "companyLogo": {
+     "url": "https://media.licdn.com/dms/image/v2/D4D0BAQGF4eOou62nvQ/company-logo_400_400/company-logo_400_400/0/1664795263764/fredhutch_logo?e=1785369600&v=beta&t=-gkrm_Vep8ouaPj1B8IMvKvtsDoqOHZnUuOKIOPEE1s",
+     "sizes": [
+      {
+       "url": "https://media.licdn.com/dms/image/v2/D4D0BAQGF4eOou62nvQ/company-logo_400_400/company-logo_400_400/0/1664795263764/fredhutch_logo?e=1785369600&v=beta&t=-gkrm_Vep8ouaPj1B8IMvKvtsDoqOHZnUuOKIOPEE1s",
+       "width": 400,
+       "height": 400
+      },
+      {
+       "url": "https://media.licdn.com/dms/image/v2/D4D0BAQGF4eOou62nvQ/company-logo_200_200/company-logo_200_200/0/1664795263764/fredhutch_logo?e=1785369600&v=beta&t=s-5fa6oIcj1PCcvkY4IUSCsKCevrptegR1Gvx084gus",
+       "width": 200,
+       "height": 200
+      },
+      {
+       "url": "https://media.licdn.com/dms/image/v2/D4D0BAQGF4eOou62nvQ/company-logo_100_100/company-logo_100_100/0/1664795263764/fredhutch_logo?e=1785369600&v=beta&t=r-lBCpMLQIOczvzaakF449_YSISI4O44oNIrKQk4Kdw",
+       "width": 100,
+       "height": 100
+      }
+     ]
+    },
+    "companyUniversalName": "fredhutch"
+   }
+  ],
+  "education": [
+   {
+    "schoolName": "The University of Chicago Booth School of Business",
+    "schoolLinkedinUrl": "https://www.linkedin.com/company/8398/",
+    "schoolId": "8398",
+    "degree": null,
+    "fieldOfStudy": null,
+    "skills": [],
+    "startDate": {
+     "year": 1994,
+     "text": "1994"
+    },
+    "endDate": {
+     "year": 1996,
+     "text": "1996"
+    },
+    "period": "1994 - 1996",
+    "schoolLogo": {
+     "url": "https://media.licdn.com/dms/image/v2/D560BAQFZO05jhYKSkw/company-logo_400_400/company-logo_400_400/0/1692627816910/universityofchicagoboothschoolofbusiness_logo?e=1785369600&v=beta&t=wpcOuH2M79opuKh0raxNvH1X_iJs0FGgD3a-Cla_cRM",
+     "sizes": [
+      {
+       "url": "https://media.licdn.com/dms/image/v2/D560BAQFZO05jhYKSkw/company-logo_400_400/company-logo_400_400/0/1692627816910/universityofchicagoboothschoolofbusiness_logo?e=1785369600&v=beta&t=wpcOuH2M79opuKh0raxNvH1X_iJs0FGgD3a-Cla_cRM",
+       "width": 400,
+       "height": 400
+      },
+      {
+       "url": "https://media.licdn.com/dms/image/v2/D560BAQFZO05jhYKSkw/company-logo_200_200/company-logo_200_200/0/1692627816910/universityofchicagoboothschoolofbusiness_logo?e=1785369600&v=beta&t=Xdx5sSM2sDY3X7Qfb8IZcaVoVCt31oLXqeoyRhZv6vo",
+       "width": 200,
+       "height": 200
+      },
+      {
+       "url": "https://media.licdn.com/dms/image/v2/D560BAQFZO05jhYKSkw/company-logo_100_100/company-logo_100_100/0/1692627816910/universityofchicagoboothschoolofbusiness_logo?e=1785369600&v=beta&t=_YUpaGaS5Mk-1zaNjPnkbaPwV-fFsnJP2eo3G77dYPM",
+       "width": 100,
+       "height": 100
+      }
+     ]
+    }
+   },
+   {
+    "schoolName": "Manipal Institute of Technology",
+    "schoolLinkedinUrl": "https://www.linkedin.com/company/577550/",
+    "schoolId": "577550",
+    "degree": "Bachelor\u2019s Degree",
+    "fieldOfStudy": "Electrical Engineering",
+    "skills": [],
+    "startDate": null,
+    "endDate": {},
+    "schoolLogo": {
+     "url": "https://media.licdn.com/dms/image/v2/D4D0BAQHodG_7cUqs6w/company-logo_400_400/B4DZ8hC8AUJQAU-/0/1782965846315/manipal_institute_of_technology_logo?e=1785369600&v=beta&t=odWRAYsJ2FnGqeZYaRZbSJrCbrxTAR2wMgzVI5UPksA",
+     "sizes": [
+      {
+       "url": "https://media.licdn.com/dms/image/v2/D4D0BAQHodG_7cUqs6w/company-logo_400_400/B4DZ8hC8AUJQAU-/0/1782965846315/manipal_institute_of_technology_logo?e=1785369600&v=beta&t=odWRAYsJ2FnGqeZYaRZbSJrCbrxTAR2wMgzVI5UPksA",
+       "width": 400,
+       "height": 400
+      },
+      {
+       "url": "https://media.licdn.com/dms/image/v2/D4D0BAQHodG_7cUqs6w/company-logo_200_200/B4DZ8hC8AUJQAE-/0/1782965846314/manipal_institute_of_technology_logo?e=1785369600&v=beta&t=bbhghUszSFubVyoweH817Y-qZkGjKB8xT7kkHP2JM8k",
+       "width": 200,
+       "height": 200
+      },
+      {
+       "url": "https://media.licdn.com/dms/image/v2/D4D0BAQHodG_7cUqs6w/company-logo_100_100/B4DZ8hC8AUJQAI-/0/1782965846315/manipal_institute_of_technology_logo?e=1785369600&v=beta&t=n6R3kc3eRfI0O3tca8b5a94T8NJT7WcFereyMiBsMag",
+       "width": 100,
+       "height": 100
+      }
+     ]
+    }
+   },
+   {
+    "schoolName": "University of Wisconsin-Milwaukee",
+    "schoolLinkedinUrl": "https://www.linkedin.com/company/166690/",
+    "schoolId": "166690",
+    "degree": "Master\u2019s Degree",
+    "fieldOfStudy": "Computer Science",
+    "skills": [],
+    "startDate": null,
+    "endDate": {},
+    "schoolLogo": {
+     "url": "https://media.licdn.com/dms/image/v2/D4D0BAQE47QlO_LG8SQ/company-logo_400_400/company-logo_400_400/0/1729615751602/uwmilwaukee_logo?e=1785369600&v=beta&t=TWcXYY-rOJ6BBsIFvXvPrvWfZAO_Ii77WwhONxomYvI",
+     "sizes": [
+      {
+       "url": "https://media.licdn.com/dms/image/v2/D4D0BAQE47QlO_LG8SQ/company-logo_400_400/company-logo_400_400/0/1729615751602/uwmilwaukee_logo?e=1785369600&v=beta&t=TWcXYY-rOJ6BBsIFvXvPrvWfZAO_Ii77WwhONxomYvI",
+       "width": 400,
+       "height": 400
+      },
+      {
+       "url": "https://media.licdn.com/dms/image/v2/D4D0BAQE47QlO_LG8SQ/company-logo_200_200/company-logo_200_200/0/1729615751602/uwmilwaukee_logo?e=1785369600&v=beta&t=skPuUHnXu594aOOx_9Zm15Nnsc2wZd_1rICXqsWVe8Y",
+       "width": 200,
+       "height": 200
+      },
+      {
+       "url": "https://media.licdn.com/dms/image/v2/D4D0BAQE47QlO_LG8SQ/company-logo_100_100/company-logo_100_100/0/1729615751602/uwmilwaukee_logo?e=1785369600&v=beta&t=VQ0VWCqY2KU75g_3Re5kE8riRAVsC8bkmizcwndgG4A",
+       "width": 100,
+       "height": 100
+      }
+     ]
+    }
+   }
   ],
   "certifications": [],
-  "courses": [],
-  "honors": [],
-  "languages": [],
-  "volunteerExperiences": [],
   "projects": [],
-  "publications": [],
-  "patents": [],
-  "testScores": [],
-  "organizations": [],
-  "volunteerCauses": [],
-  "companyName": "Microsoft",
-  "companyPublicId": "microsoft",
-  "companyLinkedinUrl": "https://www.linkedin.com/company/microsoft/",
-  "currentCompany": {
-    "entityUrn": "urn:li:fsd_company:1035",
-    "name": "Microsoft",
-    "logoResolutionResult": {
-      "url": null,
-      "vectorImage": {
-        "digitalmediaAsset": "urn:li:digitalmediaAsset:D560BAQH32RJQCl3dDQ",
-        "attribution": null,
-        "c2paManifestData": null,
-        "artifacts": [
-          {
-            "width": 100,
-            "fileIdentifyingUrlPathSegment": "100_100/B56ZYQ0mrGGoAU-/0/1744038948046/microsoft_logo?e=1784764800&v=beta&t=3MVeFwy4IE8doZUZRN7vVxkvvHNe0SWwwlz7Qm4RhSs",
-            "expiresAt": 1784764800000,
-            "height": 100
-          },
-          {
-            "width": 200,
-            "fileIdentifyingUrlPathSegment": "200_200/B56ZYQ0mrGGoAM-/0/1744038948046/microsoft_logo?e=1784764800&v=beta&t=I54vEQDfZhkhNp4TWJPG3VvUk8uLYMv3oOR3y5JPQyA",
-            "expiresAt": 1784764800000,
-            "height": 200
-          },
-          {
-            "width": 400,
-            "fileIdentifyingUrlPathSegment": "400_400/B56ZYQ0mrGGoAc-/0/1744038948046/microsoft_logo?e=1784764800&v=beta&t=DhpFophiVi5zm0ne4pSzjITIw6oQBW7rWKHeyyqLl9k",
-            "expiresAt": 1784764800000,
-            "height": 400
-          }
-        ],
-        "rootUrl": "https://media.licdn.com/dms/image/v2/D560BAQH32RJQCl3dDQ/company-logo_"
-      }
-    },
-    "universalName": "microsoft",
-    "url": "https://www.linkedin.com/company/microsoft/"
-  },
-  "followerCount": 12054390,
-  "mutualConnections": [],
-  "isVerified": true,
-  "verificationBadge": "SYS_ICN_VERIFIED_MEDIUM",
-  "availablePremiumFeatures": [
-    "PROFILE_CUSTOM_CTA",
-    "FEATURED_PROFILE_SECTION",
-    "COVER_PHOTO_CAROUSEL"
-  ],
-  "pronunciationUrl": "",
-  "connectionsCount": 831,
+  "volunteering": [],
+  "receivedRecommendations": [],
   "skills": [],
-  "inputUrl": "https://www.linkedin.com/in/satyanadella/"
-}
+  "publications": [],
+  "courses": [],
+  "patents": [],
+  "honorsAndAwards": [],
+  "languages": [],
+  "organizations": [],
+  "causes": [],
+  "featured": {
+   "images": [],
+   "link": null,
+   "title": null,
+   "subtitle": null,
+   "slides": [
+    {
+     "title": "A frontier without an ecosystem is not stable",
+     "subtitle": "snscratchpad.com",
+     "description": null,
+     "url": "https://www.linkedin.com/feed/update/urn:li:activity:7471948728229322753?updateEntityUrn=urn%3Ali%3Afs_feedUpdate%3A%28V2%2Curn%3Ali%3Aactivity%3A7471948728229322753%29",
+     "image": {
+      "url": "https://media.licdn.com/dms/image/sync/v2/D5627AQH2vsHGQX5iVw/articleshare-shrink_1280_800/B56Z7GxuH6JsAg-/0/1781451383636?e=1784203200&v=beta&t=mMPW8JvsNSy_x-bi1mXZdjZD2VatRjgzx_JHJP4gFRU"
+     }
+    },
+    {
+     "title": null,
+     "subtitle": null,
+     "description": null,
+     "url": "https://www.linkedin.com/feed/update/urn:li:activity:7467787167491100672?updateEntityUrn=urn%3Ali%3Afs_feedUpdate%3A%28V2%2Curn%3Ali%3Aactivity%3A7467787167491100672%29",
+     "image": {
+      "url": "https://media.licdn.com/dms/image/v2/D5605AQEJ-6q4Hy_Pcg/videocover-high/B56Z6Low1lHEBM-/0/1780459189021?e=1784203200&v=beta&t=Drmc3cml9sKDLcKUKgi86J6moY9DU-a0kzMMHy0Nw5g"
+     }
+    },
+    {
+     "title": "Copilot's agentic capabilities in Word, Excel, and PowerPoint are generally available | Microsoft 365 Blog",
+     "subtitle": "microsoft.com",
+     "description": null,
+     "url": "https://www.linkedin.com/feed/update/urn:li:activity:7452870230600548352?updateEntityUrn=urn%3Ali%3Afs_feedUpdate%3A%28V2%2Curn%3Ali%3Aactivity%3A7452870230600548352%29",
+     "image": {
+      "url": "https://media.licdn.com/dms/image/sync/v2/D5627AQEpFV8fKxBoYA/articleshare-shrink_1280_800/B4EZ5baeCVK0AY-/0/1779650127755?e=1784203200&v=beta&t=clg5lEg4Wx9StP2U8rNgmhZLmNyvEqvQrkSmBt1bvm8"
+     }
+    },
+    {
+     "title": null,
+     "subtitle": null,
+     "description": null,
+     "url": "https://www.linkedin.com/feed/update/urn:li:activity:7452924970042826753?updateEntityUrn=urn%3Ali%3Afs_feedUpdate%3A%28V2%2Curn%3Ali%3Aactivity%3A7452924970042826753%29",
+     "image": {
+      "url": "https://media.licdn.com/dms/image/v2/D5605AQE8J6uE0kBkkw/feedshare-thumbnail_720_1280/B56Z24btxpIUA0-/0/1776915770269?e=1784203200&v=beta&t=g1vJzKpUMCtWGXLEFt5wNr5EzKsYcpx96VseEHtsAps"
+     }
+    },
+    {
+     "title": null,
+     "subtitle": null,
+     "description": null,
+     "url": "https://www.linkedin.com/feed/update/urn:li:activity:7434963514328387584?updateEntityUrn=urn%3Ali%3Afs_feedUpdate%3A%28V2%2Curn%3Ali%3Aactivity%3A7434963514328387584%29",
+     "image": {
+      "url": "https://media.licdn.com/dms/image/v2/D5605AQFFU-73f82NDQ/videocover-high/B56Zy5L3QaG4BY-/0/1772633424719?e=1784203200&v=beta&t=PnPQQ0I0jxtGaeMRVVpD0BVr9VwGxevrrk6E9l2TExs"
+     }
+    }
+   ]
+  },
+  "composeOptionType": "PREMIUM_INMAIL",
+  "moreProfiles": [
+   {
+    "id": "ACoAAAFJLZwBzRXupAjfllXxLKCQnZyfnkuRDz8",
+    "firstName": "Judson",
+    "lastName": "Althoff",
+    "position": "CEO, Microsoft Commercial Business",
+    "publicIdentifier": "judsonalthoff",
+    "linkedinUrl": "https://www.linkedin.com/in/judsonalthoff"
+   },
+   {
+    "id": "ACoAAA9eyYUBh9JQIB19tmDanxKjRK9p8Nw4FrY",
+    "firstName": "Mustafa",
+    "lastName": "Suleyman",
+    "position": "CEO, Microsoft AI",
+    "publicIdentifier": "mustafa-suleyman",
+    "linkedinUrl": "https://www.linkedin.com/in/mustafa-suleyman"
+   },
+   {
+    "id": "ACoAAAAMjd8BC8bWfqJTi7Mqbv_UkRVFR_2mwzQ",
+    "firstName": "Yusuf",
+    "lastName": "Mehdi",
+    "position": "Executive Vice President & Consumer Chief Marketing Officer        Leading AI, Technology & Business Transformation | Board Director",
+    "publicIdentifier": "yusufmehdi",
+    "linkedinUrl": "https://www.linkedin.com/in/yusufmehdi"
+   },
+   {
+    "id": "ACoAAABodSABOhe_QI3tzsNSAIjYt733cEaaTlo",
+    "firstName": "Takeshi",
+    "lastName": "Numoto",
+    "position": "Executive Vice President & Chief Marketing Officer at Microsoft",
+    "publicIdentifier": "takeshinumoto",
+    "linkedinUrl": "https://www.linkedin.com/in/takeshinumoto"
+   },
+   {
+    "id": "ACoAAAHlijIBydUn0kdExcSMOY25MBj0wIhxegU",
+    "firstName": "Charles",
+    "lastName": "Lamanna",
+    "position": "EVP, Copilot, Agents and Platform at Microsoft",
+    "publicIdentifier": "charleslamanna",
+    "linkedinUrl": "https://www.linkedin.com/in/charleslamanna"
+   },
+   {
+    "id": "ACoAAAGPeLsBi7TKKy_2z8zMkLFLKSuJZFDT2GM",
+    "firstName": "Asha",
+    "lastName": "Sharma",
+    "position": "CEO XBOX",
+    "publicIdentifier": "aboutasha",
+    "linkedinUrl": "https://www.linkedin.com/in/aboutasha"
+   },
+   {
+    "id": "ACoAAA8BYqEBCGLg_vT_ca6mMEqkpp9nVffJ3hc",
+    "firstName": "Bill",
+    "lastName": "Gates",
+    "position": "Chair, Gates Foundation and Founder, Breakthrough Energy",
+    "publicIdentifier": "williamhgates",
+    "linkedinUrl": "https://www.linkedin.com/in/williamhgates"
+   },
+   {
+    "id": "ACoAAAA6VrQB2ICTn4bco-sQn_H8Ib5TrzwlLbU",
+    "firstName": "Julia",
+    "lastName": "Liuson",
+    "position": "President Developer Division at Microsoft",
+    "publicIdentifier": "julia-liuson-6703441",
+    "linkedinUrl": "https://www.linkedin.com/in/julia-liuson-6703441"
+   },
+   {
+    "id": "ACoAAAAPcUQBcv0VAYz5FtuEBJWGa7EDeUpIPkU",
+    "firstName": "Puneet",
+    "lastName": "Chandok",
+    "position": "President Microsoft India & South Asia | Chairman CII AI Council | Lifelong learner | Voice for Responsible AI",
+    "publicIdentifier": "puneetchandok",
+    "linkedinUrl": "https://www.linkedin.com/in/puneetchandok"
+   },
+   {
+    "id": "ACoAAAC6W1ABxdWN664_yXuTMWqEcrJuIi1x9uU",
+    "firstName": "Rajesh",
+    "lastName": "Jha",
+    "position": "Executive Vice President, Experiences + Devices",
+    "publicIdentifier": "rajesh-jha-90010b4",
+    "linkedinUrl": "https://www.linkedin.com/in/rajesh-jha-90010b4"
+   },
+   {
+    "id": "ACoAAAYn8uIBG--3Sm_0rCzr6suByt_eeNGdIus",
+    "firstName": "Dmitrii",
+    "lastName": "Vinogradov",
+    "position": "Head of Ports Solutions Delivery at W\u00e4rtsil\u00e4, PMP\u00ae",
+    "publicIdentifier": "vinograpes",
+    "linkedinUrl": "https://www.linkedin.com/in/vinograpes"
+   },
+   {
+    "id": "ACoAACQGxvEBNuhoB58QKpBHXBg0YxVGQ35fyS0",
+    "firstName": "Bojan",
+    "lastName": "Ran\u010di\u0107",
+    "position": "Structural Engineer - Naval Architect at Salt Ship Design",
+    "publicIdentifier": "bojan-ran%C4%8Di%C4%87-44150614a",
+    "linkedinUrl": "https://www.linkedin.com/in/bojan-ran%C4%8Di%C4%87-44150614a"
+   },
+   {
+    "id": "ACoAAADHaXYBPajqMXfN6iQinXGW4eo7OrkU9e8",
+    "firstName": "Kent",
+    "lastName": "\u00c5strand",
+    "position": "Senior Manager, Strategy at W\u00e4rtsil\u00e4 Marine",
+    "publicIdentifier": "kentastrand",
+    "linkedinUrl": "https://www.linkedin.com/in/kentastrand"
+   },
+   {
+    "id": "ACoAAB6jmbUB9OOT_txvY93tcJhd59a2Ir0MYDo",
+    "firstName": "Jelena",
+    "lastName": "Krkic",
+    "position": "Senior Software Testing Engineer at W\u00e4rtsil\u00e4| ISTQB certified tester | Bachelor of IT & Computer Science",
+    "publicIdentifier": "jelena-krkic-985197124",
+    "linkedinUrl": "https://www.linkedin.com/in/jelena-krkic-985197124"
+   },
+   {
+    "id": "ACoAADtAhfQBbUxqBC9QDuE1KOdnn6tYbMKAd-o",
+    "firstName": "Valentin",
+    "lastName": "Rosliakov",
+    "position": "Senior Commercial Project Manager \u0432 \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u0438 Wartsila Voyage doo Beograd",
+    "publicIdentifier": "valentin-rosliakov-358b00238",
+    "linkedinUrl": "https://www.linkedin.com/in/valentin-rosliakov-358b00238"
+   },
+   {
+    "id": "ACoAADtbHEABjCasSvUe-ooI4wQeBL8L5m9uMtE",
+    "firstName": "Aleksandar",
+    "lastName": "Malovic",
+    "position": "ISTQB\u00ae Software Test Engineer at W\u00e4rtsil\u00e4",
+    "publicIdentifier": "aleksandarmalovic",
+    "linkedinUrl": "https://www.linkedin.com/in/aleksandarmalovic"
+   },
+   {
+    "id": "ACoAAFo5qdgBQb9V3kZhDjSFihKwMjw0BBO6Onc",
+    "firstName": "Anna",
+    "lastName": "Muzykantova",
+    "position": "Product Owner at W\u00e4rtsil\u00e4 Voyage",
+    "publicIdentifier": "anna-muzykantova-334b40362",
+    "linkedinUrl": "https://www.linkedin.com/in/anna-muzykantova-334b40362"
+   },
+   {
+    "id": "ACoAACZjBHoB6zdHx_9RNNrnJKOLwevPJFIoDZE",
+    "firstName": "Mia",
+    "lastName": "Djurikin",
+    "position": "MBA Candidate at FTN | Experienced Administrative Manager & HR Specialist | Recruitment, Employee Development, Office Management & Internal Communications | Focused on efficient processes and positive workplace culture |",
+    "publicIdentifier": "mia-djurikin-8a282215b",
+    "linkedinUrl": "https://www.linkedin.com/in/mia-djurikin-8a282215b"
+   },
+   {
+    "id": "ACoAAAe21B0B9nixfW9b2Os_2IFk6pCN-1TkvqU",
+    "firstName": "Bogdan",
+    "lastName": "Doroslovac",
+    "position": "Eleonorina Velika Tataa\u00e1",
+    "publicIdentifier": "bogdandoroslovac",
+    "linkedinUrl": "https://www.linkedin.com/in/bogdandoroslovac"
+   },
+   {
+    "id": "ACoAAEa_7aQBLa_ZP__KI5Qd3ZJMVGcVVGXxgmk",
+    "firstName": "Milo\u0161",
+    "lastName": "\u0110or\u0111evi\u0107",
+    "position": ".",
+    "publicIdentifier": "milosdjordjevic19",
+    "linkedinUrl": "https://www.linkedin.com/in/milosdjordjevic19"
+   }
+  ],
+  "interests": [
+   {
+    "interestName": "Top Voices",
+    "elements": [
+     {
+      "title": "Clara Shih",
+      "subtitle": "Founder, New Work Foundation |\u00a0Advisor & Founder of Meta Business AI | ex-CEO, Salesforce AI | Fortune 500 Board Director | TIME100 AI",
+      "link": "https://www.linkedin.com/in/clarashih",
+      "caption": "718,617 followers",
+      "image": {
+       "url": "https://media.licdn.com/dms/image/v2/D4E03AQFbuK14rYWmxQ/profile-displayphoto-crop_800_800/B4EZ21VDwhK8AI-/0/1776863699040?e=1785369600&v=beta&t=MSkBZbC_c1AnL6XhSxqBr9IQB47N6qrgSWAbn1YbmsQ"
+      }
+     },
+     {
+      "title": "Mary Barra",
+      "subtitle": "Chair and Chief Executive Officer at General Motors",
+      "link": "https://www.linkedin.com/in/mary-barra",
+      "caption": "1,498,487 followers",
+      "image": {
+       "url": "https://media.licdn.com/dms/image/v2/D5603AQFNy7nvRz3AAA/profile-displayphoto-shrink_800_800/B56ZSTmJCnGsAc-/0/1737643037521?e=1785369600&v=beta&t=tIutcOkuopU6RGKIHiHMHwbbluHgIguL9cHOiACLM2o"
+      }
+     }
+    ]
+   },
+   {
+    "interestName": "Companies",
+    "elements": [
+     {
+      "title": "Microsoft",
+      "subtitle": null,
+      "link": "https://www.linkedin.com/company/1035/",
+      "caption": "28,579,091 followers",
+      "image": {
+       "url": "https://media.licdn.com/dms/image/v2/D560BAQH32RJQCl3dDQ/company-logo_400_400/B56ZYQ0mrGGoAc-/0/1744038948046/microsoft_logo?e=1785369600&v=beta&t=MEO7A07bWVt_6bI4K3NG45Resuli18UBtd6dnfPA-Bg"
+      }
+     },
+     {
+      "title": "KPMG US",
+      "subtitle": null,
+      "link": "https://www.linkedin.com/company/1079/",
+      "caption": "2,224,763 followers",
+      "image": {
+       "url": "https://media.licdn.com/dms/image/v2/D4E0BAQFujenQWGHyUw/company-logo_400_400/B4EZx3zZGkIsAc-/0/1771536487156/kpmg_us_logo?e=1785369600&v=beta&t=GrdRu-mK4FV865F47EJZKlXX40Ril9AxdsDTrBzyhIw"
+      }
+     }
+    ]
+   },
+   {
+    "interestName": "Groups",
+    "elements": [
+     {
+      "title": "Artificial Intelligence, Deep Learning, Machine Learning",
+      "subtitle": null,
+      "link": "https://www.linkedin.com/groups/1814785",
+      "caption": "2,611,087 members",
+      "image": {
+       "url": "https://media.licdn.com/dms/image/v2/D5607AQFnB8aamZr7Wg/group-logo_image-shrink_400x400/group-logo_image-shrink_400x400/0/1732554739194?e=1784203200&v=beta&t=esc5CvYuHPcKwOf7teN0KDTkVoHZqcFCuEB3nRw-xmc"
+      }
+     },
+     {
+      "title": "AI & Machine Learning Community (moderated)",
+      "subtitle": null,
+      "link": "https://www.linkedin.com/groups/961087",
+      "caption": "2,033,562 members",
+      "image": {
+       "url": "https://media.licdn.com/dms/image/v2/D4E07AQFKqRQfAuHIYA/group-logo_image-shrink_400x400/B4EZ33j7upHcAM-/0/1777974885510?e=1784203200&v=beta&t=31x_Xxa6E1nWO0Lewm8b-Z_mLxmE6hheC5RpUV-xm3U"
+      }
+     }
+    ]
+   },
+   {
+    "interestName": "Newsletters",
+    "elements": [
+     {
+      "title": "Ahead of AI",
+      "subtitle": "AI and machine learning research, trends, and educational material.",
+      "link": "https://www.linkedin.com/newsletters/6994407435943772160",
+      "caption": "Published monthly",
+      "image": {
+       "url": "https://media.licdn.com/dms/image/v2/D5612AQEOohyjO2Tvrg/series-logo_image-shrink_300_300/series-logo_image-shrink_300_300/0/1668774886638?e=1785369600&v=beta&t=YtF7Eyy68OgTefRltca6sDvnTpuaHLANeEohlu4hNiw"
+      }
+     },
+     {
+      "title": "Principled Perspectives",
+      "subtitle": "Ray Dalio's ongoing flow of research and perspectives about the economy, markets, life and work.",
+      "link": "https://www.linkedin.com/newsletters/6648615071662522368",
+      "caption": "Published monthly",
+      "image": {
+       "url": "https://media.licdn.com/dms/image/v2/C4D12AQEvJ24UNXGwiA/series-logo_image-shrink_300_300/series-logo_image-shrink_300_300/0/1641851518215?e=1785369600&v=beta&t=8yXNkPwnc0ekwqHBBlCsC9Lp-5FwT9nuXPzfS8XuaFs"
+      }
+     }
+    ]
+   },
+   {
+    "interestName": "Schools",
+    "elements": [
+     {
+      "title": "University of Wisconsin-Milwaukee",
+      "subtitle": null,
+      "link": "https://www.linkedin.com/school/166690/",
+      "caption": "202,048 followers",
+      "image": {
+       "url": "https://media.licdn.com/dms/image/v2/D4D0BAQE47QlO_LG8SQ/company-logo_400_400/company-logo_400_400/0/1729615751602/uwmilwaukee_logo?e=1785369600&v=beta&t=TWcXYY-rOJ6BBsIFvXvPrvWfZAO_Ii77WwhONxomYvI"
+      }
+     },
+     {
+      "title": "Manipal Institute of Technology",
+      "subtitle": null,
+      "link": "https://www.linkedin.com/school/577550/",
+      "caption": "107,885 followers",
+      "image": {
+       "url": "https://media.licdn.com/dms/image/v2/D4D0BAQHodG_7cUqs6w/company-logo_400_400/B4DZ8hC8AUJQAU-/0/1782965846315/manipal_institute_of_technology_logo?e=1785369600&v=beta&t=odWRAYsJ2FnGqeZYaRZbSJrCbrxTAR2wMgzVI5UPksA"
+      }
+     }
+    ]
+   }
+  ],
+  "originalQuery": {
+   "query": "satyanadella"
+  }
+ }
+]

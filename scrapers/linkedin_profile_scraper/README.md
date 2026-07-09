@@ -9,8 +9,8 @@ Extracts professional details from LinkedIn public profiles using the Apify plat
 - Education history (school, degree, field of study, dates)
 
 ## Apify Actor
-**ID:** `supreme_coder/linkedin-profile-scraper`
-**Cost:** ~$0.003 per profile ($3 per 1,000)
+**ID:** `harvestapi/linkedin-profile-scraper`
+**Cost:** $0.004 per profile ($4 per 1,000)
 **Login required:** No — works on public profiles without LinkedIn cookies
 
 ## Setup
@@ -53,12 +53,11 @@ See `input_schema.json` for full schema. Required field: `profile_urls` (list of
 See `output_schema.json` for full schema and `example_output.json` for a sample.
 
 ## Notes
-- **Actor output change (observed 2026-07-06):** the actor no longer returns
-  `firstName`/`lastName`/`headline`/`geoLocationName`, so `full_name`,
-  `headline`, and `location` in our output are now empty/None. Job title,
-  company, work history, education, and summary still come through
-  (see the refreshed `raw_sample.json`). No workflow currently consumes this
-  scraper; if names become needed, swap actors.
+- **Fields returned:** the harvestapi actor (swapped in 2026-07-09) returns
+  `firstName`/`lastName`/`headline`/`location`, so `full_name`, `headline`, and
+  `location` in our output are populated — along with job title, company, work
+  history, education, and summary (see the refreshed `raw_sample.json`). This is
+  a change from the previous apimaestro actor, which had stopped returning names.
 - **Account requirement:** on some Apify accounts this actor fails with
   "Proxy authentication required" (residential-proxy restriction) — verified
   account-dependent 2026-07-06, not an input problem.

@@ -240,7 +240,7 @@ For a 100-company run with all default steps and ~20% qualifying as P0:
 - Anthropic: ~150-300 LLM calls (column-detection + 100 enrichment + score + per-P0 buyer/persona/post-filter + per-P0 hooks/copy). Roughly **$1-3 with Sonnet 4.6**.
 - Exa search: ~120-150 calls (enrichment for all + buyer search for P0 + LinkedIn URL).
 - Apollo: ~20 contact lookups (P0 only).
-- Apify: ~20 LinkedIn-post-scraping calls × actor cost (~$0.01/run).
+- Apify: ~20 LinkedIn-post-scraping calls × actor cost ($2 per 1,000 posts via HarvestAPI — ~$0.03 per lead at 15 posts).
 - Google Sheets API: ~500-1500 cell writes.
 
 Run with `--skip-posts --skip-small-talk --skip-hooks --skip-copy` to limit

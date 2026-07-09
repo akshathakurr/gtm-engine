@@ -4,17 +4,13 @@ Fetches recent posts from a LinkedIn company page.
 
 ## Actor
 
-`apimaestro/linkedin-company-posts` — same provider as the working LinkedIn Profile Post Scraper.
-
-## ⚠️ Discovery call pending
-
-This scraper was built without a live discovery call because the Apify account hit its monthly limit. Field names in `scraper.py` are based on `apimaestro`'s profile-post conventions and may not match exactly. When credits are restored:
+`harvestapi/linkedin-company-posts` — $2 per 1,000 posts, no cookies (swapped from `apimaestro/linkedin-company-posts` 2026-07-09; the apimaestro actor is the known-good fallback). Field mappings verified against a live discovery call — `raw_sample.json` holds real actor output. Re-run discovery any time with:
 
 ```bash
-APIFY_API_TOKEN=... python3 scraper.py --discover https://www.linkedin.com/company/anthropic/
+APIFY_API_TOKEN=... python3 scraper.py --discover https://www.linkedin.com/company/google/
 ```
 
-This will overwrite `raw_sample.json` with the real actor output. Then read `raw_sample.json` and fix any field mappings in `_parse_post`, `_parse_author`, `_parse_stats` before using the scraper in production.
+Note: some company slugs (e.g. `anthropic`) return 0 posts on every vendor — a LinkedIn-side quirk, not an input error.
 
 ## Inputs
 

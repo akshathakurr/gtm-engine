@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 import anthropic
 
 from config import CLAUDE_MODEL
-from workflows._common import strip_json_fence as _strip_json_fence
+from workflows._common import strip_json_fence as _strip_json_fence, map_rate_limited
 from scrapers.web_search.scraper import search_web
 from scrapers.website_scraper import scraper as _website_mod
 from scrapers.linkedin_profile_post_scraper import scraper as _li_posts_mod
@@ -21,8 +21,6 @@ from scrapers.twitter_profile_scraper import scraper as _twitter_mod
 from scrapers.review_scraper import scraper as _review_mod
 from scrapers.firecrawl_scraper import scraper as _firecrawl_mod
 
-import threading
-from concurrent.futures import ThreadPoolExecutor
 
 
 # ---------------------------------------------------------------------------
@@ -93,25 +91,13 @@ def _run_parallel(tasks: Dict[str, "callable"], max_workers: int = COMPETITOR_EN
     """Run named zero-arg thunks concurrently. Returns {key: (result, error)}.
 
     Exceptions are captured per task (never raised), so one failed lookup can't
-    abort the others or the competitor.
+    abort the others or the competitor. Thin wrapper over _common.map_rate_limited.
     """
-    out: Dict[str, tuple] = {}
-    if not tasks:
-        return out
-    lock = threading.Lock()
-
-    def run(key, fn):
-        try:
-            value, err = fn(), None
-        except Exception as e:  # noqa: BLE001 — captured per task, surfaced to caller
-            value, err = None, e
-        with lock:
-            out[key] = (value, err)
-
-    with ThreadPoolExecutor(max_workers=min(max_workers, len(tasks))) as ex:
-        for fut in [ex.submit(run, k, fn) for k, fn in tasks.items()]:
-            fut.result()
-    return out
+    keys = list(tasks)
+    results, errors = map_rate_limited(
+        lambda fn: fn(), [tasks[k] for k in keys], max_workers=max_workers,
+    )
+    return dict(zip(keys, zip(results, errors)))
 
 
 def _strip_www(netloc: str) -> str:
@@ -130,9 +116,10 @@ def scrape_website(url: str) -> dict:
         return {}
     try:
         fc = _firecrawl_mod.scrape_website(url)
-        if fc is not None:
+        # Firecrawl returns None with no key, and an empty result (no pages) on
+        # fetch/quota failure — fall back to the static scraper in both cases.
+        if fc is not None and fc.get("full_text_by_page"):
             return fc
-        # No Firecrawl key — fall back to the static requests/BeautifulSoup path.
         return _website_mod.scrape_website(url=url)
     except Exception as e:
         print(f"    Website scrape error: {e}")
@@ -204,6 +191,8 @@ def find_official_site(company_name: str, client: anthropic.Anthropic) -> str:
             )}],
         )
         chosen = json.loads(_strip_json_fence(resp.content[0].text)).get("url", "")
+        if chosen == "":
+            return ""  # Claude says none of the candidates is this company
         return chosen if chosen in unique else unique[0]
     except Exception:
         return unique[0]
@@ -249,10 +238,12 @@ def find_linkedin_url(company_name: str, website: str,
             pass
 
     # --- Pass 2: web search + Claude disambiguation ---
-    # Co-mention query: forces domain + linkedin.com/company to appear together
+    # Co-mention query: forces domain + linkedin.com/company to appear together.
+    # With no website/domain, anchor on the quoted company name instead.
+    anchor = domain or f'"{company_name}"'
     try:
         result = search_web(
-            query=f'{domain} linkedin.com/company',
+            query=f'{anchor} linkedin.com/company',
             num_results=5,
             summary_question=f"What is the LinkedIn company page URL for {company_name} ({domain})?",
         )
@@ -420,9 +411,10 @@ def get_recent_news(company_name: str, website: str, client: anthropic.Anthropic
 
     candidates = []
     for r in result.get("results", []):
-        url   = r.get("url", "")
-        title = r.get("title", "")
-        snip  = r.get("snippet") or r.get("summary", "")
+        # .get(key, "") still yields None when the key exists with a null value
+        url   = r.get("url") or ""
+        title = r.get("title") or ""
+        snip  = r.get("snippet") or r.get("summary") or ""
         if url and title:
             candidates.append({"title": title, "url": url, "snippet": snip[:200]})
     if not candidates:

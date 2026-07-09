@@ -1,171 +1,263 @@
 [
-  {
-    "urn": {
-      "activity_urn": "7445475747680411650",
-      "share_urn": "7445475746657124355",
-      "ugcPost_urn": null
-    },
-    "full_urn": "urn:li:activity:7445475747680411650",
-    "posted_at": {
-      "date": "2026-04-02 16:22:28",
-      "relative": "6 days ago \u2022 Edited \u2022 Visible to anyone on or off LinkedIn",
-      "timestamp": 1775139748497
-    },
-    "text": "We're bringing our growing MAI model family to every developer in Foundry, including \u2026\n \n\u2022 MAI-Transcribe-1, most accurate transcription model in world across 25 languages\n \n\u2022 MAI-Voice-1, natural, expressive speech generation\n\n\u2022 MAI-Image-2, our most capable image model yet\n \nStart building: https://lnkd.in/dPDFeiGw",
-    "url": "https://www.linkedin.com/posts/satyanadella_were-bringing-our-growing-mai-model-family-activity-7445475747680411650-T_tO",
-    "post_type": "regular",
-    "author": {
-      "first_name": "Satya",
-      "last_name": "Nadella",
-      "headline": "Chairman and CEO at Microsoft",
-      "username": "satyanadella",
-      "profile_url": "https://www.linkedin.com/in/satyanadella",
-      "profile_picture": "https://media.licdn.com/dms/image/v2/C5603AQHHUuOSlRVA1w/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1579726625483"
-    },
-    "stats": {
-      "total_reactions": 4768,
-      "like": 4136,
-      "support": 14,
-      "love": 250,
-      "insight": 65,
-      "celebrate": 301,
-      "funny": 2,
-      "comments": 268,
-      "reposts": 397
-    },
-    "media": {
-      "type": "image",
-      "url": "https://media.licdn.com/dms/image/v2/D4D22AQHDycUbPOUVuw/feedshare-shrink_2048_1536/B4DZ1OktnpJQAk-/0/1775139744114",
-      "images": [
-        {
-          "url": "https://media.licdn.com/dms/image/v2/D4D22AQHDycUbPOUVuw/feedshare-shrink_2048_1536/B4DZ1OktnpJQAk-/0/1775139744114",
-          "width": 1920,
-          "height": 1080
-        }
-      ]
-    },
-    "pagination_token": "dXJuOmxpOmFjdGl2aXR5OjczNzQ4MTYzNTcxNTE4ODMyNjUtMTc1ODI5MzIzNjk5OA=="
+ {
+  "type": "post",
+  "id": "7480710438134046720",
+  "linkedinUrl": "https://www.linkedin.com/posts/philip-welkhoff-4a679111_malaria-activity-7480317054718418944-UaPC",
+  "content": "Malaria is unforgiving, pushing back every time we push forward and causing tremendous suffering whenever things go wrong.  Drug and insecticide resistance.  Climate shocks.  Budget cuts.  When we lose ground against #malaria, we lose it fast.\n\nBut here's what keeps me optimistic: few communities are as resilient as the people fighting this disease.  Scientists, advocates, partners around the world, community health workers, parents, all refusing to give up.\n\nAnd right now there is real reason for hope.  The pipeline of new drugs and ways to control mosquitoes is strong. There is a robust portfolio of second-generation vaccine candidates to build on the successes of the first two malaria vaccines that are already reaching children.  A single-dose cure is within reach.  The toolkit already in hand, the science, and the R&D pipeline have each never been stronger. \n\nI wrote a piece on what this moment demands: sustained investment, faster inovation, and getting new tools to the people who need them before the disease outpaces us.  The malaria community is calling it the \"Big Push\".  \n\nBritain's role in this fight goes all the way back to 1897 when Sir Ronald Ross discovered that mosquitoes transmit malaria. UK institutions and researchers today are leading on vaccine development, vector control, and more. And UK is a leading funder of malaria R&D globally, with more than 14 million lives saved since 2000 thanks to these new tools. \n\nThis is a legacy worth protecting and building upon.  \n\nRead the piece here: https://lnkd.in/gqBRE7pi",
+  "contentAttributes": [],
+  "author": {
+   "id": "ACoAAAJtxn4Boa6EAbT9Y4WXaWia2E8Vs6yE1bc",
+   "universalName": null,
+   "publicIdentifier": "philip-welkhoff-4a679111",
+   "type": "profile",
+   "name": "Philip Welkhoff",
+   "linkedinUrl": "https://www.linkedin.com/in/philip-welkhoff-4a679111?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAJtxn4Boa6EAbT9Y4WXaWia2E8Vs6yE1bc",
+   "info": "Director, Malaria at Bill & Melinda Gates Foundation",
+   "website": null,
+   "websiteLabel": null,
+   "avatar": {
+    "url": "https://media.licdn.com/dms/image/v2/C5603AQFD-ED7aA4qwg/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1517765094895?e=1785369600&v=beta&t=24jk_eIOHLELy1PiFYhcNspiarqWeHjcDHFq6YdTOe0",
+    "width": 450,
+    "height": 450
+   },
+   "urn": "40748670"
   },
-  {
-    "urn": {
-      "activity_urn": "7444806163835236352",
-      "share_urn": null,
-      "ugcPost_urn": "7444806162686062592"
-    },
-    "full_urn": "urn:li:ugcPost:7444806162686062592",
-    "posted_at": {
-      "date": "2026-03-31 20:01:47",
-      "relative": "1 week ago \u2022 Visible to anyone on or off LinkedIn",
-      "timestamp": 1774980107268
-    },
-    "text": "Excited to see Open to Work from my colleagues Ryan and Aneesh out in the world.",
-    "url": "https://www.linkedin.com/posts/satyanadella_today-is-the-day-open-to-work-is-officially-activity-7444806163835236352-3xPh",
-    "post_type": "quote",
-    "author": {
-      "first_name": "Satya",
-      "last_name": "Nadella",
-      "headline": "Chairman and CEO at Microsoft",
-      "username": "satyanadella",
-      "profile_url": "https://www.linkedin.com/in/satyanadella",
-      "profile_picture": "https://media.licdn.com/dms/image/v2/C5603AQHHUuOSlRVA1w/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1579726625483"
-    },
-    "stats": {
-      "total_reactions": 1224,
-      "like": 1038,
-      "support": 10,
-      "love": 62,
-      "insight": 9,
-      "celebrate": 103,
-      "funny": 2,
-      "comments": 113,
-      "reposts": 41
-    },
-    "reshared_post": {
-      "urn": {
-        "activity_urn": "7444760504234946560",
-        "share_urn": null,
-        "ugcPost_urn": "7444504390310486016"
-      },
-      "posted_at": {
-        "date": "2026-03-31 17:00:21",
-        "relative": "1 week ago \u2022 Visible to anyone on or off LinkedIn",
-        "timestamp": 1774969221171
-      },
-      "text": "Today is the day - Open to Work is officially available!",
-      "url": "https://www.linkedin.com/posts/ryanroslansky_today-is-the-day-open-to-work-is-officially-activity-7444760504234946560-TZld",
-      "post_type": "regular",
-      "author": {
-        "first_name": "Ryan",
-        "last_name": "Roslansky",
-        "headline": "CEO at LinkedIn",
-        "username": "ryanroslansky",
-        "profile_url": "https://www.linkedin.com/in/ryanroslansky",
-        "profile_picture": "https://media.licdn.com/dms/image/v2/C4D03AQELbnIckyItlw/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1667929254389"
-      },
-      "stats": {
-        "total_reactions": 0,
-        "like": 0,
-        "support": 0,
-        "love": 0,
-        "insight": 0,
-        "celebrate": 0,
-        "funny": 0,
-        "comments": 0,
-        "reposts": 0
-      },
-      "media": {
-        "type": "images",
-        "url": "https://media.licdn.com/dms/image/v2/D5622AQHoe-JvWMyScA/feedshare-shrink_2048_1536/B56Z1AxSt0IMAg-/0/1774908157607",
-        "images": [
-          {
-            "url": "https://media.licdn.com/dms/image/v2/D5622AQHoe-JvWMyScA/feedshare-shrink_2048_1536/B56Z1AxSt0IMAg-/0/1774908157607",
-            "width": 2048,
-            "height": 1365
-          }
-        ]
-      }
-    },
-    "pagination_token": "dXJuOmxpOmFjdGl2aXR5OjczNzQ4MTYzNTcxNTE4ODMyNjUtMTc1ODI5MzIzNjk5OA=="
+  "postedAt": {
+   "timestamp": 1783540353330,
+   "date": "2026-07-08T19:52:33.330Z",
+   "postedAgoShort": "1d",
+   "postedAgoText": "1 day ago \u2022 Visible to anyone on or off LinkedIn"
   },
-  {
-    "urn": {
-      "activity_urn": "7444441543010258945",
-      "share_urn": null,
-      "ugcPost_urn": "7444441487439982592"
+  "postImages": [
+   {
+    "url": "https://media.licdn.com/dms/image/v2/D5622AQH5Qcu_GJoDqA/feedshare-shrink_800/B56Z89suZjGoAc-/0/1783446562659?e=1785369600&v=beta&t=pdIO46_pwrCIjwFZMxw_yc98HdvO9F0dJtHntEr1jDY",
+    "width": 492,
+    "height": 783
+   }
+  ],
+  "repostedBy": {
+   "name": "Bill Gates",
+   "publicIdentifier": "williamhgates",
+   "universalName": null,
+   "linkedinUrl": "https://www.linkedin.com/in/williamhgates?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAA8BYqEBCGLg_vT_ca6mMEqkpp9nVffJ3hc"
+  },
+  "repostedAt": {
+   "timestamp": 1783540353330,
+   "date": "2026-07-08T19:52:33.330Z"
+  },
+  "socialContent": {
+   "hideCommentsCount": false,
+   "hideReactionsCount": false,
+   "hideSocialActivityCounts": false,
+   "hideShareAction": true,
+   "hideSendAction": true,
+   "hideRepostsCount": false,
+   "hideViewsCount": false,
+   "trustInterventionBanner": null,
+   "hideReactAction": false,
+   "hideCommentAction": false,
+   "shareUrl": "https://www.linkedin.com/posts/philip-welkhoff-4a679111_malaria-activity-7480317054718418944-UaPC?",
+   "showContributionExperience": false,
+   "showSocialDetail": true
+  },
+  "comments": [],
+  "header": {
+   "image": {
+    "url": "https://media.licdn.com/dms/image/v2/D5603AQF-RYZP55jmXA/profile-displayphoto-shrink_800_800/B56ZRi8g.aGsAc-/0/1736826818808?e=1785369600&v=beta&t=Txlh3zDcuJLtY7NcqUzAp-h5Dg2wsVTlMfz-_mV0M4g",
+    "width": 800,
+    "height": 800
+   },
+   "linkedinUrl": "https://www.linkedin.com/feed/update/urn:li:activity:7480710438134046720?updateEntityUrn=urn%3Ali%3Afsd_update%3A%28urn%3Ali%3Aactivity%3A7480710438134046720%2CMEMBER_SHARES%2CDEBUG_REASON%2CDEFAULT%2Cfalse%29&originTrackingId=qaOAFsBIZiHQjGtpmh3oWw%3D%3D",
+   "imageLink": "https://www.linkedin.com/in/williamhgates?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAA8BYqEBCGLg_vT_ca6mMEqkpp9nVffJ3hc",
+   "text": "Bill Gates reposted this"
+  },
+  "entityId": "7480710438134046720",
+  "shareUrn": "urn:li:share:7480317053547991040",
+  "shareLinkedinUrl": "https://www.linkedin.com/feed/update/urn:li:share:7480317053547991040",
+  "engagement": {
+   "id": "7480317054718418944",
+   "likes": 259,
+   "comments": 60,
+   "shares": 24,
+   "reactions": [
+    {
+     "type": "LIKE",
+     "count": 231
     },
-    "full_urn": "urn:li:ugcPost:7444441487439982592",
-    "posted_at": {
-      "date": "2026-03-30 19:52:54",
-      "relative": "1 week ago \u2022 Visible to anyone on or off LinkedIn",
-      "timestamp": 1774893174889
+    {
+     "type": "PRAISE",
+     "count": 10
     },
-    "text": "New in M365 Copilot: Council.\n\nYou can run multiple models on the same prompt at the same time, so you can see where they align and diverge, and understand what each adds.",
-    "url": "https://www.linkedin.com/posts/satyanadella_new-in-m365-copilot-council-you-can-run-activity-7444441543010258945-6cQP",
-    "post_type": "regular",
-    "author": {
-      "first_name": "Satya",
-      "last_name": "Nadella",
-      "headline": "Chairman and CEO at Microsoft",
-      "username": "satyanadella",
-      "profile_url": "https://www.linkedin.com/in/satyanadella",
-      "profile_picture": "https://media.licdn.com/dms/image/v2/C5603AQHHUuOSlRVA1w/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1579726625483"
+    {
+     "type": "INTEREST",
+     "count": 7
     },
-    "stats": {
-      "total_reactions": 6607,
-      "like": 5596,
-      "support": 20,
-      "love": 228,
-      "insight": 374,
-      "celebrate": 386,
-      "funny": 3,
-      "comments": 283,
-      "reposts": 762
+    {
+     "type": "EMPATHY",
+     "count": 6
     },
-    "media": {
-      "type": "video",
-      "url": "https://dms.licdn.com/playlist/vid/v2/D5605AQF9jvPkOXg8Fg/mp4-720p-30fp-crf28/B56Z0_4GPDHwCI-/0/1774893167671",
-      "thumbnail": "https://media.licdn.com/dms/image/v2/D5605AQF9jvPkOXg8Fg/videocover-high/B56Z0_4GPDHwBY-/0/1774893165486"
+    {
+     "type": "APPRECIATION",
+     "count": 4
     },
-    "pagination_token": "dXJuOmxpOmFjdGl2aXR5OjczNzQ4MTYzNTcxNTE4ODMyNjUtMTc1ODI5MzIzNjk5OA=="
+    {
+     "type": "ENTERTAINMENT",
+     "count": 1
+    }
+   ]
+  },
+  "reactions": [],
+  "reactionIds": [],
+  "commentIds": [],
+  "query": {
+   "sortBy": "date",
+   "page": "1",
+   "targetUrl": "https://www.linkedin.com/in/williamhgates",
+   "sessionId": "1702a917-16ae-449f-baf9-b5e4ae5eef75"
   }
+ },
+ {
+  "type": "post",
+  "id": "7480644504916676608",
+  "linkedinUrl": "https://www.linkedin.com/posts/williamhgates_the-end-of-aids-will-soon-be-in-our-reach-activity-7480644504916676608-InNY",
+  "content": "We might be close to\u00a0accomplishing\u00a0something remarkable: ending a pandemic that has devastated humanity for half a century.  https://lnkd.in/ehtubkRA",
+  "contentAttributes": [],
+  "author": {
+   "id": "ACoAAA8BYqEBCGLg_vT_ca6mMEqkpp9nVffJ3hc",
+   "universalName": null,
+   "publicIdentifier": "williamhgates",
+   "type": "profile",
+   "name": "Bill Gates",
+   "linkedinUrl": "https://www.linkedin.com/in/williamhgates?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAA8BYqEBCGLg_vT_ca6mMEqkpp9nVffJ3hc",
+   "info": "Chair, Gates Foundation and Founder, Breakthrough Energy",
+   "website": "https://www.linkedin.com/newsletters/gates-notes-6651495472181637121/",
+   "websiteLabel": "View my newsletter",
+   "avatar": {
+    "url": "https://media.licdn.com/dms/image/v2/D5603AQF-RYZP55jmXA/profile-displayphoto-shrink_800_800/B56ZRi8g.aGsAc-/0/1736826818808?e=1785369600&v=beta&t=Txlh3zDcuJLtY7NcqUzAp-h5Dg2wsVTlMfz-_mV0M4g",
+    "width": 800,
+    "height": 800
+   },
+   "urn": "251749025"
+  },
+  "postedAt": {
+   "timestamp": 1783524633626,
+   "date": "2026-07-08T15:30:33.626Z",
+   "postedAgoShort": "19h",
+   "postedAgoText": "19 hours ago \u2022 Visible to anyone on or off LinkedIn"
+  },
+  "postImages": [],
+  "document": {
+   "title": "The End of AIDS Will Soon Be in Our Reach",
+   "transcribedDocumentUrl": "https://media.licdn.com/dms/document/media/v2/D4E1FAQErmSx-lVDnnQ/feedshare-document-chunked-pdf/B4EZ9CWEQlIwBk-/0/1783524510378?e=1784203200&v=beta&t=QuzPyoX-UXpjLGiYGp5vshb3cXqBbzwZo4VGmZiH8iU",
+   "coverPages": [
+    {
+     "width": 1545,
+     "imageUrls": [
+      "https://media.licdn.com/dms/image/v2/D4E1FAQErmSx-lVDnnQ/feedshare-document-cover-images_1920/B4EZ9CWEQlIwBQ-/0/1783524510313?e=1784203200&v=beta&t=3KxPVqE9iwCvq4v7lOAhAuu8zA_GonJy7is0MfoN90Q",
+      "https://media.licdn.com/dms/image/v2/D4E1FAQErmSx-lVDnnQ/feedshare-document-cover-images_1920/B4EZ9CWEQlIwBQ-/1/1783524510313?e=1784203200&v=beta&t=U3Y9aH9XIIhkNRBtuArOXa4v11oSweheEzYZZSnyRYo",
+      "https://media.licdn.com/dms/image/v2/D4E1FAQErmSx-lVDnnQ/feedshare-document-cover-images_1920/B4EZ9CWEQlIwBQ-/2/1783524510313?e=1784203200&v=beta&t=88Z6BRWLyb53qOfqQJMKVK6S6vHBe7ks0y2BKMx-IGY"
+     ],
+     "height": 1931
+    }
+   ],
+   "totalPageCount": 6,
+   "manifestUrl": "https://media.licdn.com/dms/document/pl/v2/D4E1FAQErmSx-lVDnnQ/feedshare-document-master-manifest/B4EZ9CWEQlIwBY-/0/1783524510429?e=1784203200&v=beta&t=IzYwM2OtHldzEpy3cvTilN2LwFbbybPyEOT6yrM9fq8",
+   "manifest": {
+    "asset": "urn:li:digitalmediaAsset:D4E1FAQErmSx-lVDnnQ",
+    "transcriptManifestUrl": "https://media.licdn.com/dms/document/media/v2/D4E1FAQErmSx-lVDnnQ/feedshare-document-transcript/B4EZ9CWEQlIwA0-/0/1783524510429?e=1784764800&v=beta&t=_zlYh8HaRSqDxmXC52lFY7tPYGwV9NrKhsrqKP8xemA",
+    "transcribedDocumentUrl": "https://media.licdn.com/dms/document/media/v2/D4E1FAQErmSx-lVDnnQ/feedshare-document-pdf-analyzed/B4EZ9CWEQlIwAY-/0/1783524510429?e=1784764800&v=beta&t=z8FZz6Qv_catecdr0MI5wZvloNeMn2LqN-KfPqpRJLs",
+    "scanRequiredForDownload": true,
+    "perResolutions": [
+     {
+      "width": 390,
+      "height": 487,
+      "imageManifestUrl": "https://media.licdn.com/dms/document/pl/v2/D4E1FAQErmSx-lVDnnQ/feedshare-document-images_480/B4EZ9CWEQlIwAg-/0/1783524510429?e=1784764800&v=beta&t=9mr-epf6FlZ1AHJXOhB9Cou4AQ853HcWQO-zU4jSa2w"
+     },
+     {
+      "width": 1545,
+      "height": 1931,
+      "imageManifestUrl": "https://media.licdn.com/dms/document/pl/v2/D4E1FAQErmSx-lVDnnQ/feedshare-document-images_1920/B4EZ9CWEQlIwAo-/0/1783524510429?e=1784764800&v=beta&t=70gT2WZOvAUrSVimQPXgBT_HTXSfwBm0PZ_Hl10_PV4"
+     },
+     {
+      "width": 135,
+      "height": 168,
+      "imageManifestUrl": "https://media.licdn.com/dms/document/pl/v2/D4E1FAQErmSx-lVDnnQ/feedshare-document-images_160/B4EZ9CWEQlIwAc-/0/1783524510429?e=1784764800&v=beta&t=7VmgZsUHmBRovqMr7qJbIcwdj1uzk9Ibea_UiWX7M9I"
+     },
+     {
+      "width": 645,
+      "height": 806,
+      "imageManifestUrl": "https://media.licdn.com/dms/document/pl/v2/D4E1FAQErmSx-lVDnnQ/feedshare-document-images_800/B4EZ9CWEQlIwAk-/0/1783524510429?e=1784764800&v=beta&t=GHrzF8QivVn75eFKbaiht8QKnT5KyZR6ZegaUlJLisI"
+     },
+     {
+      "width": 1035,
+      "height": 1293,
+      "imageManifestUrl": "https://media.licdn.com/dms/document/pl/v2/D4E1FAQErmSx-lVDnnQ/feedshare-document-images_1280/B4EZ9CWEQlIwAQ-/0/1783524510429?e=1784764800&v=beta&t=fnZce6ZekP6p0tcN4vkQE1VY2-IDnLbRfNzmknyMLLk"
+     }
+    ]
+   }
+  },
+  "socialContent": {
+   "hideCommentsCount": false,
+   "hideReactionsCount": false,
+   "hideSocialActivityCounts": false,
+   "hideShareAction": true,
+   "hideSendAction": true,
+   "hideRepostsCount": false,
+   "hideViewsCount": false,
+   "trustInterventionBanner": null,
+   "hideReactAction": false,
+   "hideCommentAction": false,
+   "shareUrl": "https://www.linkedin.com/posts/williamhgates_the-end-of-aids-will-soon-be-in-our-reach-activity-7480644504916676608-InNY?",
+   "showContributionExperience": false,
+   "showSocialDetail": true
+  },
+  "comments": [],
+  "header": {
+   "text": null
+  },
+  "entityId": "7480644504916676608",
+  "shareUrn": "urn:li:ugcPost:7480644503926812672",
+  "shareLinkedinUrl": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7480644503926812672",
+  "engagement": {
+   "id": "7480644503926812672",
+   "likes": 1095,
+   "comments": 182,
+   "shares": 58,
+   "reactions": [
+    {
+     "type": "LIKE",
+     "count": 930
+    },
+    {
+     "type": "EMPATHY",
+     "count": 62
+    },
+    {
+     "type": "APPRECIATION",
+     "count": 48
+    },
+    {
+     "type": "PRAISE",
+     "count": 45
+    },
+    {
+     "type": "INTEREST",
+     "count": 8
+    },
+    {
+     "type": "ENTERTAINMENT",
+     "count": 2
+    }
+   ]
+  },
+  "reactions": [],
+  "reactionIds": [],
+  "commentIds": [],
+  "query": {
+   "sortBy": "date",
+   "page": "1",
+   "targetUrl": "https://www.linkedin.com/in/williamhgates",
+   "sessionId": "1702a917-16ae-449f-baf9-b5e4ae5eef75"
+  }
+ }
 ]

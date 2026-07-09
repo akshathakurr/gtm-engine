@@ -94,7 +94,7 @@ python3 workflow.py --intent engagement --mode auto --commentable-max-comments 5
 
 ## Cost & spend preview
 
-Each run fans out across **two paid Apify sources** (this intent's curated-profile source + its discovery search). The search actor bills one call **per keyword** (`≈ keywords × max_per_keyword` posts at $0.005/post); the profile-posts actor bills at **$5/1,000** — 1,000× the search rate — once per profile. A default prospect run (ICP profiles × 10 + 5 signal keywords × 25) or engagement run (authority profiles × 10 + 7 genre keywords × 25) is roughly **$1–2 worst-case**.
+Each run fans out across **two paid Apify sources** (this intent's curated-profile source + its discovery search). The search actor bills one call **per keyword** (`≈ keywords × max_per_keyword` posts at $0.002/post); the profile-posts actor bills at the same **$2/1,000** rate once per profile. A default prospect run (ICP profiles × 10 + 5 signal keywords × 25) or engagement run (authority profiles × 10 + 7 genre keywords × 25) is roughly **$0.40–0.80 worst-case**.
 
 Before any actor is billed, the workflow prints an itemized **worst-case spend estimate**. In `--mode interactive` it waits for you to confirm (`y/N`) before spending; in `--mode auto` it prints the estimate for the record and proceeds. Trim `max_per_keyword`, cut keywords, or skip a source to bring the number down.
 

@@ -50,6 +50,7 @@ from workflows._common import (
     read_context_file as _read_context_file,
     append_to_context_file as _append_to_context_file,
     section_body as _section_body,
+    _parse_gws_json,
 )
 
 try:
@@ -110,6 +111,19 @@ def _to_str(v) -> str:
     if isinstance(v, list):
         return "\n".join(str(x) for x in v)
     return str(v) if v else ""
+
+
+def _join(v, sep: str) -> str:
+    """Join a model-returned list field; tolerate a bare string (no char-explosion)."""
+    if isinstance(v, list):
+        return sep.join(str(x) for x in v)
+    return str(v) if v else ""
+
+
+def _bullets(v) -> str:
+    if not isinstance(v, list):
+        v = [v] if v else []
+    return "\n".join(f"• {pt}" for pt in v)
 
 
 # ---------------------------------------------------------------------------
@@ -661,10 +675,10 @@ def run_daily(
         row[c["WHY"]]       = _to_str(idea.get("why", ""))
         row[c["PROJECT"]]   = args.project_name or ""
         row[c["REFERENCE"]] = _to_str(idea.get("references", []))
-        row[c["TALKING"]]   = "\n".join(f"• {pt}" for pt in (idea.get("talking_points") or []))
+        row[c["TALKING"]]   = _bullets(idea.get("talking_points"))
         row[c["MAIN"]]      = ""
         row[c["SEO"]]       = _to_str(idea.get("seo_target", ""))
-        row[c["KEYWORDS"]]  = ", ".join(idea.get("keywords") or [])
+        row[c["KEYWORDS"]]  = _join(idea.get("keywords"), ", ")
         row[c["KW_SCORE"]]  = format_keyword_scores(kw_scores)
         row[c["ASSETS"]]    = _to_str(idea.get("assets", ""))
         row[c["STATUS"]]    = STATUS_IDEA
@@ -741,10 +755,10 @@ def run_idea(
 
         updated = list(row_data)
         updated[c["WHY"]]       = _to_str(meta.get("why", ""))
-        updated[c["REFERENCE"]] = "\n".join(meta.get("references", []))
-        updated[c["TALKING"]]   = "\n".join(f"• {pt}" for pt in meta.get("talking_points", []))
-        updated[c["SEO"]]       = meta.get("seo_target", "")
-        updated[c["KEYWORDS"]]  = ", ".join(meta.get("keywords", []))
+        updated[c["REFERENCE"]] = _join(meta.get("references"), "\n")
+        updated[c["TALKING"]]   = _bullets(meta.get("talking_points"))
+        updated[c["SEO"]]       = _to_str(meta.get("seo_target", ""))
+        updated[c["KEYWORDS"]]  = _join(meta.get("keywords"), ", ")
         updated[c["KW_SCORE"]]  = format_keyword_scores(kw_scores)
         updated[c["ASSETS"]]    = _to_str(meta.get("assets", ""))
         updated[c["STATUS"]]    = STATUS_IDEA
@@ -767,25 +781,38 @@ def create_blog_doc(
     keywords: str,
     content: str,
 ) -> str:
-    """Create a Google Doc; if blogs_folder_id given, move it there. Returns edit URL."""
-    result = subprocess.run(
-        ["gws", "docs", "documents", "create",
-         "--json", json.dumps({"title": title})],
-        capture_output=True, text=True, check=True,
-    )
-    doc_id = json.loads(result.stdout)["documentId"]
+    """Create a Google Doc; if blogs_folder_id given, move it there. Returns edit URL.
+
+    gws exits 0 even on errors (signals via an "error" key) and may print a
+    banner line before the JSON, so every call is parsed via _parse_gws_json
+    and checked — a failure raises a clean RuntimeError instead of a traceback.
+    """
+    def _gws(step: str, cmd: List[str]) -> dict:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        data = _parse_gws_json(result.stdout)
+        if not isinstance(data, dict) or "error" in data:
+            detail = (data.get("error") if isinstance(data, dict) else None) \
+                or (result.stderr or result.stdout or "").strip()[:200]
+            raise RuntimeError(f"Google Docs {step} failed: {detail}")
+        return data
+
+    doc_id = _gws("create", [
+        "gws", "docs", "documents", "create",
+        "--json", json.dumps({"title": title}),
+    ]).get("documentId")
+    if not doc_id:
+        raise RuntimeError("Google Docs create failed: no documentId returned")
 
     if blogs_folder_id:
-        subprocess.run(
-            ["gws", "drive", "files", "update",
-             "--params", json.dumps({
-                 "fileId": doc_id,
-                 "addParents": blogs_folder_id,
-                 "removeParents": "root",
-             }),
-             "--json", "{}"],
-            capture_output=True, text=True, check=True,
-        )
+        _gws("move", [
+            "gws", "drive", "files", "update",
+            "--params", json.dumps({
+                "fileId": doc_id,
+                "addParents": blogs_folder_id,
+                "removeParents": "root",
+            }),
+            "--json", "{}",
+        ])
 
     full_text = (
         f"SEO Target: {seo_target}\n"
@@ -793,16 +820,15 @@ def create_blog_doc(
         f"{'─' * 60}\n\n"
         f"{content}"
     )
-    subprocess.run(
-        ["gws", "docs", "documents", "batchUpdate",
-         "--params", json.dumps({"documentId": doc_id}),
-         "--json", json.dumps({
-             "requests": [{
-                 "insertText": {"location": {"index": 1}, "text": full_text}
-             }]
-         })],
-        capture_output=True, text=True, check=True,
-    )
+    _gws("write", [
+        "gws", "docs", "documents", "batchUpdate",
+        "--params", json.dumps({"documentId": doc_id}),
+        "--json", json.dumps({
+            "requests": [{
+                "insertText": {"location": {"index": 1}, "text": full_text}
+            }]
+        }),
+    ])
     return f"https://docs.google.com/document/d/{doc_id}/edit"
 
 
@@ -836,20 +862,29 @@ def run_write(
 
     draft = write_blog_post(idea, talking_pts, keywords, seo_target, full_context, client)
 
-    if store.is_csv:
-        # No Google Doc without gws — write the draft to a local Markdown file
-        # next to the CSV and record its path in Main Content.
-        out_dir = os.path.dirname(os.path.abspath(store.csv_path)) or "."
+    def _save_local_md() -> str:
+        # Write the draft to a local Markdown file and record its path in Main
+        # Content. Used in CSV mode, and as the fallback when the Google Doc
+        # step fails — the paid-for draft must never be lost.
+        out_dir = (os.path.dirname(os.path.abspath(store.csv_path)) or "."
+                   if store.is_csv else os.getcwd())
         slug = re.sub(r"[^a-z0-9]+", "-", idea.lower()).strip("-")[:60] or f"row-{args.row}"
         md_path = os.path.join(out_dir, f"{slug}.md")
         with open(md_path, "w") as f:
             f.write(f"# {idea}\n\nSEO Target: {seo_target}\nKeywords: {keywords}\n\n---\n\n{draft}\n")
-        main_content = md_path
         print(f"Draft written locally: {md_path}")
+        return md_path
+
+    if store.is_csv:
+        main_content = _save_local_md()
     else:
         print("Creating Google Doc...")
-        main_content = create_blog_doc(args.blogs_folder_id, idea, seo_target, keywords, draft)
-        print(f"Doc created: {main_content}")
+        try:
+            main_content = create_blog_doc(args.blogs_folder_id, idea, seo_target, keywords, draft)
+            print(f"Doc created: {main_content}")
+        except Exception as e:
+            print(f"Couldn't create the Google Doc ({e}) — saving the draft locally instead.")
+            main_content = _save_local_md()
 
     row[c["MAIN"]]   = main_content
     row[c["STATUS"]] = STATUS_DRAFT

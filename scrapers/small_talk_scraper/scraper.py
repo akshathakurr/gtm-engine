@@ -78,7 +78,7 @@ def _claude_json(client: anthropic.Anthropic, prompt: str, max_tokens: int = 150
 def _twitter_handle_from_url(url: str) -> Optional[str]:
     if not url:
         return None
-    m = re.search(r"(?:twitter\.com|x\.com)/([A-Za-z0-9_]{1,15})", url)
+    m = re.search(r"https?://(?:www\.|mobile\.)?(?:twitter\.com|x\.com)/([A-Za-z0-9_]{1,15})", url)
     return m.group(1) if m else None
 
 
