@@ -14,9 +14,13 @@ import json
 import shutil
 import subprocess
 import time
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional, Sequence
 
-from config import CONTEXT_DIR
+import anthropic
+
+from config import CONTEXT_DIR, CLAUDE_MODEL
 
 # Filename inside CONTEXT_DIR where workflows read/write user answers.
 CONTEXT_FILE = "context.md"
@@ -450,3 +454,236 @@ def section_body(text: str, header: str) -> str:
     if body.lower() in ("(fill this in)", "(none)", "(skip)"):
         return ""
     return body
+
+
+# ---------------------------------------------------------------------------
+# Bounded concurrency with call-start rate limiting
+# ---------------------------------------------------------------------------
+#
+# The outreach workflows fan a per-lead LLM/scraper step across a small pool of
+# threads. Compute runs concurrently; the (single-threaded) sheet/CSV backend is
+# written sequentially afterwards, so it is never touched from two threads.
+
+DEFAULT_CONCURRENCY = 6
+
+
+class RateLimiter:
+    """Spaces successive acquire() calls >= min_interval apart (thread-safe).
+
+    Spacing applies to call *starts*, so slow work after acquire() overlaps
+    across threads without bursting a rate-limited service.
+    """
+
+    def __init__(self, min_interval: float):
+        self._min_interval = min_interval
+        self._lock = threading.Lock()
+        self._next = 0.0
+
+    def acquire(self) -> None:
+        if self._min_interval <= 0:
+            return
+        with self._lock:
+            now = time.monotonic()
+            wait = self._next - now
+            if wait > 0:
+                time.sleep(wait)
+                now += wait
+            self._next = now + self._min_interval
+
+
+def map_rate_limited(fn, items: list, *, min_interval: float = 0.0,
+                     max_workers: int = DEFAULT_CONCURRENCY):
+    """Run fn(item) over a bounded pool, starts spaced >= min_interval.
+
+    Returns (results, errors) aligned to ``items``. fn exceptions are captured
+    (result None, error set), never raised, so one bad item can't kill the batch.
+    Results preserve input order.
+    """
+    n = len(items)
+    if n == 0:
+        return [], []
+    limiter = RateLimiter(min_interval)
+    results: List[Optional[object]] = [None] * n
+    errors: List[Optional[Exception]] = [None] * n
+
+    def task(idx, item):
+        limiter.acquire()
+        try:
+            return idx, fn(item), None
+        except Exception as e:  # noqa: BLE001 — captured per item, surfaced to caller
+            return idx, None, e
+
+    with ThreadPoolExecutor(max_workers=min(max_workers, n)) as ex:
+        for fut in [ex.submit(task, i, it) for i, it in enumerate(items)]:
+            idx, res, err = fut.result()
+            results[idx] = res
+            errors[idx] = err
+    return results, errors
+
+
+# ---------------------------------------------------------------------------
+# Row backends — same interface for a Google Sheet and a local CSV
+# ---------------------------------------------------------------------------
+# Both expose:
+#   read_all()                        → list of rows (header + data)
+#   write_header(col_idx, name)       → write one column header
+#   write_cell(row_num, col_idx, val) → write one cell (row_num is 1-based, 1=header)
+#   write_column(col_idx, values)     → write data rows 2..N+1 in a column
+
+class GoogleSheetsBackend:
+    def __init__(self, sheet_id: str, sheet_name: str):
+        self.sheet_id = sheet_id
+        self.sheet_name = sheet_name
+
+    def read_all(self) -> List[List[str]]:
+        return gws_read_sheet(self.sheet_id, self.sheet_name)
+
+    def write_header(self, col_idx: int, name: str) -> None:
+        gws_write_range(self.sheet_id, f"{self.sheet_name}!{col_letter(col_idx)}1", [[name]])
+
+    def write_cell(self, row_num: int, col_idx: int, value: str) -> None:
+        gws_write_range(self.sheet_id, f"{self.sheet_name}!{col_letter(col_idx)}{row_num}", [[value]])
+
+    def write_column(self, col_idx: int, values: List[str]) -> None:
+        if not values:
+            return
+        ltr = col_letter(col_idx)
+        rng = f"{self.sheet_name}!{ltr}2:{ltr}{len(values) + 1}"
+        gws_write_range(self.sheet_id, rng, [[v] for v in values])
+
+
+class CsvBackend:
+    """In-memory rows; rewrites the output CSV after every write so partial progress survives crashes."""
+
+    def __init__(self, input_path: str, output_path: Optional[str] = None):
+        self.input_path = input_path
+        self.output_path = output_path or input_path
+        self.rows: List[List[str]] = []
+
+    def read_all(self) -> List[List[str]]:
+        if not os.path.exists(self.input_path):
+            raise FileNotFoundError(f"Input CSV not found: {self.input_path}")
+        with open(self.input_path, newline="", encoding="utf-8") as f:
+            self.rows = [list(row) for row in csv.reader(f)]
+        return self.rows
+
+    def _ensure(self, row_idx: int, col_idx: int) -> None:
+        while len(self.rows) <= row_idx:
+            self.rows.append([])
+        while len(self.rows[row_idx]) <= col_idx:
+            self.rows[row_idx].append("")
+
+    def _flush(self) -> None:
+        os.makedirs(os.path.dirname(os.path.abspath(self.output_path)) or ".", exist_ok=True)
+        width = max((len(r) for r in self.rows), default=0)
+        for r in self.rows:
+            while len(r) < width:
+                r.append("")
+        with open(self.output_path, "w", newline="", encoding="utf-8") as f:
+            csv.writer(f).writerows(self.rows)
+
+    def write_header(self, col_idx: int, name: str) -> None:
+        self._ensure(0, col_idx)
+        self.rows[0][col_idx] = name
+        self._flush()
+
+    def write_cell(self, row_num: int, col_idx: int, value: str) -> None:
+        idx = row_num - 1  # row_num is 1-based
+        self._ensure(idx, col_idx)
+        self.rows[idx][col_idx] = value
+        self._flush()
+
+    def write_column(self, col_idx: int, values: List[str]) -> None:
+        for i, v in enumerate(values):
+            idx = i + 1  # data starts at row index 1 (sheet row 2)
+            self._ensure(idx, col_idx)
+            self.rows[idx][col_idx] = v
+        self._flush()
+
+
+# ---------------------------------------------------------------------------
+# Column mapping — reconcile arbitrary sheet headers with workflow fields
+# ---------------------------------------------------------------------------
+
+def cell_combined(row: List[str], indices: List[int]) -> str:
+    """Join values from multiple columns into one string (skips empty/missing)."""
+    parts = [row[i].strip() for i in indices if i < len(row) and row[i] and row[i].strip()]
+    return " ".join(parts)
+
+
+def get_or_create_col(headers: List[str], mapping: Dict[str, List[int]],
+                      field_key: str, default_name: str) -> int:
+    """Use the column ``field_key`` was mapped to if any; else append ``default_name``.
+    Guards against the LLM returning out-of-bounds indices."""
+    indices = [i for i in (mapping.get(field_key) or []) if 0 <= i < len(headers)]
+    if indices:
+        return indices[0]
+    return ensure_col(headers, default_name)
+
+
+def detect_columns(headers: List[str], sample_row: List[str],
+                   required_fields: Dict[str, str],
+                   client: "anthropic.Anthropic", max_tokens: int = 600) -> Dict[str, List[int]]:
+    """Use Claude to map sheet headers to standard workflow fields.
+
+    ``required_fields`` is {field_name: description}. Returns {field_name:
+    [col_idx, ...]}; multiple indices means the values should be combined (e.g.
+    firstName + lastName for "name"). Empty list means not found.
+    """
+    padded = list(sample_row) + [""] * max(0, len(headers) - len(sample_row))
+    sample_block = "\n".join(
+        f"  col {i} ({h}): {(padded[i] or '')[:80]}"
+        for i, h in enumerate(headers)
+    )
+    fields_block = "\n".join(f"- {name}: {desc}" for name, desc in required_fields.items())
+
+    prompt = f"""Map spreadsheet columns to standard workflow fields.
+
+Sheet columns (index: header — sample value):
+{sample_block}
+
+Required fields:
+{fields_block}
+
+For each required field, return the column INDEX(es) whose contents best match.
+- If a field spans multiple columns (e.g., name split into firstName + lastName), return all relevant indices.
+- Headers don't have to match field names exactly — judge by content. Use the sample to disambiguate.
+- Return null for fields that have no matching column.
+
+Return JSON: {{"<field_name>": [<idx>, ...] or null, ...}}
+Only valid JSON, no explanation."""
+
+    resp = client.messages.create(
+        model=CLAUDE_MODEL, temperature=0, max_tokens=max_tokens,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    parsed = json.loads(strip_json_fence(resp.content[0].text))
+    return {
+        k: (v if isinstance(v, list) else [v] if v is not None else [])
+        for k, v in parsed.items()
+    }
+
+
+# ---------------------------------------------------------------------------
+# LinkedIn post-scraping config (read from context.md, scraper defaults as fallback)
+# ---------------------------------------------------------------------------
+
+DEFAULT_MAX_POSTS = 15
+DEFAULT_DAYS_BACK = 90
+
+
+def parse_post_config(icp_context: str) -> Dict:
+    """Read post-scraping config from the ICP markdown, falling back to defaults."""
+    max_posts = DEFAULT_MAX_POSTS
+    days_back = DEFAULT_DAYS_BACK
+    for line in icp_context.splitlines():
+        ll = line.lower()
+        if "max posts per profile" in ll:
+            m = re.search(r"\d+", line)
+            if m:
+                max_posts = int(m.group())
+        elif "days back" in ll:
+            m = re.search(r"\d+", line)
+            if m:
+                days_back = int(m.group())
+    return {"max_posts": max_posts, "days_back": days_back}
