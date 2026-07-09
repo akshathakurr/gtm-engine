@@ -13,10 +13,10 @@ from scrapers._apify import dataset_items, ApifyRunError  # noqa: E402
 # Suppress verbose Apify actor log streaming
 logging.getLogger("apify_client").setLevel(logging.WARNING)
 
-# Swapped 2026-07-09: supreme_coder/linkedin-profile-scraper started failing
-# actor-side ("no available accounts found" / proxy 400s). Same output contract,
-# new provider (already used by 4 other scrapers in this repo).
-ACTOR_ID = "apimaestro/linkedin-profile-batch-scraper-no-cookies-required"
+# Swapped 2026-07-09 (twice): supreme_coder died actor-side → apimaestro batch
+# ($5/1k) → harvestapi ($4/1k, 27k+ users, no cookies). Same output contract.
+ACTOR_ID = "harvestapi/linkedin-profile-scraper"
+_SCRAPER_MODE = "Profile details no email ($4 per 1k)"
 
 _MONTHS = {m: i for i, m in enumerate(
     ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -42,7 +42,7 @@ def scrape_linkedin_profiles(profile_urls: list[str], max_profiles: int = 10) ->
 
     client = ApifyClient(api_token)
 
-    actor_input = {"usernames": urls}
+    actor_input = {"queries": urls, "profileScraperMode": _SCRAPER_MODE}
 
     print(f"Scraping {len(urls)} LinkedIn profile(s)...")
     run = client.actor(ACTOR_ID).call(run_input=actor_input)
@@ -60,55 +60,51 @@ def scrape_linkedin_profiles(profile_urls: list[str], max_profiles: int = 10) ->
     errors = []
 
     for item in raw_items:
-        basic = item.get("basic_info") or {}
-        if item.get("error") or not basic:
+        if item.get("error") or not item.get("linkedinUrl"):
             errors.append({
-                "url": item.get("profileUrl", "unknown"),
+                "url": item.get("linkedinUrl") or item.get("query", "unknown"),
                 "reason": item.get("error", "No data returned")
             })
             continue
 
-        # Current role — prefer the experience entry marked current.
-        experience_raw = item.get("experience") or []
+        # Current role — the actor exposes it directly.
+        current = (item.get("currentPosition") or [{}])[0]
         current_company = None
-        current = next((p for p in experience_raw if p.get("is_current")),
-                       experience_raw[0] if experience_raw else None)
-        if current or basic.get("current_company"):
+        if current.get("companyName") or current.get("position"):
             current_company = {
-                "name": (current or {}).get("company") or basic.get("current_company"),
-                "title": (current or {}).get("title") or basic.get("headline"),
+                "name": current.get("companyName"),
+                "title": current.get("position") or item.get("headline"),
             }
 
         work_history = [
             {
-                "title": pos.get("title"),
-                "company": pos.get("company"),
+                "title": pos.get("position"),
+                "company": pos.get("companyName"),
                 "location": pos.get("location"),
-                "start_date": _format_date(pos.get("start_date")),
-                "end_date": _format_date(pos.get("end_date")),
+                "start_date": _format_date(pos.get("startDate")),
+                "end_date": _format_date(pos.get("endDate")),
                 "description": pos.get("description")
             }
-            for pos in experience_raw
+            for pos in (item.get("experience") or [])
         ]
 
         education = [
             {
-                "school": edu.get("school"),
+                "school": edu.get("schoolName"),
                 "degree": edu.get("degree"),
-                "field_of_study": edu.get("field_of_study"),
-                "start_date": _format_date(edu.get("start_date")),
-                "end_date": _format_date(edu.get("end_date"))
+                "field_of_study": edu.get("fieldOfStudy"),
+                "start_date": _format_date(edu.get("startDate")),
+                "end_date": _format_date(edu.get("endDate"))
             }
             for edu in (item.get("education") or [])
         ]
 
         profiles.append({
-            "url": item.get("profileUrl") or basic.get("profile_url"),
-            "full_name": basic.get("fullname")
-                or f"{basic.get('first_name', '')} {basic.get('last_name', '')}".strip(),
-            "headline": basic.get("headline"),
-            "about": basic.get("about"),
-            "location": (basic.get("location") or {}).get("full"),
+            "url": item.get("linkedinUrl"),
+            "full_name": f"{item.get('firstName', '')} {item.get('lastName', '')}".strip(),
+            "headline": item.get("headline"),
+            "about": item.get("about"),
+            "location": (item.get("location") or {}).get("linkedinText"),
             "current_company": current_company,
             "work_history": work_history,
             "education": education

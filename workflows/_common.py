@@ -437,10 +437,10 @@ def append_to_context_file(section_header: str, body: str) -> None:
 
 # USD per returned item, by source key. Keep in sync with each scraper's README.
 APIFY_UNIT_COST = {
-    "linkedin_post_search":   0.005,    # apimaestro posts-search   ($5/1k)
-    "linkedin_profile_posts": 0.005,    # apimaestro profile-posts  ($5/1k)
+    "linkedin_post_search":   0.002,    # harvestapi post-search    ($2/1k)
+    "linkedin_profile_posts": 0.002,    # harvestapi profile-posts  ($2/1k)
     "linkedin_comments":      0.0012,   # apimaestro comments       ($1.2/1k)
-    "linkedin_profile":       0.005,    # apimaestro profile batch  ($5/1k)
+    "linkedin_profile":       0.004,    # harvestapi profile detail ($4/1k)
     "twitter":                0.00025,  # kaitoeasyapi tweets  (~$0.25/1k, upper bound)
 }
 

@@ -9,8 +9,8 @@ Extracts professional details from LinkedIn public profiles using the Apify plat
 - Education history (school, degree, field of study, dates)
 
 ## Apify Actor
-**ID:** `apimaestro/linkedin-profile-batch-scraper-no-cookies-required`
-**Cost:** $0.005 per profile ($5 per 1,000)
+**ID:** `harvestapi/linkedin-profile-scraper`
+**Cost:** $0.004 per profile ($4 per 1,000)
 **Login required:** No — works on public profiles without LinkedIn cookies
 
 ## Setup

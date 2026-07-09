@@ -11,8 +11,8 @@ Fetches posts and activity from a LinkedIn user's profile, ordered newest to old
 - Unique `urn` per post for deduplication across runs
 
 ## Apify Actor
-**ID:** `apimaestro/linkedin-profile-posts`
-**Cost:** ~$5 per 1,000 posts
+**ID:** `harvestapi/linkedin-profile-posts`
+**Cost:** ~$2 per 1,000 posts
 **Login required:** No — works on public profiles without LinkedIn cookies
 **Posts per API call:** 100
 

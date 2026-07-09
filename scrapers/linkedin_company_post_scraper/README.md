@@ -4,7 +4,7 @@ Fetches recent posts from a LinkedIn company page.
 
 ## Actor
 
-`apimaestro/linkedin-company-posts` — same provider as the working LinkedIn Profile Post Scraper.
+`harvestapi/linkedin-company-posts` — same provider as the working LinkedIn Profile Post Scraper.
 
 ## ⚠️ Discovery call pending
 

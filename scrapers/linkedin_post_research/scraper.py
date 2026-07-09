@@ -2,8 +2,8 @@
 LinkedIn Post Research Scraper
 Search LinkedIn posts by keyword. Returns post content, author, and engagement stats.
 
-Actor: apimaestro/linkedin-posts-search-scraper-no-cookies
-Cost: $0.005/post (PAY_PER_EVENT, free tier)
+Actor: harvestapi/linkedin-post-search (swapped 2026-07-09 from
+apimaestro/linkedin-posts-search-scraper-no-cookies — $2/1k vs $5/1k).
 No LinkedIn account or cookies required.
 """
 
@@ -18,9 +18,18 @@ import requests
 from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))
+
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+from scrapers._harvest import parse_author, parse_stats, is_post_item, clean_url, _to_int  # noqa: E402
+
 APIFY_TOKEN = os.getenv("APIFY_API_TOKEN")
-ACTOR_ID = "apimaestro~linkedin-posts-search-scraper-no-cookies"
+ACTOR_ID = "harvestapi~linkedin-post-search"
 BASE_URL = "https://api.apify.com/v2"
+
+# Our public sort names → the actor's sortBy values
+_SORT_MAP = {"date_posted": "date", "relevance": "relevance"}
 
 
 @contextlib.contextmanager
@@ -73,33 +82,32 @@ def _fetch_dataset(dataset_id: str, limit: int = 100) -> list:
     return resp.json()
 
 
-def _parse_post(raw: dict) -> dict:
-    """Map raw actor output fields to our schema."""
-    author = raw.get("author") or {}
-    stats = raw.get("stats") or {}
-    posted_at = raw.get("posted_at") or {}
-    content = raw.get("content") or {}
+def _parse_post(raw: dict, keyword: str) -> dict:
+    """Map a HarvestAPI post item to our search-post schema."""
+    posted_at = raw.get("postedAt") or {}
+    stats = parse_stats(raw)
+    author = parse_author(raw.get("author") or {})
 
     return {
-        "post_id": raw.get("activity_id", ""),
-        "post_url": raw.get("post_url", ""),
-        "text": raw.get("text", ""),
+        "post_id": raw.get("id", ""),
+        "post_url": clean_url(raw.get("linkedinUrl")),
+        "text": raw.get("content", "") or "",
         "author": {
-            "name": author.get("name", ""),
-            "headline": author.get("headline", ""),
-            "profile_url": author.get("profile_url", ""),
+            "name": author["name"],
+            "headline": author["headline"] or "",
+            "profile_url": author["profile_url"],
         },
         "stats": {
-            "reactions": stats.get("total_reactions", 0),
-            "comments": stats.get("comments", 0),
-            "shares": stats.get("shares", 0),
+            "reactions": stats["total_reactions"],
+            "comments": stats["comments"],
+            "shares": stats["reposts"],
         },
         "posted_at": posted_at.get("date", ""),
-        "posted_at_timestamp": posted_at.get("timestamp"),
-        "hashtags": raw.get("hashtags", []),
-        "content_type": content.get("type", ""),
-        "is_reshare": raw.get("is_reshare", False),
-        "search_input": raw.get("search_input", ""),
+        "posted_at_timestamp": _to_int(posted_at.get("timestamp")),
+        "hashtags": [w for w in (raw.get("content") or "").split() if w.startswith("#")],
+        "content_type": raw.get("type", ""),
+        "is_reshare": bool(raw.get("repostedBy")),
+        "search_input": keyword,
     }
 
 
@@ -115,10 +123,8 @@ def search_linkedin_posts(
     Args:
         keyword:     Search term (e.g. "hiring SDR", "context graph", "#saas").
         sort:        "date_posted" (newest first) or "relevance".
-        max_posts:   Max posts to return (each costs $0.005 on free tier).
-        date_filter: Optional time window — leave empty for all time.
-                     The actor doesn't document valid values; omit unless you
-                     know the accepted string.
+        max_posts:   Max posts to return (each costs $0.002 on free tier).
+        date_filter: Optional time window — one of '1h', '24h', 'week', 'month'.
 
     Returns:
         {
@@ -132,16 +138,14 @@ def search_linkedin_posts(
     """
     errors = []
     posts = []
-    total_available = 0
 
     payload: dict = {
-        "keyword": keyword,
-        "sort_type": sort,
-        "page_number": 1,
+        "searchQueries": [keyword],
         "maxPosts": max_posts,
+        "sortBy": _SORT_MAP.get(sort, "relevance"),
     }
     if date_filter:
-        payload["date_filter"] = date_filter
+        payload["postedLimit"] = date_filter
 
     try:
         with _suppress_apify_logs():
@@ -155,18 +159,18 @@ def search_linkedin_posts(
             dataset_id = run["defaultDatasetId"]
             raw_items = _fetch_dataset(dataset_id, limit=max_posts)
 
-            # Extract total_available from the first item's metadata
-            if raw_items:
-                meta = raw_items[0].get("metadata") or {}
-                total_available = meta.get("total_count", 0)
-
-            # Deduplicate by activity_id (actor may return dupes across pages)
+            # Deduplicate by post id (defensive — the actor shouldn't dupe)
             seen = set()
             for item in raw_items:
-                aid = item.get("activity_id", "")
-                if aid and aid not in seen:
-                    seen.add(aid)
-                    posts.append(_parse_post(item))
+                if not is_post_item(item):
+                    msg = item.get("error") or item.get("message")
+                    if msg:
+                        errors.append(f"Actor message: {msg}")
+                    continue
+                pid = item.get("id", "")
+                if pid and pid not in seen:
+                    seen.add(pid)
+                    posts.append(_parse_post(item, keyword))
                     if len(posts) >= max_posts:
                         break
 
@@ -178,7 +182,7 @@ def search_linkedin_posts(
         "sort": sort,
         "posts": posts,
         "post_count": len(posts),
-        "total_available": total_available if not errors else 0,
+        "total_available": len(posts),
         "errors": errors,
     }
 

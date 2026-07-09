@@ -1,184 +1,240 @@
-[{
-  "activity_id": "7448412279097724928",
-  "post_url": "https://www.linkedin.com/posts/deepiq16_aiagents-knowledgegraphs-graphrag-activity-7448412279097724928-oGg7?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGS__VQBT5Mcv-bU11FoicE2FtR-wI59RQY",
-  "text": "Graph RAGs are emerging as a core component of many effective AI agents.\nThey are not infrastructure. They are enterprise IP.\n \nEnterprises have become comfortable outsourcing systems. Data warehouses, ERP platforms, and applications run externally while ownership of data remains internal.\n \nBut a knowledge graph is different.\n \nIt doesn't just store data. It defines:\n • how your enterprise is structured\n • how systems relate\n • how decisions impact each other\n \nIn the context of AI agents, this becomes critical. Agents rely on this structure to interpret data and operate across systems.\n \nOver time, the knowledge graph begins to reflect how the enterprise functions.\n \nAt that point, it becomes more than a technical layer. It becomes enterprise intellectual property.\n \nThe key question is not where the graph is deployed. It is who defines and controls the structure behind it.\n \nRead the full whitepaper: https://lnkd.in/gxSSHTF3\n \n#AIAgents #KnowledgeGraphs #GraphRAG #EnterpriseAI #AgenticAI #EnterpriseIP #GenAI",
-  "full_urn": "urn:li:activity:7448412279097724928",
-  "author": {
-    "name": "DeepIQ",
-    "headline": "21,268 followers",
-    "profile_id": "13624737",
-    "profile_url": "https://www.linkedin.com/company/deepiq16/posts",
-    "image_url": "https://media.licdn.com/dms/image/v2/C510BAQGaIFxvEO6lAw/company-logo_100_100/company-logo_100_100/0/1630566891517/deepiq16_logo?e=1777507200&v=beta&t=2YT8Hvxev4AI-0CC_xUMJpHYd9q3HsQilrdmzB5MPHQ"
-  },
-  "stats": {
-    "total_reactions": 3,
-    "comments": 0,
-    "shares": 1,
-    "reactions": [
-      {
-        "type": "LIKE",
-        "count": 3
-      }
-    ]
-  },
-  "posted_at": {
-    "display_text": "22m",
-    "date": "2026-04-10 18:51:12",
-    "timestamp": 1775839872145,
-    "edited": true
-  },
-  "hashtags": [
-    "AIAgents",
-    "KnowledgeGraphs",
-    "GraphRAG",
-    "EnterpriseAI",
-    "AgenticAI",
-    "EnterpriseIP",
-    "GenAI"
-  ],
-  "content": {
-    "type": "image",
-    "url": "https://media.licdn.com/dms/image/v2/D5622AQGthphkjB63pA/feedshare-shrink_2048_1536/B56Z14TfwSIIAk-/0/1775839870215?e=1777507200&v=beta&t=ivpY0QT-0Dq5P6pKwQZgvj8yCRz7U9ktBJ2Kme7aLw8",
-    "images": [
-      {
-        "url": "https://media.licdn.com/dms/image/v2/D5622AQGthphkjB63pA/feedshare-shrink_800/B56Z14TfwSIIAg-/0/1775839870214?e=1777507200&v=beta&t=F2ssieHJxB-xnGj-vHFci5oi3LJvEvEoyMNGvpteLTE",
-        "width": 800,
-        "height": 800
-      },
-      {
-        "url": "https://media.licdn.com/dms/image/v2/D5622AQGthphkjB63pA/feedshare-shrink_2048_1536/B56Z14TfwSIIAk-/0/1775839870215?e=1777507200&v=beta&t=ivpY0QT-0Dq5P6pKwQZgvj8yCRz7U9ktBJ2Kme7aLw8",
-        "width": 1200,
-        "height": 1200
-      },
-      {
-        "url": "https://media.licdn.com/dms/image/v2/D5622AQGthphkjB63pA/feedshare-shrink_1280/B56Z14TfwSIIAQ-/0/1775839870215?e=1777507200&v=beta&t=bHyYsSoA0lw_pO2yAuvO5SmAG6JgULVVjFIqnxrxVAc",
-        "width": 1200,
-        "height": 1200
-      }
-    ]
-  },
-  "is_reshare": false,
-  "metadata": {
-    "total_count": 263,
-    "count": 50,
-    "page": 1,
-    "page_size": 50,
-    "total_pages": 6,
-    "has_next_page": true,
-    "has_prev_page": false
-  },
-  "search_input": "context graph"
-},
-{
-  "activity_id": "7448411015446200320",
-  "post_url": "https://www.linkedin.com/posts/rajshrinivasan_not-all-agent-workflows-are-the-same-activity-7448411015446200320-2x0L?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGS__VQBT5Mcv-bU11FoicE2FtR-wI59RQY",
-  "text": "👉 Not all agent workflows are the same.\n\nWe tend to say “build an agent” as if there’s only one pattern. There isn’t. Over the past few weeks, I’ve been experimenting with a few:\n\n🔹 **Sequential pipelines**\nStep-by-step processing\nExtractor → Annotator → Summarizer\nUse when each stage depends on the previous one\n\n🔹 **Concurrent (fan-out / fan-in)**\nMultiple agents run in parallel → results merged\nUse when tasks are independent and latency matters\n\n🔹 **DAG workflows**\nFixed structure, deterministic routing\nUse when you need predictability and testability\n\n🔹 **Agent loops (ReAct)**\nModel decides what to do next\nUse when the path isn’t known upfront\n\n🔹 **Group chat / multi-agent collaboration**\nAgents share context and build on each other\nUse when ideas need to evolve, not just process\n\n\nThe mistake I see often:\n\n👉 Trying to solve everything with one pattern\n\nBut each pattern answers a different question:\n\n* Who decides the next step?\n* Is the flow deterministic or emergent?\n* Can you predict cost and latency?\n* Can you test it?\n\nThere’s another dimension to this:\n\n👉 Not just how the flow works…\n👉 But who does the work\n\n🔹 **Magentic delegation (agent-as-tool)**\nA manager agent calls specialist agents as if they were tools\n\n* keeps control centralized\n* isolates responsibilities\n* makes specialists reusable\n\nThis combines with most orchestration styles — it’s a layering choice, not a replacement\n\n\nHere’s what helped me make sense of frameworks:\n\n👉 They’re all exposing the same patterns\n👉 just in different ways\n\n**Flow (orchestration):**\n\n* LangGraph → explicit graphs (nodes + edges)\n* Azure AI Foundry → pipelines / orchestrators\n* LlamaIndex → workflows / query pipelines\n\n**Delegation (magentic):**\n\n* LangChain → agents calling tools (including sub-agents)\n* Azure → connected agents / tool invocation\n* LlamaIndex → tool-using agents / sub-workflows\n\nDifferent abstractions. Same ideas.\n\nA cleaner way to think about it:\n\n✔ Keep orchestration patterns simple\n✔ Add delegation as a second dimension\n\nOrchestration is about **flow**\nMagentic is about **who does the work**\n\nThey’re not competing ideas. They compose. Most confusion in agent design comes from mixing these two dimensions. Once you separate them, “agent design” becomes much clearer. You’re not choosing a framework. You’re choosing a control model. Frameworks don’t define architecture. They just make certain designs easier.",
-  "full_urn": "urn:li:activity:7448411015446200320",
-  "author": {
-    "name": "Raj Shrinivasan",
-    "headline": "AI Engineer & Builder | Agentic Systems · RAG · LangGraph · Azure AI Foundry | From Idea to Production",
-    "profile_id": "359037924",
-    "profile_url": "https://www.linkedin.com/in/rajshrinivasan?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAABVme-QBEI1MUNEkhJsetyMMMh8XMacH090",
-    "image_url": "https://media.licdn.com/dms/image/v2/D5635AQEsH5eoLgHtxw/profile-framedphoto-shrink_100_100/B56Zu.rqZrIQAo-/0/1768430675737?e=1776448800&v=beta&t=PzHQt_dUYvwV5dcAhna2ryVU-0GxW1LkgGmqShgKFEU"
-  },
-  "stats": {
-    "total_reactions": 1,
-    "comments": 0,
-    "shares": 0,
-    "reactions": [
-      {
-        "type": "LIKE",
-        "count": 1
-      }
-    ]
-  },
-  "posted_at": {
-    "display_text": "27m",
-    "date": "2026-04-10 18:46:10",
-    "timestamp": 1775839570867
-  },
-  "hashtags": [],
-  "content": {
-    "type": "image",
-    "url": "https://media.licdn.com/dms/image/v2/D5622AQE92yog_sgtKw/feedshare-shrink_2048_1536/B56Z14SWefGgAs-/0/1775839570152?e=1777507200&v=beta&t=hvKp7AavHpLlJVJhVVdJVoG4ekDcYZJu0xuSTGkxAcA",
-    "images": [
-      {
-        "url": "https://media.licdn.com/dms/image/v2/D5622AQE92yog_sgtKw/feedshare-shrink_1280/B56Z14SWefGgAY-/0/1775839570151?e=1777507200&v=beta&t=vVAwigGhcd3LHj3fgL6L5q6X31orqBoF0DOxf9eHA4o",
-        "width": 1280,
-        "height": 853
-      },
-      {
-        "url": "https://media.licdn.com/dms/image/v2/D5622AQE92yog_sgtKw/feedshare-shrink_800/B56Z14SWefGgAo-/0/1775839570151?e=1777507200&v=beta&t=gN8uBfvgyFXHsD13jhXIDMtUUc-h5q48iUPJE3Nz9cs",
-        "width": 800,
-        "height": 533
-      },
-      {
-        "url": "https://media.licdn.com/dms/image/v2/D5622AQE92yog_sgtKw/feedshare-shrink_2048_1536/B56Z14SWefGgAs-/0/1775839570152?e=1777507200&v=beta&t=hvKp7AavHpLlJVJhVVdJVoG4ekDcYZJu0xuSTGkxAcA",
-        "width": 1536,
-        "height": 1024
-      }
-    ]
-  },
-  "is_reshare": false,
-  "metadata": {
-    "total_count": 263,
-    "count": 50,
-    "page": 1,
-    "page_size": 50,
-    "total_pages": 6,
-    "has_next_page": true,
-    "has_prev_page": false
-  },
-  "search_input": "context graph"
-},
-{
-  "activity_id": "7448410725389320192",
-  "post_url": "https://www.linkedin.com/posts/gengyang_zero-false-positives-ai-agent-finds-real-activity-7448410725389320192-rbIV?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGS__VQBT5Mcv-bU11FoicE2FtR-wI59RQY",
-  "text": "Discovery is becoming abundant. Actionability is still scarce.\n\nI recently joined Cyber Defense TV to talk about one of the biggest problems in application security today: the industry is getting better and faster at generating findings, but proving which ones are real is still the harder part.\n\nThat changes how security teams work. When a finding cannot be verified, teams end up debating reachability, severity, and priority. A working PoC usually settles that discussion much faster than a long argument ever will.\n\nAt ZAST.AI, our approach is built around that reality:\nAnalyze — combine static analysis, code property graph analysis, and LLM reasoning to understand flows, assets, trust boundaries, and business logic\nGenerate — produce PoC candidates from the relevant execution context\nVerify — run those PoCs against test targets to determine whether the path is actually exploitable\n\nSo far, that workflow has helped us turn candidate findings into verified results, contribute 150+ CVEs across projects including Microsoft Azure SDK, Apache Struts, and WordPress, and uncover hundreds of “forever days” in legacy IoT firmware.\n\nOne of the main points from the interview was simple: as AI-generated reports continue to multiply, verification becomes more important for everyone in the process — researchers, vendors, CNAs, and defenders trying to prioritize what actually matters.\n\nIf you want the full conversation, the episode is here:\n🎥 Full episode: https://lnkd.in/gDHy4wTN\n\n#Cybersecurity #AppSec #VulnerabilityResearch #SoftwareSecurity #AIForSecurity",
-  "full_urn": "urn:li:activity:7448410725389320192",
-  "author": {
-    "name": "Geng Yang",
-    "headline": "Founder & CEO at ZAST.AI | Autonomous exploit verification for AppSec teams | From findings to proof",
-    "profile_id": "17766077",
-    "profile_url": "https://www.linkedin.com/in/gengyang?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAEPFr0BHJ67G0g7Txvpawtvq7UHdDzerSg",
-    "image_url": "https://media.licdn.com/dms/image/v2/D5603AQFpwouCR-mcnA/profile-displayphoto-scale_100_100/B56ZvkKvlPKwAc-/0/1769059589267?e=1777507200&v=beta&t=0-iBpOsWRPfP3Llyaf3HTQdtD80nkUrtTkGaKQzkDF0"
-  },
-  "stats": {
-    "total_reactions": 0,
-    "comments": 0,
-    "shares": 0,
-    "reactions": []
-  },
-  "posted_at": {
-    "display_text": "28m",
-    "date": "2026-04-10 18:45:01",
-    "timestamp": 1775839501712
-  },
-  "hashtags": [
-    "Cybersecurity",
-    "AppSec",
-    "VulnerabilityResearch",
-    "SoftwareSecurity",
-    "AIForSecurity"
-  ],
-  "content": {
-    "type": "article",
-    "article": {
-      "title": "Zero False Positives: AI Agent Finds Real Vulnerabilities & Generates Exploits | Zast AI",
-      "subtitle": "youtube.com",
-      "url": "https://youtu.be/N3aB4w4jZHY",
-      "thumbnail_url": "https://media.licdn.com/dms/image/sync/v2/D5627AQH-6Q8xrvZvJA/articleshare-shrink_1280_800/B56Z12EiEfJ8AQ-/0/1775802393976?e=1776448800&v=beta&t=Zrt-Ot9M6Mge5a4Etgz8L2XXkbLGwor5Qh2J01fo1p0"
+[
+ {
+  "type": "post",
+  "id": "7480938830112411648",
+  "linkedinUrl": "https://www.linkedin.com/posts/adampcrandall_contactlens-iol-manufacturing-activity-7480938830112411648-eZ-t",
+  "content": "Such an incredible week in Santa Barbara, CA with the DAC International team. Grateful for the chance to roll up my sleeves on-site and invest even deeper in this world-class business!\n\nThis trip was all about strategic alignment and execution. I had the opportunity to lead working sessions with our CEO, Janet Boudreau Ceddia and the President of DAC, Ken Payne, mapping out how we continue to scale DAC\u2019s impact across the global #contactlens and #IOL #manufacturing ecosystem. We left with clear priorities, a sharper GTM & customer first focus, and even more conviction in the road ahead.\n\nWhat impressed me most (again) was seeing the craftsmanship, engineering rigor, and pride that goes into every single lathe on the floor. From frames in fabrication to fully configured systems ready for FAT, the attention to detail at each station is exactly why customers trust DAC as the standard in #lathing equipment for soft lenses, GP lenses, specialty designs, and IOLs.\n\nHuge thank you to the entire DAC International team for the hospitality, transparency, and passion you bring to your work every day. The innovation happening inside this facility is what enables our customers to push the boundaries of what\u2019s possible in vision care.\n\nWhen it comes to the contact lens and IOL industry, DAC is truly the benchmark. No other lathe consistently delivers the same level of precision, surface quality, and repeatability as a DAC lathe, and that\u2019s why leading manufacturers around the world continue to trust DAC as their standard.\n\n#WeAreAddtronics \n\nwww.DAC-Intl.Com\n\nwww.Addtronics.Com",
+  "contentAttributes": [
+   {
+    "start": 54,
+    "length": 17,
+    "type": "COMPANY_NAME",
+    "hyperlink": null,
+    "textLink": null,
+    "company": {
+     "id": "6833196",
+     "name": "DAC International",
+     "linkedinUrl": "https://www.linkedin.com/company/dac-international/"
     }
+   },
+   {
+    "start": 306,
+    "length": 21,
+    "type": "PROFILE_MENTION",
+    "hyperlink": null,
+    "textLink": null,
+    "profile": {
+     "id": "ACoAAAFenMwBPjmxjOJNRpeX_Xz9AJ0IJBY3fVs",
+     "firstName": "Janet",
+     "lastName": "Boudreau Ceddia",
+     "linkedinUrl": "https://www.linkedin.com/in/janetbceddia",
+     "publicIdentifier": "janetbceddia"
+    }
+   },
+   {
+    "start": 354,
+    "length": 9,
+    "type": "PROFILE_MENTION",
+    "hyperlink": null,
+    "textLink": null,
+    "profile": {
+     "id": "ACoAAAIhr9YBDYLhHBtW-5MEHs7KDEOZNHPPVvg",
+     "firstName": "Ken",
+     "lastName": "Payne",
+     "linkedinUrl": "https://www.linkedin.com/in/ken-payne-81ab87b",
+     "publicIdentifier": "ken-payne-81ab87b"
+    }
+   }
+  ],
+  "author": {
+   "id": "ACoAAAlZ7CoB0mNmrxHt_nbIGurjyUTOYhjYsDA",
+   "universalName": null,
+   "publicIdentifier": "adampcrandall",
+   "type": "profile",
+   "name": "Adam P. Crandall",
+   "linkedinUrl": "https://www.linkedin.com/in/adampcrandall?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAAlZ7CoB0mNmrxHt_nbIGurjyUTOYhjYsDA",
+   "info": "Chief Revenue Officer | Private Equity | PE\u2011Backed Industrial Automation & Capital Equipment | Multi\u2011site, Multi\u2011Brand Revenue Leader | 1x Exit | Buy\u2011And\u2011Build | M&A Integration | Revenue $10M-$500M | EBITDA $5M-$100M",
+   "website": "http://www.Addtronics.com",
+   "websiteLabel": "Visit my website",
+   "avatar": {
+    "url": "https://media.licdn.com/dms/image/v2/D5603AQH1WTtU7D55EA/profile-displayphoto-crop_800_800/B56ZiPcx.5HkAM-/0/1754753345322?e=1785369600&v=beta&t=0S90rIPKpiICflgRB-hwig71azjH-DBSN8UqK-czbpI",
+    "width": 800,
+    "height": 800
+   },
+   "urn": "156888106"
   },
-  "is_reshare": false,
-  "metadata": {
-    "total_count": 263,
-    "count": 50,
-    "page": 1,
-    "page_size": 50,
-    "total_pages": 6,
-    "has_next_page": true,
-    "has_prev_page": false
+  "postedAt": {
+   "timestamp": 1783594806221,
+   "date": "2026-07-09T11:00:06.221Z",
+   "postedAgoShort": "28m",
+   "postedAgoText": "28 minutes ago \u2022 Visible to anyone on or off LinkedIn"
   },
-  "search_input": "context graph"
-}]
+  "postImages": [
+   {
+    "url": "https://media.licdn.com/dms/image/v2/D5622AQHy04smYXwMzg/feedshare-image-high-res/B56Z9FWBzLGQAU-/0/1783574830547?e=1785369600&v=beta&t=f_i5ZdMtVSGBOc2_6vYIftz_V5hMRgCZ2o-NjCGvMrY",
+    "width": 1290,
+    "height": 968
+   },
+   {
+    "url": "https://media.licdn.com/dms/image/v2/D5622AQFhXQsv8v4d8Q/feedshare-shrink_1280/B56Z9FWC88GoAM-/0/1783574837922?e=1785369600&v=beta&t=n78FG43M5gkE7CJReiv7XPdu7YWpB4oN__SN89HZWJs",
+    "width": 1280,
+    "height": 1707
+   },
+   {
+    "url": "https://media.licdn.com/dms/image/v2/D5622AQHSRBdSMrBwdw/feedshare-image-high-res/B56Z9FWC0tG8AY-/0/1783574839570?e=1785369600&v=beta&t=C7XQBwcC2dUSv0HHUtEpt7QgJ5f0WBGoXCz0ghMSWR8",
+    "width": 2048,
+    "height": 1536
+   },
+   {
+    "url": "https://media.licdn.com/dms/image/v2/D5622AQG68cd_wZSs0A/feedshare-shrink_1280/B56Z9FWAfgKUAM-/0/1783574827910?e=1785369600&v=beta&t=8zQUWtmoc73XCv3rG4AyrSTFIPKTnK8pJfPaNfCmqZE",
+    "width": 1280,
+    "height": 1707
+   },
+   {
+    "url": "https://media.licdn.com/dms/image/v2/D5622AQGqmN5Mcry6lw/feedshare-image-high-res/B56Z9FWDtsGsAU-/0/1783574840901?e=1785369600&v=beta&t=4gRpc6ZHL9gATnuVvYdG50NeKzo0hLgjOI8ef7h3z8k",
+    "width": 2048,
+    "height": 1536
+   },
+   {
+    "url": "https://media.licdn.com/dms/image/v2/D5622AQFqtntL22Hz8w/feedshare-shrink_1280/B56Z9FWDntLAAM-/0/1783574843769?e=1785369600&v=beta&t=32uKA1KY0fGEVGkoXt88CkAXX7sd8CDGWThTdmLJu7g",
+    "width": 1280,
+    "height": 1707
+   },
+   {
+    "url": "https://media.licdn.com/dms/image/v2/D5622AQHBk0HOSXHRlw/feedshare-image-high-res/B56Z9FWENMJoAU-/0/1783574843290?e=1785369600&v=beta&t=5HxMRJ_TSl881173D8pC_ORSOu2CPkmzXjmNhcL6_xw",
+    "width": 2048,
+    "height": 1536
+   }
+  ],
+  "socialContent": {
+   "hideCommentsCount": false,
+   "hideReactionsCount": false,
+   "hideSocialActivityCounts": false,
+   "hideShareAction": true,
+   "hideSendAction": true,
+   "hideRepostsCount": false,
+   "hideViewsCount": false,
+   "trustInterventionBanner": null,
+   "hideReactAction": false,
+   "hideCommentAction": false,
+   "shareUrl": "https://www.linkedin.com/posts/adampcrandall_contactlens-iol-manufacturing-activity-7480938830112411648-eZ-t?",
+   "showContributionExperience": false,
+   "showSocialDetail": true
+  },
+  "comments": [],
+  "header": {
+   "text": null
+  },
+  "entityId": "7480938830112411648",
+  "shareUrn": "urn:li:ugcPost:7480855109590020097",
+  "shareLinkedinUrl": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7480855109590020097",
+  "engagement": {
+   "id": "7480855109590020097",
+   "likes": 2,
+   "comments": 0,
+   "shares": 0,
+   "reactions": [
+    {
+     "type": "LIKE",
+     "count": 2
+    }
+   ]
+  },
+  "reactions": [],
+  "reactionIds": [],
+  "commentIds": [],
+  "query": {
+   "sortBy": "date",
+   "page": 1,
+   "search": "gtm engineering"
+  }
+ },
+ {
+  "type": "post",
+  "id": "7480938474674700289",
+  "linkedinUrl": "https://www.linkedin.com/posts/raahuulmwadhwa_sales-gtm-activity-7480938474674700289-6YGA",
+  "content": "12 students confirmed for GTM Engineering Cohort 01 in less than 10 days.\n\n\n\nDifferent roles. Different companies. Different countries. Almost identical questions.\n\nWho is in the room:\nAn SDR leader with an 8-person team. Mandate: double pipeline without adding headcount.\n\nA first GTM hire at a stealth AI-native startup. 8 weeks to launch, building outbound from scratch.\n\nA 9-year sales veteran mid AI-existential moment. Wants optionality. Keep the FT seat, add consulting income, keep the in-house GTME door open.\n\nA founder tired of watching an agency burn $1,500 of Clay credits with nothing to show. Ready to own the fundamentals themselves.\n\nA head of sales underutilizing their founder's LinkedIn network. 1-2 meetings a month from a channel that could produce 15.\n\nA senior operator running his own AI enrichment stack. Asking: \"Is GTM Engineering dying in 18 months?\"\n\nA senior SDR at 130% quota for 4 quarters straight. Already at the ceiling. No AE path visible for 24 months.\n\nEvery one of them is asking, in slightly different words:\n\nHow do I do more without hiring more?\n\nHow do I stop being replaceable by AI?\n\nHow do I keep my seat AND build the next thing on the side?\n\nHow do I own the fundamentals instead of outsourcing them?\n\nHow do I go from \"recommends systems\" to \"builds systems\"?\n\nSame question. Different seats.\n\nWhat I have learned in 10 days of enrollment calls:\n\nThe SDR ceiling is real. 130% quota is the start of a hard conversation about \"what next\", not the finish line\n\nEveryone is nervous about AI. Especially the top performers. The ones asking \"am I next?\" are the exact ones who will not be\n\nFounders are done outsourcing outbound. They want to own the fundamentals, then decide what to delegate\n\n\"Optionality\" is the word people say out loud. Freelance + FT + agency + in-house GTME. They want all four doors open\n\nWhy this is happening now:\n\nGTM is the last big function that has not been rebuilt around AI as an operating layer. Product, engineering, marketing, ops have all had their AI moment. Sales is next.\n\nThe people who build that operating layer in the next 12 months become the people the market rewards for the next 5 years.\n\nThat is the thesis.\n\nIf any of the 7 profiles sounded like you, you might already be one of the people who should be in the room.\n\nWe extended the deadline to Saturday.\n\nThis is being taught by one of the smartest minds in GTM engineering Shubh Saxena\n\nPeople enrolling have already seen his work and they know what hes capable of.\n\nFill the form in the comments and I will personally reach out\n\n#sales #gtm",
+  "contentAttributes": [
+   {
+    "start": 2421,
+    "length": 12,
+    "type": "PROFILE_MENTION",
+    "hyperlink": null,
+    "textLink": null,
+    "profile": {
+     "id": "ACoAADDh9uMB8-UJw03HlKVBbWDcOo4eDdYmltk",
+     "firstName": "Shubh",
+     "lastName": "Saxena ",
+     "linkedinUrl": "https://www.linkedin.com/in/thegtmguy",
+     "publicIdentifier": "thegtmguy"
+    }
+   }
+  ],
+  "author": {
+   "id": "ACoAAA_5tW4BarCLwimY2swqV0jCgVbirJQDgIw",
+   "universalName": null,
+   "publicIdentifier": "raahuulmwadhwa",
+   "type": "profile",
+   "name": "Rahul Wadhwa",
+   "linkedinUrl": "https://www.linkedin.com/in/raahuulmwadhwa?miniProfileUrn=urn%3Ali%3Afsd_profile%3AACoAAA_5tW4BarCLwimY2swqV0jCgVbirJQDgIw",
+   "info": "Founder School of SDR | School of Interviews & School of Sales | I fix broken SDR hiring and fake sales training | 947+ SDRs trained | Real placements. No fluff | Hands Down the Best Hair in Sales",
+   "website": null,
+   "websiteLabel": null,
+   "avatar": {
+    "url": "https://media.licdn.com/dms/image/v2/D5603AQGZGjhy3c2U6g/profile-displayphoto-crop_800_800/B56Z1.F10DIIAI-/0/1775936957149?e=1785369600&v=beta&t=-NoCUFJZuGJk00x3AqbW9uXgx8qD2KPEQrDVeqgOPBc",
+    "width": 800,
+    "height": 800
+   },
+   "urn": "268023150"
+  },
+  "postedAt": {
+   "timestamp": 1783594721478,
+   "date": "2026-07-09T10:58:41.478Z",
+   "postedAgoShort": "30m",
+   "postedAgoText": "30 minutes ago \u2022 Visible to anyone on or off LinkedIn"
+  },
+  "postImages": [],
+  "socialContent": {
+   "hideCommentsCount": false,
+   "hideReactionsCount": false,
+   "hideSocialActivityCounts": false,
+   "hideShareAction": true,
+   "hideSendAction": true,
+   "hideRepostsCount": false,
+   "hideViewsCount": false,
+   "trustInterventionBanner": null,
+   "hideReactAction": false,
+   "hideCommentAction": false,
+   "shareUrl": "https://www.linkedin.com/posts/raahuulmwadhwa_sales-gtm-activity-7480938474674700289-6YGA?",
+   "showContributionExperience": false,
+   "showSocialDetail": true
+  },
+  "comments": [],
+  "header": {
+   "text": null
+  },
+  "entityId": "7480938474674700289",
+  "shareUrn": "urn:li:share:7480938471759495168",
+  "shareLinkedinUrl": "https://www.linkedin.com/feed/update/urn:li:share:7480938471759495168",
+  "engagement": {
+   "id": "7480938474674700289",
+   "likes": 3,
+   "comments": 1,
+   "shares": 0,
+   "reactions": [
+    {
+     "type": "LIKE",
+     "count": 3
+    }
+   ]
+  },
+  "reactions": [],
+  "reactionIds": [],
+  "commentIds": [],
+  "query": {
+   "sortBy": "date",
+   "page": 1,
+   "search": "gtm engineering"
+  }
+ }
+]

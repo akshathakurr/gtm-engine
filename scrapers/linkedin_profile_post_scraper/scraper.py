@@ -11,6 +11,7 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 from scrapers._apify import dataset_items, ApifyRunError  # noqa: E402
+from scrapers._harvest import parse_post, is_post_item  # noqa: E402
 
 # Silence Apify's client logger once at import (thread-safe — happens before any
 # concurrent use). Per-call actor-run log streaming is disabled via logger=None.
@@ -28,8 +29,11 @@ def _suppress_apify_logs():
     """
     yield
 
-ACTOR_ID = "apimaestro/linkedin-profile-posts"
-POSTS_PER_PAGE = 100
+
+# Swapped 2026-07-09: apimaestro/linkedin-profile-posts ($5/1k) →
+# harvestapi/linkedin-profile-posts ($2/1k). Same output contract; the actor
+# handles limits and date cutoffs server-side, so no pagination loop is needed.
+ACTOR_ID = "harvestapi/linkedin-profile-posts"
 
 
 DEFAULT_MAX_POSTS = 15
@@ -64,7 +68,7 @@ def scrape_linkedin_profile_posts(
     if not api_token:
         raise EnvironmentError("APIFY_API_TOKEN environment variable is not set.")
 
-    # Resolve cutoff datetime (UTC)
+    # Resolve cutoff datetime (UTC) — passed server-side AND enforced locally.
     cutoff_dt: Optional[datetime] = None
     if days_back is not None:
         cutoff_dt = datetime.now(timezone.utc) - timedelta(days=days_back)
@@ -74,152 +78,49 @@ def scrape_linkedin_profile_posts(
     client = ApifyClient(api_token)
 
     username = _extract_username(profile_url)
-
-    all_raw: list = []
-    errors: list = []
-    pagination_token: Optional[str] = None
-    seen_urns: set = set()
-    page = 1
-
     print(f"Fetching posts for {username}...")
 
-    while len(all_raw) < max_posts:
-        # Request only as many posts as we still need — minimises data cost
-        remaining = max_posts - len(all_raw)
-        actor_input = {
-            "profileUrls": [{"url": profile_url}],
-            "username": username,
-            "limit": min(remaining, POSTS_PER_PAGE),
-            "page_number": page,
-        }
-        if pagination_token:
-            actor_input["pagination_token"] = pagination_token
+    actor_input = {
+        "targetUrls": [profile_url],
+        "maxPosts": max_posts,
+        "includeReposts": False,  # matches the old behavior of dropping reposts
+    }
+    if cutoff_dt is not None:
+        actor_input["postedLimitDate"] = cutoff_dt.strftime("%Y-%m-%d")
 
+    errors: list = []
+    try:
         run = client.actor(ACTOR_ID).call(run_input=actor_input, logger=None)
-        try:
-            items = dataset_items(client, run)
-        except ApifyRunError as e:
-            errors.append(f"Actor run failed (page {page}): {e}")
-            break
+        items = dataset_items(client, run)
+    except ApifyRunError as e:
+        return {"profile_url": profile_url, "total": 0, "posts": [], "errors": [str(e)]}
 
-        if not items:
-            break
-
-        new_items = []
-        stop_early = False
-
-        for item in items:
-            urn = item.get("full_urn")
-            if not urn or urn in seen_urns:
+    posts = []
+    for item in items:
+        if not is_post_item(item):
+            msg = item.get("error") or item.get("message")
+            if msg:
+                errors.append(f"Actor message: {msg}")
+            continue
+        post = parse_post(item)
+        if post["post_type"] == "repost":
+            continue
+        # Local cutoff guard — the server-side date limit is authoritative, but
+        # keep the old exact-cutoff behavior for same-day precision.
+        if cutoff_dt is not None and post["timestamp_ms"]:
+            post_dt = datetime.fromtimestamp(post["timestamp_ms"] / 1000, tz=timezone.utc)
+            if post_dt < cutoff_dt:
                 continue
-            seen_urns.add(urn)
+        posts.append(post)
 
-            if item.get("post_type") == "repost":
-                continue
-
-            # Stop as soon as we go past the cutoff — posts are newest→oldest
-            if cutoff_dt is not None:
-                ts_ms = (item.get("posted_at") or {}).get("timestamp")
-                if ts_ms is not None:
-                    post_dt = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc)
-                    if post_dt < cutoff_dt:
-                        stop_early = True
-                        break
-
-            new_items.append(item)
-
-        all_raw.extend(new_items)
-
-        if stop_early:
-            break
-
-        # Check if there are more pages
-        last_token = items[-1].get("pagination_token") if items else None
-        if not last_token or last_token == pagination_token:
-            break
-
-        pagination_token = last_token
-        page += 1
-
-    # Always cap at max_posts
-    all_raw = all_raw[:max_posts]
-
-    posts = [_parse_post(item) for item in all_raw]
+    posts.sort(key=lambda p: p.get("timestamp_ms") or 0, reverse=True)
+    posts = posts[:max_posts]
 
     return {
         "profile_url": profile_url,
         "total": len(posts),
         "posts": posts,
         "errors": errors,
-    }
-
-
-# ---------------------------------------------------------------------------
-# Parsing helpers
-# ---------------------------------------------------------------------------
-
-def _parse_post(item: dict) -> dict:
-    posted_at = item.get("posted_at") or {}
-    media = item.get("media")
-    reshared = item.get("reshared_post")
-
-    post = {
-        "urn": item.get("full_urn"),
-        "url": item.get("url"),
-        "post_type": item.get("post_type"),
-        "posted_at": posted_at.get("date"),
-        "timestamp_ms": posted_at.get("timestamp"),
-        "text": item.get("text"),
-        "author": _parse_author(item.get("author") or {}),
-        "stats": _parse_stats(item.get("stats") or {}),
-        "media": _parse_media(media),
-        "reshared_post": _parse_reshared(reshared) if reshared else None,
-    }
-    return post
-
-
-def _parse_author(author: dict) -> dict:
-    return {
-        "name": f"{author.get('first_name', '')} {author.get('last_name', '')}".strip(),
-        "headline": author.get("headline"),
-        "username": author.get("username"),
-        "profile_url": author.get("profile_url"),
-    }
-
-
-def _parse_stats(stats: dict) -> dict:
-    return {
-        "total_reactions": stats.get("total_reactions", 0),
-        "likes": stats.get("like", 0),
-        "comments": stats.get("comments", 0),
-        "reposts": stats.get("reposts", 0),
-    }
-
-
-def _parse_media(media: Optional[dict]) -> Optional[dict]:
-    if not media:
-        return None
-    result = {"type": media.get("type"), "url": media.get("url")}
-    if media.get("thumbnail"):
-        result["thumbnail"] = media["thumbnail"]
-    if media.get("images"):
-        result["images"] = [
-            {"url": img.get("url"), "width": img.get("width"), "height": img.get("height")}
-            for img in media["images"]
-        ]
-    return result
-
-
-def _parse_reshared(reshared: dict) -> dict:
-    posted_at = reshared.get("posted_at") or {}
-    return {
-        "urn": (reshared.get("urn") or {}).get("activity_urn") or (reshared.get("urn") or {}).get("ugcPost_urn"),
-        "url": reshared.get("url"),
-        "post_type": reshared.get("post_type"),
-        "posted_at": posted_at.get("date"),
-        "text": reshared.get("text"),
-        "author": _parse_author(reshared.get("author") or {}),
-        "media": _parse_media(reshared.get("media")),
     }
 
 
