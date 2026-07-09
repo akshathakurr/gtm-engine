@@ -145,7 +145,7 @@ if __name__ == "__main__":
 
 ## Process (always follow this order)
 
-1. **Find the actor** — check the Apify store. Prefer `apimaestro` actors for LinkedIn (proven pattern). Check pricing model before running anything.
+1. **Find the actor** — check the Apify store. For LinkedIn prefer `harvestapi` (primary since 2026-07-09 — $2/1k posts, $4/1k profiles, one shared item shape parsed by `scrapers/_harvest.py`) with `apimaestro` as the known-good fallback. Check pricing model before running anything.
 2. **Read docs via the Apify REST API** — Apify store pages are JS-rendered and useless to fetch. Use the API directly:
    ```bash
    curl "https://api.apify.com/v2/acts/{username}~{actor-name}?token=$APIFY_API_TOKEN"
@@ -161,7 +161,7 @@ Skipping the discovery call means your field names are guesses. This has already
 ## Apify actor rules
 
 ### Picking an actor
-- **Prefer `apimaestro` for LinkedIn** — consistent input conventions, proven track record, API-based (not browser-based).
+- **Prefer `harvestapi` for LinkedIn** (since 2026-07-09) — 60% cheaper posts, server-side `maxPosts`/`postedLimitDate` (no pagination loops), one shared output shape across its post actors. `apimaestro` is the tested fallback: consistent, API-based, but $5/1k posts.
 - **Avoid browser crawlers** — `supreme_coder/linkedin-post` looked cheap at $1/1k posts but was a browser crawler that made 280+ requests for 3 posts and cost $1.51 for one aborted run. Always check the pricing model type: `per result` is safe, `compute units` or `browser sessions` is risky.
 - **Check user reviews** on the store page before committing to a new actor.
 
@@ -172,7 +172,7 @@ Skipping the discovery call means your field names are guesses. This has already
 ### Known actor quirks
 | Actor | Quirk |
 |---|---|
-| `apimaestro/linkedin-profile-posts` | Must explicitly pass `username` extracted from URL. If omitted, actor silently defaults to `satyanadella` for every run. |
+| *(fallback-era, apimaestro)* `apimaestro/linkedin-profile-posts` | Must explicitly pass `username` extracted from URL. If omitted, actor silently defaults to `satyanadella` for every run. |
 | `apimaestro/linkedin-profile-posts` | Pagination token is on the **last item** of each page, not in response metadata. |
 | `apimaestro/linkedin-profile-posts` | No built-in delay between profile calls. When scraping 50+ profiles in a loop, add `time.sleep(5)` between calls in the workflow — LinkedIn can throttle the actor session on bursts. |
 | All `apimaestro` actors | Stream verbose logs to stderr — suppress with the `_suppress_apify_logs()` context manager (see any built scraper). |
@@ -383,7 +383,7 @@ Replaced `altimis/scweet`, which started demanding *full X account access* — a
 
 ## LinkedIn Post Research Scraper — key patterns
 
-- **Actor:** `apimaestro/linkedin-posts-search-scraper-no-cookies` (2.1M+ runs, no cookies required)
+- **Actor:** `harvestapi/linkedin-post-search` (swapped 2026-07-09; `apimaestro/linkedin-posts-search-scraper-no-cookies` is the fallback)
 - **Pricing:** $0.005/post on free tier (PAY_PER_EVENT). For 20 posts = ~$0.10/search.
 - **Input fields:**
   - `keyword` (string) — the search term. NOT `keywords` (array) or `query`.
@@ -396,7 +396,7 @@ Replaced `altimis/scweet`, which started demanding *full X account access* — a
 - **`posted_at.date`** — `"YYYY-MM-DD HH:MM:SS"` string. `posted_at.timestamp` is Unix ms.
 - **`stats`** — `total_reactions`, `comments`, `shares`. Reactions breakdown in `reactions[]`.
 - **Dataset item count misleading** — run `stats.itemCount` shows 0 even when data is present. Always fetch from dataset directly.
-- **Discovery trap:** `harvestapi/linkedin-post-search` (1M+ runs) sounds right but is for profile/company-based filtering, NOT keyword search — returns 0 for keyword queries. Use apimaestro's actor instead.
+- ~~Discovery trap: harvestapi/linkedin-post-search is profile-filtering only~~ — **outdated (fixed upstream)**: since mid-2026 it accepts `searchQueries` for keyword search and is now our primary post-search actor ($2/1k vs apimaestro's $5/1k).
 - **`benjarapi/linkedin-post-search`** and **`powerai/linkedin-posts-search-scraper`** exist as alternatives but are less proven.
 
 ---

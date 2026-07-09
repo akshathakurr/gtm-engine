@@ -230,7 +230,7 @@ For a 100-lead run with all default steps enabled and ~30% Decision Makers:
 
 - Anthropic: ~150-250 LLM calls (1 column-detection + 1 classify + 30 enrichment + 1 score + ~30 competitor + ~30 post-filter + per-lead hooks/copy when wired). Roughly **$1-3 with Sonnet 4.6**.
 - Exa search: ~60-90 calls (enrichment + competitors). Per Exa free-tier limits.
-- Apify: ~30 LinkedIn-post-scraping calls × actor cost (default actor is ~$0.01/run).
+- Apify: ~30 LinkedIn-post-scraping calls × actor cost ($2 per 1,000 posts via HarvestAPI — ~$0.03 per lead at 15 posts).
 - Google Sheets API: ~500-1500 cell writes — usually fine on quotas.
 
 Run with `--skip-posts --skip-small-talk --skip-copy` to limit cost while

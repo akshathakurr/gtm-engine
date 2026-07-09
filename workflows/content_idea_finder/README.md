@@ -109,11 +109,11 @@ Edit these to change the defaults; or add your own sections to `context.md` to o
 
 ## Cost estimate (per daily run)
 
-- Creator pulls (Twitter): ~11 profiles × $0.04 ≈ **$0.45**
-- Trend search (Twitter): ~12 queries × $0.04 ≈ **$0.48**
+- Creator pulls (Twitter): ~11 profiles × ~$0.006 (25 tweets at ~$0.25/1k) ≈ **$0.07**
+- Trend search (Twitter): ~12 queries × ~$0.006 ≈ **$0.07**
 - HN: free
-- LLM clustering (Sonnet 4.6): ~$0.05
-- **Total: ~$1.00/day** if all sources run
+- LLM clustering: ~$0.05
+- **Total: ~$0.20/day** if all sources run
 
 Before any Twitter actor is billed, the workflow prints an itemized **worst-case spend estimate** (trends + creators; HN is free). Without `--auto` it waits for a `y/N` confirmation; with `--auto` it prints the estimate and proceeds. Use skip flags during testing to keep the bill down.
 
