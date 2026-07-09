@@ -91,5 +91,5 @@ Key output fields per post:
 ## Notes
 - Only scrapes publicly visible posts
 - Posts are returned newest → oldest
-- The actor fetches 100 posts per page; the scraper paginates automatically
+- The actor caps results server-side via `maxPosts` (and an optional date cutoff), so there's no pagination loop
 - To avoid duplicate posts across runs, track seen `urn` values
