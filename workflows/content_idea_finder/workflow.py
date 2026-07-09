@@ -46,7 +46,7 @@ from workflows._common import (
     read_context_file as _read_context_file,
     append_to_context_file as _append_to_context_file,
     section_body as _section_body,
-    preview_and_confirm, TabularStore,
+    preview_and_confirm, TabularStore, find_col, cell,
 )
 from scrapers.twitter_profile_scraper.scraper import scrape_twitter_profiles_batch
 from scrapers.twitter_research_scraper.scraper import search_tweets
@@ -92,11 +92,13 @@ def _read_multiline_input(prompt_text: str) -> str:
 
 
 def _parse_lines(body: str) -> List[str]:
-    """Each non-empty, non-comment line becomes an entry."""
+    """Each non-empty, non-comment line becomes an entry (markdown bullets OK)."""
     out: List[str] = []
     for line in body.splitlines():
         line = line.strip()
-        if not line or line.startswith("#") or line.startswith("(") or line.startswith("-"):
+        if line.startswith(("- ", "* ")):
+            line = line[2:].strip()
+        if not line or line.startswith("#") or line.startswith("("):
             continue
         out.append(line)
     return out
@@ -163,11 +165,13 @@ def resolve_inputs(auto: bool) -> Dict:
     """
     text = _read_context_file()
 
-    creators_default      = load_json("creators.json").get("creators", [])
-    trends_default        = load_json("trend_queries.json").get("queries", [])
-    trends_min_likes      = load_json("trend_queries.json").get("min_likes", 100)
-    hn_default            = load_json("hn_queries.json").get("queries", [])
-    hn_min_points         = load_json("hn_queries.json").get("min_points", 100)
+    creators_default = load_json("creators.json").get("creators", [])
+    trends_json      = load_json("trend_queries.json")
+    trends_default   = trends_json.get("queries", [])
+    trends_min_likes = trends_json.get("min_likes", 100)
+    hn_json          = load_json("hn_queries.json")
+    hn_default       = hn_json.get("queries", [])
+    hn_min_points    = hn_json.get("min_points", 100)
 
     show_intro = False
     inputs: Dict = {
@@ -611,8 +615,16 @@ def write_outputs(ideas: List[Dict], store: TabularStore, run_date: str) -> str:
     os.makedirs(_OUTPUTS, exist_ok=True)
     local_path = os.path.join(_OUTPUTS, f"{run_date}.json")
 
+    # Same-day reruns append to the day's file instead of overwriting it.
+    prior: List[Dict] = []
+    if os.path.exists(local_path):
+        try:
+            with open(local_path) as f:
+                prior = json.load(f).get("ideas", [])
+        except (ValueError, OSError):
+            prior = []
     with open(local_path, "w") as f:
-        json.dump({"date": run_date, "ideas": ideas}, f, indent=2, ensure_ascii=False)
+        json.dump({"date": run_date, "ideas": prior + ideas}, f, indent=2, ensure_ascii=False)
     print(f"  Local JSON → {local_path}")
 
     rows: List[Dict[str, str]] = []
@@ -691,9 +703,11 @@ def main() -> None:
     # actor (HN uses the free Algolia API). Worst case bills the actor's 20-item
     # floor per run; 25 is the per-query/per-creator fetch default.
     TWEETS_PER_PULL = 25  # matches fetch_trend_tweets / fetch_creator_posts defaults
+    # Idea mode runs exactly ONE seed-idea search, not one per trend query.
+    trend_pulls = 1 if args.mode == "idea" else len(trend_queries)
     if not preview_and_confirm([
         ("Twitter trend search", "twitter",
-         (0 if args.skip_trends else len(trend_queries) * TWEETS_PER_PULL)),
+         (0 if args.skip_trends else trend_pulls * TWEETS_PER_PULL)),
         ("Creator tweet pulls",  "twitter",
          (0 if args.skip_creators else len(creators_list) * TWEETS_PER_PULL)),
     ], interactive=not args.auto):
@@ -770,56 +784,20 @@ def main() -> None:
     else:
         print(f"\n--- Idea mode: '{args.idea}' ---")
 
-        # Search Twitter for the seed idea
+        # Search Twitter + HN for the seed idea — same field mapping as daily
+        # mode, via the shared fetchers (bucket "seed_idea", no engagement floor).
+        seed_query = [{"bucket": "seed_idea", "query": args.idea}]
         if not args.skip_trends:
             print("\n--- Searching Twitter for seed idea ---")
-            result = search_tweets(
-                query=args.idea,
-                max_tweets=25,
-                days_back=args.lookback_days,
-                include_replies=False,
+            trend_posts = fetch_trend_tweets(
+                queries=seed_query, min_likes=0, lookback_days=args.lookback_days,
             )
-            tweets = result.get("tweets", [])
-            print(f"  {len(tweets)} tweets found")
-            for t in tweets:
-                author = t.get("author") or {}
-                trend_posts.append({
-                    "source":     "trend",
-                    "query":      args.idea,
-                    "bucket":     "seed_idea",
-                    "author":     author.get("name", ""),
-                    "handle":     author.get("screen_name", ""),
-                    "text":       t.get("text", ""),
-                    "url":        t.get("url", ""),
-                    "created_at": t.get("created_at", ""),
-                    "engagement": (t.get("likes", 0) or 0) + (t.get("retweets", 0) or 0) * 2,
-                })
-
-        # Search HN for the seed idea
         if not args.skip_hn:
             print("\n--- Searching HN for seed idea ---")
-            hn_result = scrape_hn(
-                query=args.idea,
-                story_type="story",
-                sort_by="relevance",
-                days_back=args.hn_lookback_days,
-                max_results=20,
+            hn_stories = fetch_hn_stories(
+                queries=seed_query, min_points=0,
+                lookback_days=args.hn_lookback_days, max_per_query=20,
             )
-            hn_raw = hn_result.get("stories", [])
-            print(f"  {len(hn_raw)} HN stories found")
-            for s in hn_raw:
-                hn_stories.append({
-                    "source":     "hn",
-                    "query":      args.idea,
-                    "bucket":     "seed_idea",
-                    "title":      s.get("title", ""),
-                    "text":       s.get("title", ""),
-                    "url":        s.get("url") or s.get("hn_url", ""),
-                    "hn_url":     s.get("hn_url", ""),
-                    "author":     s.get("author", ""),
-                    "created_at": s.get("created_at", ""),
-                    "engagement": s.get("points", 0) or 0,
-                })
 
         # Build seed topic — topic is the idea itself, keywords extracted from it
         seed_keywords = [w for w in args.idea.lower().split() if len(w) > 3]
@@ -858,8 +836,23 @@ def main() -> None:
     # HYDRATE + FINALIZE
     # ======================================================================
     print("\n--- Hydrating source quotes ---")
+    # Same-day reruns must not mint duplicate IDs — continue numbering from the
+    # highest existing "<run_date>-NN" already in the store.
+    start_n = 0
+    existing_rows = store.read_all() or []
+    if existing_rows:
+        id_idx = find_col(existing_rows[0], "Idea ID")
+        if id_idx is not None:
+            prefix = f"{run_date}-"
+            for r in existing_rows[1:]:
+                v = cell(r, id_idx)
+                if v.startswith(prefix):
+                    try:
+                        start_n = max(start_n, int(v[len(prefix):]))
+                    except ValueError:
+                        pass
     ideas: List[Dict] = []
-    for n, idea in enumerate(classified, 1):
+    for n, idea in enumerate(classified, start_n + 1):
         quotes = hydrate_source_quotes(
             source_ids=idea.get("source_ids", []),
             trend_posts=trend_posts,

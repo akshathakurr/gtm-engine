@@ -269,9 +269,12 @@ def process_competitor(
         for c in product_missing:
             write_col(c, prod.get(c, ""))
 
-    # Step 9: Customer reviews
+    # Step 9: Customer reviews. Only write the "not available" sentinel on a
+    # *successful* empty lookup — an errored lookup leaves the cell blank so a
+    # rerun retries it (a filled cell is skipped forever).
     if "reviews" in tasks:
-        write_col("Customer Reviews", (_val("reviews", "") or "") or "not available")
+        _rv, _rerr = res.get("reviews", (None, None))
+        write_col("Customer Reviews", (_rv or "") or ("" if _rerr else "not available"))
     elif args.skip_reviews:
         log("  [9] Skipping reviews (--skip-reviews)")
 

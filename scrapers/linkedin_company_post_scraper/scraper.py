@@ -96,6 +96,11 @@ def scrape_linkedin_company_posts(
         new_items = []
         for item in items:
             urn = item.get("full_urn") or item.get("urn")
+            if not urn and item.get("message"):
+                # Actor returns a sentinel item like
+                # {"company_input": "...", "message": "No posts found or wrong input"}
+                errors.append(f"Actor message (page {page}): {item['message']}")
+                continue
             if not urn or urn in seen_urns:
                 continue
             seen_urns.add(urn)

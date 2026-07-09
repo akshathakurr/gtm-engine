@@ -20,7 +20,6 @@ Usage:
 import os
 import sys
 import json
-import time
 import argparse
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict
@@ -35,6 +34,8 @@ from workflows._common import (
     append_to_context_file as _append_to_context_file,
     section_body as _section_body,
     preview_and_confirm, TabularStore,
+    map_rate_limited as _map_rate_limited,
+    CONTEXT_FILE as _CONTEXT_FILE,
 )
 from scrapers.linkedin_profile_post_scraper import scraper as _post_scraper
 from scrapers.linkedin_post_research import scraper as _search_scraper
@@ -47,75 +48,12 @@ SEARCH_CONCURRENCY = 3      # max in-flight posts-search runs
 VELOCITY_MIN_HOURS = 2.0    # age floor for velocity so just-posted noise can't dominate the ranking
 
 
-# ---------------------------------------------------------------------------
-# Rate-limited concurrency
-#
-# Apify actors throttle on bursts, so we space request *starts* by a minimum
-# interval (the same intervals the old serial sleeps used) while letting the
-# slow actor run-times overlap across a small, bounded pool. In-flight runs are
-# capped by max_workers, so we never exceed the free plan's concurrent-run room.
-# ---------------------------------------------------------------------------
-
-import threading
 from concurrent.futures import ThreadPoolExecutor
-
-
-class _RateLimiter:
-    """Spaces successive acquire() calls >= min_interval apart (thread-safe).
-
-    Spacing applies to call *starts*, so work done after acquire() overlaps
-    across threads without ever bursting the actor.
-    """
-
-    def __init__(self, min_interval: float):
-        self._min_interval = min_interval
-        self._lock = threading.Lock()
-        self._next = 0.0
-
-    def acquire(self) -> None:
-        with self._lock:
-            now = time.monotonic()
-            wait = self._next - now
-            if wait > 0:
-                time.sleep(wait)
-                now += wait
-            self._next = now + self._min_interval
-
-
-def _map_rate_limited(fn, items: list, *, min_interval: float, max_workers: int):
-    """Run fn(item) over a bounded thread pool, starts spaced >= min_interval.
-
-    Returns (results, errors) — two lists aligned to `items`. fn exceptions are
-    captured (results[i] is None, errors[i] is the exception), never raised, so
-    one bad item can't kill the batch.
-    """
-    n = len(items)
-    if n == 0:
-        return [], []
-    limiter = _RateLimiter(min_interval)
-    results: List[Optional[object]] = [None] * n
-    errors: List[Optional[Exception]] = [None] * n
-
-    def task(i: int, item):
-        limiter.acquire()
-        try:
-            return i, fn(item), None
-        except Exception as e:  # noqa: BLE001 — captured per-item, surfaced to caller
-            return i, None, e
-
-    with ThreadPoolExecutor(max_workers=min(max_workers, n)) as ex:
-        for fut in [ex.submit(task, i, it) for i, it in enumerate(items)]:
-            i, res, err = fut.result()
-            results[i] = res
-            errors[i] = err
-    return results, errors
 
 
 # ---------------------------------------------------------------------------
 # Context backfill — interactive pre-step for missing sections in context.md
 # ---------------------------------------------------------------------------
-
-_CONTEXT_FILE = "context.md"
 
 REQUIRED_SECTIONS = [
     {
@@ -144,11 +82,13 @@ REQUIRED_SECTIONS = [
 
 
 def _parse_keyword_lines(body: str) -> List[str]:
-    """Each non-empty, non-comment line becomes a keyword."""
+    """Each non-empty, non-comment line becomes a keyword (markdown bullets OK)."""
     out: List[str] = []
     for line in body.splitlines():
         line = line.strip()
-        if not line or line.startswith("#") or line.startswith("(") or line.startswith("-"):
+        if line.startswith(("- ", "* ")):
+            line = line[2:].strip()
+        if not line or line.startswith("#") or line.startswith("("):
             continue
         out.append(line)
     return out
@@ -445,8 +385,23 @@ _INTENT_ANGLE_GUIDANCE = {
 }
 
 
+SCORE_CHUNK_SIZE = 40  # posts per Claude call — keeps each reply well under max_tokens
+
+
 def score_relevance(posts: List[dict], project_context: str, client: anthropic.Anthropic,
                     intent: str = "prospect") -> List[Optional[dict]]:
+    """Score posts in chunks so one long run can't truncate the reply mid-array."""
+    scores: List[Optional[dict]] = []
+    for start in range(0, len(posts), SCORE_CHUNK_SIZE):
+        chunk = posts[start:start + SCORE_CHUNK_SIZE]
+        if start:
+            print(f"  ...scoring posts {start + 1}-{start + len(chunk)} of {len(posts)}")
+        scores.extend(_score_chunk(chunk, project_context, client, intent))
+    return scores
+
+
+def _score_chunk(posts: List[dict], project_context: str, client: anthropic.Anthropic,
+                 intent: str = "prospect") -> List[Optional[dict]]:
     if not posts:
         return []
 
@@ -496,8 +451,8 @@ Return only valid JSON, no explanation."""
         parsed = json.loads(_strip_json_fence(resp.content[0].text))
     except json.JSONDecodeError:
         # One malformed reply shouldn't discard every scraped post; score nothing
-        # this run and let the caller report zero matches.
-        print("  ! Couldn't parse the relevance scores from Claude — skipping scoring this run.")
+        # for this chunk and let the caller report fewer matches.
+        print("  ! Couldn't parse the relevance scores from Claude — skipping this batch.")
         return [None] * len(posts)
     result: List[Optional[dict]] = [None] * len(posts)
     for item in parsed:
@@ -627,15 +582,17 @@ def _prompt_intent() -> str:
         print("Please enter 1 (prospect) or 2 (engagement).")
 
 
-def _load_keywords(workflow_dir: str, filename: str, ctx_section: Optional[str] = None) -> List[str]:
+def _load_keywords(workflow_dir: str, filename: str, ctx_section: Optional[str] = None,
+                   captured_body: str = "") -> List[str]:
     """
     Resolution order:
       1. context.md `## {ctx_section}` (one keyword per line)  ← new, preferred
-      2. /Context/<project>/<filename>.json (legacy per-project override)
-      3. workflow_dir/<filename>.json (default, kept for backward compat)
+      2. answers typed at the setup prompt this run but not saved to context.md
+      3. /Context/<project>/<filename>.json (legacy per-project override)
+      4. workflow_dir/<filename>.json (default, kept for backward compat)
     """
     if ctx_section:
-        body = _section_body(_read_context_file(), ctx_section)
+        body = _section_body(_read_context_file(), ctx_section) or captured_body
         kws = _parse_keyword_lines(body)
         if kws:
             return kws
@@ -689,6 +646,10 @@ def main():
                         help="Run non-interactively. Errors out if context.md is missing required sections.")
     args = parser.parse_args()
 
+    if args.output_csv and args.output_sheet_id:
+        print("ERROR: pass either --output-csv or --output-sheet-id, not both.")
+        sys.exit(1)
+
     interactive = args.mode == "interactive"
 
     # ---- Intent — one play per run. Prompted in interactive mode, required in auto.
@@ -705,8 +666,10 @@ def main():
             sys.exit(2)
     intent_label = INTENT_LABELS[intent]
 
-    # Pre-step: backfill the context sections THIS intent needs before doing any work.
-    ensure_context_complete(auto=args.auto, intent=intent)
+    # Pre-step: backfill the context sections THIS intent needs before doing any
+    # work. Only interactive mode may prompt — a default (auto-mode) run must
+    # never block on stdin, so it errors out like --auto if sections are missing.
+    captured = ensure_context_complete(auto=args.auto or not interactive, intent=intent)
 
     workflow_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -738,7 +701,8 @@ def main():
         cur_label = "ICP/prospect"
         skip_curated   = args.skip_icp
         disc_keywords  = _load_keywords(workflow_dir, "signal_keywords.json",
-                                        ctx_section="LinkedIn Comment Signal Keywords")
+                                        ctx_section="LinkedIn Comment Signal Keywords",
+                                        captured_body=captured.get("signal_keywords", ""))
         skip_discovery = args.skip_signal
         disc_label     = "SIGNAL"
     else:
@@ -749,7 +713,8 @@ def main():
         cur_label = "authority"
         skip_curated   = args.skip_authority
         disc_keywords  = _load_keywords(workflow_dir, "genre_keywords.json",
-                                        ctx_section="LinkedIn Comment Genre Keywords")
+                                        ctx_section="LinkedIn Comment Genre Keywords",
+                                        captured_body=captured.get("genre_keywords", ""))
         skip_discovery = args.skip_trending
         disc_label     = "TRENDING"
 
@@ -868,9 +833,6 @@ def main():
         _pause("Scoring complete — review results.json before sheet write")
 
     # ---- Append to sheet (or CSV)
-    if args.output_csv and args.output_sheet_id:
-        print("ERROR: pass either --output-csv or --output-sheet-id, not both.")
-        sys.exit(1)
     if args.output_csv:
         out_store = TabularStore(csv_path=args.output_csv)
     elif "TODO" not in out_sheet_id:

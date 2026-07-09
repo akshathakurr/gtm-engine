@@ -109,6 +109,9 @@ def _parse_gws_json(stdout: str):
     return None
 
 
+# NOTE: gws_available / gws_create_sheet / rows_to_values / write_input_csv have
+# no in-repo Python callers — they are Claude Code's session-time API (see
+# CLAUDE.md "Where the output goes" / "When the ask is vague"). Don't delete.
 def gws_available(timeout: int = 15) -> bool:
     """Return True if the ``gws`` CLI is installed *and* usably authenticated.
 
@@ -285,16 +288,27 @@ class TabularStore:
             with open(self.csv_path, "a", newline="") as f:
                 csv.writer(f).writerows([[str(c) for c in r] for r in rows])
             return
-        result = subprocess.run(
-            ["gws", "sheets", "spreadsheets", "values", "append",
-             "--params", json.dumps({
-                 "spreadsheetId": self.sheet_id, "range": self.sheet_name,
-                 "valueInputOption": "USER_ENTERED", "insertDataOption": "INSERT_ROWS",
-             }),
-             "--json", json.dumps({"values": [[str(c) for c in r] for r in rows]})],
-            capture_output=True, text=True,
-        )
-        self._raise_on_gws_error(result, "append")
+        cmd = ["gws", "sheets", "spreadsheets", "values", "append",
+               "--params", json.dumps({
+                   "spreadsheetId": self.sheet_id, "range": self.sheet_name,
+                   "valueInputOption": "USER_ENTERED", "insertDataOption": "INSERT_ROWS",
+               }),
+               "--json", json.dumps({"values": [[str(c) for c in r] for r in rows]})]
+        # Retry only clearly-rejected transient failures (429/5xx). A rejected
+        # request never landed, so retrying can't duplicate rows; anything
+        # ambiguous or permanent raises immediately.
+        for attempt in (1, 2, 3):
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            try:
+                self._raise_on_gws_error(result, "append")
+                return
+            except RuntimeError as e:
+                transient = any(s in str(e).lower() for s in
+                                ("429", "rate limit", "ratelimit", "quota exceeded",
+                                 "unavailable", "internal error", "backend error"))
+                if attempt == 3 or not transient:
+                    raise
+                time.sleep(2 ** attempt)  # 2s, 4s
 
     def update_row(self, row_idx: int, values: List[str]) -> None:
         """Overwrite the 1-indexed row ``row_idx`` with ``values``."""
@@ -671,7 +685,8 @@ def get_or_create_col(headers: List[str], mapping: Dict[str, List[int]],
                       field_key: str, default_name: str) -> int:
     """Use the column ``field_key`` was mapped to if any; else append ``default_name``.
     Guards against the LLM returning out-of-bounds indices."""
-    indices = [i for i in (mapping.get(field_key) or []) if 0 <= i < len(headers)]
+    indices = [i for i in (mapping.get(field_key) or [])
+               if isinstance(i, int) and 0 <= i < len(headers)]
     if indices:
         return indices[0]
     return ensure_col(headers, default_name)
