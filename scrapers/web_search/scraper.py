@@ -138,8 +138,12 @@ def _search_exa(
         # Exa "fast" search type — same content index, p50 latency <425ms.
         # Available on the free plan; full param compatibility with contents.
         "type": "fast",
-        "highlights": {"num_sentences": 3, "highlights_per_url": 2},
-        "summary": {"query": question},
+        # search() takes content options under `contents` (highlights/summary/text);
+        # the old top-level kwargs were the deprecated search_and_contents() style.
+        "contents": {
+            "highlights": {"num_sentences": 3, "highlights_per_url": 2},
+            "summary": {"query": question},
+        },
     }
 
     if days_back is not None:
@@ -153,7 +157,7 @@ def _search_exa(
         kwargs["exclude_domains"] = exclude_domains
 
     _exa_throttle()
-    response = exa.search_and_contents(query, **kwargs)
+    response = exa.search(query, **kwargs)
 
     return [
         {
