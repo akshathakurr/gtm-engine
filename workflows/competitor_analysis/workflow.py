@@ -41,7 +41,12 @@ from workflows._common import (
     RateLimiter,
 )
 from workflows.competitor_analysis.steps import (
-    OUTPUT_COLUMNS, COMPANY_CONCURRENCY, APIFY_MIN_INTERVAL, process_competitor,
+    OUTPUT_COLUMNS, COMPANY_CONCURRENCY, APIFY_MIN_INTERVAL,
+    _run_parallel,
+    scrape_website, find_official_site, find_linkedin_url, draft_description,
+    get_firmographics, get_recent_news, find_founders, get_founder_post_type,
+    extract_product_info, get_customer_reviews, get_deal_size, get_content_type,
+    analyze_competitor,
 )
 
 
@@ -109,6 +114,228 @@ def check_context_complete(auto: bool) -> None:
         print("Aborted. Fill context/context.md and re-run.")
         sys.exit(0)
     print()
+
+
+# ---------------------------------------------------------------------------
+# Per-competitor orchestration (write-free — safe to run concurrently)
+# ---------------------------------------------------------------------------
+
+def process_competitor(
+    index: int,
+    total: int,
+    competitor: str,
+    website: str,
+    row: List[str],
+    col_map: Dict[str, int],
+    args,
+    client: anthropic.Anthropic,
+    icp_context: str,
+    apify_limiter,
+    url_col=None,
+) -> tuple:
+    """Run all 12 enrichment steps for one competitor and return the values to write.
+
+    Does NO backend I/O: it buffers every output-column value into ``pending``
+    (col_idx → value) and collects progress into ``logs``. The caller writes the
+    row and prints the logs on the main thread, so companies can run concurrently
+    without touching the single-threaded backend from multiple threads.
+
+    ``apify_limiter`` (a shared _common.RateLimiter) spaces the throttled Apify
+    actor calls — founder posts + reviews — across all concurrent companies.
+
+    Returns ``(pending: Dict[int, str], logs: List[str])``.
+    """
+    logs: List[str] = []
+    written: Dict[str, str] = {}
+    pending: Dict[int, str] = {}
+
+    def log(msg: str = "") -> None:
+        logs.append(msg)
+
+    def get_col(name: str) -> str:
+        """Read from original row OR from this run's writes."""
+        return written.get(name) or (
+            row[col_map[name]].strip()
+            if col_map.get(name) is not None and col_map[name] < len(row)
+            else ""
+        )
+
+    def write_col(name: str, value: str) -> None:
+        if value:
+            pending[col_map[name]] = value
+            written[name] = value
+
+    log(f"{'='*60}")
+    log(f"[{index + 1}/{total}] {competitor}  ({website or 'no URL'})")
+    log(f"{'='*60}")
+
+    # ── Step 1: Website scrape ────────────────────────────────────────────
+    scraped: dict = {}
+    if not website:
+        # No URL on the row — find the official site first so website-derived
+        # columns (description, product info, CTA…) still populate. Persisted to
+        # the input URL column via pending (written on the main thread).
+        log("  [1] No website URL — searching for the official site...")
+        website = find_official_site(competitor, client)
+        if website and url_col is not None:
+            pending[url_col] = website
+    if website:
+        log(f"  [1] Scraping website ({website})...")
+        scraped = scrape_website(website)
+        log(f"    → {len(scraped.get('full_text_by_page', {}))} pages scraped")
+    else:
+        log("  [1] No website found — skipping scrape")
+
+    # ── Steps 2–10: independent enrichment (Claude + Exa + reviews actor) ──
+    firm_cols = ["Employee Count", "Founded Year", "Last Funding Stage", "Total Funding", "Est. Revenue", "HQ Location"]
+    f1_cols = ["Founder (1) Name", "Founder (1) LinkedIn", "Founder (1) Twitter"]
+    f2_cols = ["Founder (2) Name", "Founder (2) LinkedIn", "Founder (2) Twitter"]
+    product_cols = [
+        "Target Persona (User)", "Sales Motion", "Primary CTA", "Pricing",
+        "Customer Stories", "Product Features", "Top Logos", "Marketing Messaging", "SEO",
+    ]
+    firm_missing     = [c for c in firm_cols if not get_col(c)]
+    missing_founders = [c for c in f1_cols + f2_cols if not get_col(c)]
+    product_missing  = [c for c in product_cols if not get_col(c)] if scraped else []
+
+    tasks: Dict[str, "callable"] = {}
+    if not get_col("Company LinkedIn URL"):
+        tasks["li_url"] = lambda: find_linkedin_url(competitor, website, client)
+    if not get_col("Company Description") and scraped:
+        tasks["desc"] = lambda: draft_description(competitor, scraped, client)
+    if firm_missing:
+        tasks["firm"] = lambda: get_firmographics(competitor, website, client)
+    if not get_col("Recent News"):
+        tasks["news"] = lambda: get_recent_news(competitor, website, client)
+    if missing_founders:
+        tasks["founders"] = lambda: find_founders(competitor, website, client)
+    if product_missing:
+        tasks["prod"] = lambda: extract_product_info(competitor, scraped, client)
+    if not get_col("Deal Size"):
+        tasks["deal"] = lambda: get_deal_size(competitor, website, client)
+    if not args.skip_reviews and not get_col("Customer Reviews"):
+        # Reviews hits a throttled Apify actor — gate it on the shared limiter.
+        tasks["reviews"] = lambda: (apify_limiter.acquire() or get_customer_reviews(competitor, website, client))
+
+    if tasks:
+        log(f"  [2-10] Enriching — {len(tasks)} lookups in parallel: {', '.join(tasks)}")
+        res = _run_parallel(tasks)
+        for key, (_v, err) in res.items():
+            if err:
+                log(f"    ! {key} lookup failed: {err}")
+    else:
+        res = {}
+        log("  [2-10] All enrichment columns already filled — skipping")
+
+    def _val(key, default):
+        value, _err = res.get(key, (None, None))
+        return value if value is not None else default
+
+    # Step 2: Company LinkedIn URL
+    if "li_url" in tasks:
+        write_col("Company LinkedIn URL", _val("li_url", ""))
+
+    # Step 3: Company description
+    if "desc" in tasks:
+        write_col("Company Description", _val("desc", ""))
+
+    # Step 4: Firmographics
+    if "firm" in tasks:
+        firm = _val("firm", {}) or {}
+        for c in firm_missing:
+            write_col(c, firm.get(c, ""))
+
+    # Step 5: Recent news
+    if "news" in tasks:
+        write_col("Recent News", _val("news", ""))
+
+    # Step 6: Founders (write, then rebuild the list from final cell values)
+    if "founders" in tasks:
+        found = _val("founders", []) or []
+        f1 = found[0] if len(found) > 0 else {}
+        f2 = found[1] if len(found) > 1 else {}
+        for col_name, key in [("Founder (1) Name", "name"), ("Founder (1) LinkedIn", "linkedin"), ("Founder (1) Twitter", "twitter")]:
+            if not get_col(col_name): write_col(col_name, f1.get(key, ""))
+        for col_name, key in [("Founder (2) Name", "name"), ("Founder (2) LinkedIn", "linkedin"), ("Founder (2) Twitter", "twitter")]:
+            if not get_col(col_name): write_col(col_name, f2.get(key, ""))
+    founders: List[Dict[str, str]] = [
+        {"name": get_col("Founder (1) Name"), "linkedin": get_col("Founder (1) LinkedIn"), "twitter": get_col("Founder (1) Twitter")},
+        {"name": get_col("Founder (2) Name"), "linkedin": get_col("Founder (2) LinkedIn"), "twitter": get_col("Founder (2) Twitter")},
+    ]
+
+    # Step 8: Product info
+    if "prod" in tasks:
+        prod = _val("prod", {}) or {}
+        for c in product_missing:
+            write_col(c, prod.get(c, ""))
+
+    # Step 9: Customer reviews
+    if "reviews" in tasks:
+        write_col("Customer Reviews", (_val("reviews", "") or "") or "not available")
+    elif args.skip_reviews:
+        log("  [9] Skipping reviews (--skip-reviews)")
+
+    # Step 10: Deal size
+    if "deal" in tasks:
+        write_col("Deal Size", _val("deal", ""))
+
+    # ── Step 7: Founder post types (throttled actors → gated + sequential) ─
+    founder_post_summaries: List[str] = []
+    if args.skip_founder_posts:
+        log("  [7] Skipping founder posts (--skip-founder-posts)")
+    else:
+        for fi, (founder, post_col) in enumerate(zip(
+            founders[:2],
+            ["Founder (1) Post type", "Founder (2) Post type"],
+        )):
+            fname = founder.get("name", "") if founder else ""
+            if not fname:
+                continue
+            if get_col(post_col):
+                founder_post_summaries.append(f"[{fname}] {get_col(post_col)}")
+                continue
+            log(f"  [7.{fi+1}] Getting post type for {fname}...")
+            apify_limiter.acquire()  # space actor calls across all concurrent companies
+            pt = get_founder_post_type(
+                fname,
+                founder.get("linkedin", ""),
+                founder.get("twitter", ""),
+                client,
+                skip_twitter=args.skip_twitter,
+            )
+            write_col(post_col, pt)
+            if pt:
+                founder_post_summaries.append(f"[{fname}] {pt}")
+            log(f"    → {pt[:100] or '(no data)'}")
+
+    # ── Step 11: Content type ─────────────────────────────────────────────
+    if not get_col("Content Type"):
+        log("  [11] Synthesising content type...")
+        ct = get_content_type(competitor, founder_post_summaries, scraped, client)
+        write_col("Content Type", ct)
+        log(f"    → {ct[:100] or '(none)'}")
+    else:
+        log("  [11] Content Type already filled — skipping")
+
+    # ── Step 12: Final analysis ───────────────────────────────────────────
+    if args.skip_analysis:
+        log("  [12] Skipping analysis (--skip-analysis)")
+    else:
+        analysis_cols = ["Competitor Score", "Strength", "Weakness", "Target ICP"]
+        missing_analysis = [c for c in analysis_cols if not get_col(c)]
+        if missing_analysis:
+            log("  [12] Running final analysis...")
+            profile = {c: get_col(c) for c in OUTPUT_COLUMNS if get_col(c)}
+            analysis = analyze_competitor(competitor, profile, icp_context, client)
+            for c in missing_analysis:
+                write_col(c, analysis.get(c, ""))
+            log(f"    → Score: {analysis.get('Competitor Score','?')} | ICP: {analysis.get('Target ICP','?')}")
+            log(f"    → Strength:  {analysis.get('Strength','')[:80]}")
+            log(f"    → Weakness:  {analysis.get('Weakness','')[:80]}")
+        else:
+            log("  [12] Analysis columns already filled — skipping")
+
+    return pending, logs
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +432,7 @@ def main() -> None:
     with ThreadPoolExecutor(max_workers=concurrency) as ex:
         futures = {
             ex.submit(process_competitor, i, total, competitor, website, row,
-                      col_map, args, client, icp_context, apify_limiter): (i, row)
+                      col_map, args, client, icp_context, apify_limiter, url_col): (i, row)
             for (i, competitor, website, row) in work
         }
         for fut in as_completed(futures):

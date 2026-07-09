@@ -46,7 +46,7 @@ from exa_py import Exa
 from config import CLAUDE_MODEL, CONTEXT_DIR, EXA_API_KEY
 from workflows._common import (
     strip_json_fence as _strip_json_fence,
-    TabularStore,
+    TabularStore, find_col, ensure_col,
     read_context_file as _read_context_file,
     append_to_context_file as _append_to_context_file,
     section_body as _section_body,
@@ -78,11 +78,16 @@ SHEET_HEADERS = [
     "Status",           # K - 10
     "Posting Date",     # L - 11
 ]
-NUM_COLS = len(SHEET_HEADERS)
-# Column index helpers (used throughout — keep these and SHEET_HEADERS in sync)
-COL_IDEA, COL_WHY, COL_PROJECT, COL_REFERENCE  = 0, 1, 2, 3
-COL_TALKING, COL_MAIN, COL_SEO, COL_KEYWORDS   = 4, 5, 6, 7
-COL_KW_SCORE, COL_ASSETS, COL_STATUS, COL_DATE = 8, 9, 10, 11
+# Logical column name → the header it maps to. Indices are resolved at runtime
+# from the store's ACTUAL header row (see resolve_columns), so a sheet with a
+# different column order — or extra columns — is read and written correctly
+# instead of silently misaligning.
+_COL_NAMES = {
+    "IDEA": "Blog Idea",      "WHY": "Why this Blog?",  "PROJECT": "Project Name",
+    "REFERENCE": "Reference", "TALKING": "Talking Points", "MAIN": "Main Content",
+    "SEO": "SEO Target",      "KEYWORDS": "Keywords",   "KW_SCORE": "Keyword Score",
+    "ASSETS": "Assets",       "STATUS": "Status",       "DATE": "Posting Date",
+}
 
 STATUS_IDEA      = "Idea"
 STATUS_DRAFT     = "Draft Ready"
@@ -257,23 +262,31 @@ def ensure_context_complete(auto: bool) -> Dict[str, str]:
 # Row store helpers (Google Sheet or local CSV, via TabularStore)
 # ---------------------------------------------------------------------------
 
-def ensure_headers(store: TabularStore) -> None:
+def resolve_columns(store: TabularStore):
+    """Resolve every logical column to its index in the store's ACTUAL header row
+    (matched by name). Creates the schema if the store is empty, and appends any
+    of the workflow's columns that are missing from an existing header — so reads
+    and writes land in the right place regardless of the sheet's column order.
+
+    Returns ``(cmap, width, rows)`` where ``cmap`` maps each `_COL_NAMES` key to
+    its column index, ``width`` is the header width, and ``rows`` is the store's
+    contents (header + data) after any header fix."""
     rows = store.read_all()
     if not rows:
         store.append([SHEET_HEADERS])
-        return
-    if rows[0] == SHEET_HEADERS:
-        return
-    # If there are existing data rows under a different header, don't rewrite
-    # the header — that would silently misalign the existing rows. Print a
-    # heads-up; new rows will append with the workflow's column order, and
-    # the user can reconcile schemas manually.
-    if len(rows) > 1:
-        print(f"  Note: {store.label()} has data rows under a different header schema. "
-              f"Keeping existing header; new rows append with the workflow's column order "
-              f"(may not align with existing labels).")
-        return
-    store.update_row(1, SHEET_HEADERS)
+        headers = list(SHEET_HEADERS)
+        rows = [headers]
+    else:
+        headers = list(rows[0])
+        missing = [h for h in SHEET_HEADERS if find_col(headers, h) is None]
+        if missing:
+            for h in missing:
+                ensure_col(headers, h)
+            store.update_row(1, headers)
+            print(f"  Added missing column(s) to {store.label()}: {missing}")
+            rows = [headers] + rows[1:]
+    cmap = {short: find_col(headers, name) for short, name in _COL_NAMES.items()}
+    return cmap, len(headers), rows
 
 
 # ---------------------------------------------------------------------------
@@ -635,7 +648,7 @@ def run_daily(
     ideas = generate_daily_ideas(ref_posts, topic_posts, full_context, args.num_ideas, client)
     print(f"Generated {len(ideas)} idea(s)")
 
-    ensure_headers(store)
+    c, width, _ = resolve_columns(store)
 
     rows: List[List[str]] = []
     for idea in ideas:
@@ -643,27 +656,27 @@ def run_daily(
         if args.validate_keywords:
             kw_scores = validate_idea_keywords(idea)
 
-        row = [""] * NUM_COLS
-        row[COL_IDEA]      = _to_str(idea.get("blog_idea", ""))
-        row[COL_WHY]       = _to_str(idea.get("why", ""))
-        row[COL_PROJECT]   = args.project_name or ""
-        row[COL_REFERENCE] = _to_str(idea.get("references", []))
-        row[COL_TALKING]   = "\n".join(f"• {pt}" for pt in (idea.get("talking_points") or []))
-        row[COL_MAIN]      = ""
-        row[COL_SEO]       = _to_str(idea.get("seo_target", ""))
-        row[COL_KEYWORDS]  = ", ".join(idea.get("keywords") or [])
-        row[COL_KW_SCORE]  = format_keyword_scores(kw_scores)
-        row[COL_ASSETS]    = _to_str(idea.get("assets", ""))
-        row[COL_STATUS]    = STATUS_IDEA
-        row[COL_DATE]      = _to_str(idea.get("posting_date", ""))
+        row = [""] * width
+        row[c["IDEA"]]      = _to_str(idea.get("blog_idea", ""))
+        row[c["WHY"]]       = _to_str(idea.get("why", ""))
+        row[c["PROJECT"]]   = args.project_name or ""
+        row[c["REFERENCE"]] = _to_str(idea.get("references", []))
+        row[c["TALKING"]]   = "\n".join(f"• {pt}" for pt in (idea.get("talking_points") or []))
+        row[c["MAIN"]]      = ""
+        row[c["SEO"]]       = _to_str(idea.get("seo_target", ""))
+        row[c["KEYWORDS"]]  = ", ".join(idea.get("keywords") or [])
+        row[c["KW_SCORE"]]  = format_keyword_scores(kw_scores)
+        row[c["ASSETS"]]    = _to_str(idea.get("assets", ""))
+        row[c["STATUS"]]    = STATUS_IDEA
+        row[c["DATE"]]      = _to_str(idea.get("posting_date", ""))
         rows.append(row)
 
     store.append(rows)
 
     print(f"\n✓ Added {len(rows)} row(s) to {store.label()}:")
     for r in rows:
-        print(f"  • {r[COL_IDEA]}")
-        print(f"    SEO target: {r[COL_SEO]}  |  Post date: {r[COL_DATE]}")
+        print(f"  • {r[c['IDEA']]}")
+        print(f"    SEO target: {r[c['SEO']]}  |  Post date: {r[c['DATE']]}")
 
 
 # ---------------------------------------------------------------------------
@@ -688,19 +701,19 @@ def run_idea(
             if len(parts) == 2:
                 references.append({"name": parts[0], "domain": parts[1]})
 
-    all_rows = store.read_all()
-    if not all_rows:
+    c, width, all_rows = resolve_columns(store)
+    data_rows = all_rows[1:]
+    if not data_rows:
         print(f"{store.label()} is empty.")
         return
 
-    data_rows = all_rows[1:]
     pending: List[tuple] = []
 
     for i, row in enumerate(data_rows, start=2):
-        r = pad_row(row, NUM_COLS)
-        idea_text = r[COL_IDEA].strip()
-        keywords  = r[COL_KEYWORDS].strip()
-        status    = r[COL_STATUS].strip().lower()
+        r = pad_row(row, width)
+        idea_text = r[c["IDEA"]].strip()
+        keywords  = r[c["KEYWORDS"]].strip()
+        status    = r[c["STATUS"]].strip().lower()
 
         if idea_text and not keywords and status not in _TERMINAL_STATUSES:
             pending.append((i, r, idea_text))
@@ -727,17 +740,17 @@ def run_idea(
             kw_scores = validate_idea_keywords(meta)
 
         updated = list(row_data)
-        updated[COL_WHY]       = _to_str(meta.get("why", ""))
-        updated[COL_REFERENCE] = "\n".join(meta.get("references", []))
-        updated[COL_TALKING]   = "\n".join(f"• {pt}" for pt in meta.get("talking_points", []))
-        updated[COL_SEO]       = meta.get("seo_target", "")
-        updated[COL_KEYWORDS]  = ", ".join(meta.get("keywords", []))
-        updated[COL_KW_SCORE]  = format_keyword_scores(kw_scores)
-        updated[COL_ASSETS]    = _to_str(meta.get("assets", ""))
-        updated[COL_STATUS]    = STATUS_IDEA
-        updated[COL_DATE]      = meta.get("posting_date", "")
-        if args.project_name and not updated[COL_PROJECT].strip():
-            updated[COL_PROJECT] = args.project_name
+        updated[c["WHY"]]       = _to_str(meta.get("why", ""))
+        updated[c["REFERENCE"]] = "\n".join(meta.get("references", []))
+        updated[c["TALKING"]]   = "\n".join(f"• {pt}" for pt in meta.get("talking_points", []))
+        updated[c["SEO"]]       = meta.get("seo_target", "")
+        updated[c["KEYWORDS"]]  = ", ".join(meta.get("keywords", []))
+        updated[c["KW_SCORE"]]  = format_keyword_scores(kw_scores)
+        updated[c["ASSETS"]]    = _to_str(meta.get("assets", ""))
+        updated[c["STATUS"]]    = STATUS_IDEA
+        updated[c["DATE"]]      = meta.get("posting_date", "")
+        if args.project_name and not updated[c["PROJECT"]].strip():
+            updated[c["PROJECT"]] = args.project_name
 
         store.update_row(row_idx, updated)
         print(f"  ✓ Updated — SEO target: {meta.get('seo_target', '')}  |  Post date: {meta.get('posting_date', '')}\n")
@@ -803,16 +816,16 @@ def run_write(
     ensure_context_complete(args.auto)
     full_context = load_all_context()
 
-    all_rows = store.read_all()
+    c, width, all_rows = resolve_columns(store)
     if args.row < 2 or args.row > len(all_rows):
         print(f"Row {args.row} is out of range ({store.label()} has {len(all_rows)} rows).")
         return
 
-    row         = pad_row(all_rows[args.row - 1], NUM_COLS)
-    idea        = row[COL_IDEA].strip()
-    talking_pts = row[COL_TALKING].strip()
-    seo_target  = row[COL_SEO].strip()
-    keywords    = row[COL_KEYWORDS].strip()
+    row         = pad_row(all_rows[args.row - 1], width)
+    idea        = row[c["IDEA"]].strip()
+    talking_pts = row[c["TALKING"]].strip()
+    seo_target  = row[c["SEO"]].strip()
+    keywords    = row[c["KEYWORDS"]].strip()
 
     if not idea:
         print("Row has no Blog Idea.")
@@ -838,8 +851,8 @@ def run_write(
         main_content = create_blog_doc(args.blogs_folder_id, idea, seo_target, keywords, draft)
         print(f"Doc created: {main_content}")
 
-    row[COL_MAIN]   = main_content
-    row[COL_STATUS] = STATUS_DRAFT
+    row[c["MAIN"]]   = main_content
+    row[c["STATUS"]] = STATUS_DRAFT
     store.update_row(args.row, row)
     print(f"Updated — Status: Draft Ready, Main Content: {main_content}")
 

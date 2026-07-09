@@ -319,6 +319,37 @@ class TabularStore:
         if not self.read_all():
             self.append([headers])
 
+    def append_mapped(self, expected_headers: List[str],
+                      rows: List[Dict[str, str]]) -> None:
+        """Append ``rows`` (dicts keyed by header name) aligned to the store's
+        ACTUAL header row, so values land under the right columns even when an
+        existing sheet/CSV's column order differs from ``expected_headers``.
+
+        Writes ``expected_headers`` as the header row if the store is empty. If
+        the store already has a header row that's missing any expected column,
+        warn (rather than silently writing values into the wrong columns, which
+        is what positional appends do)."""
+        existing = self.read_all()
+        if not existing:
+            self.append([expected_headers])
+            actual = list(expected_headers)
+        else:
+            actual = existing[0]
+            missing = [h for h in expected_headers if find_col(actual, h) is None]
+            if missing:
+                print(f"  ⚠ output {self.label()} is missing column(s) "
+                      f"{missing}; those values will be dropped. Point at an "
+                      f"empty tab/file to get the full schema.")
+        values: List[List[str]] = []
+        for row in rows:
+            line = [""] * len(actual)
+            for key, val in row.items():
+                idx = find_col(actual, key)
+                if idx is not None:
+                    line[idx] = val
+            values.append(line)
+        self.append(values)
+
 
 # ---------------------------------------------------------------------------
 # context.md — the business questionnaire

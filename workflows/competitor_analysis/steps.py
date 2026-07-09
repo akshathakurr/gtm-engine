@@ -142,6 +142,73 @@ def scrape_website(url: str) -> dict:
             return {}
 
 
+# Generic slugs are common false positives from the co-mention search — never a
+# competitor's real page.
+_JUNK_LI_SLUGS = {"linkedin", "company", "companies", "school"}
+
+
+def _is_real_company_li(url: str) -> bool:
+    slug = url.split("/company/")[-1].strip("/").lower()
+    return bool(slug) and slug not in _JUNK_LI_SLUGS
+
+
+# Social / aggregator domains that are never a company's own homepage — used to
+# reject noise when searching for an official site from just a name.
+_NON_OFFICIAL_DOMAINS = (
+    "linkedin.com", "twitter.com", "x.com", "facebook.com", "instagram.com",
+    "youtube.com", "tiktok.com", "crunchbase.com", "wikipedia.org", "g2.com",
+    "capterra.com", "glassdoor.com", "bloomberg.com", "medium.com",
+    "github.com", "reddit.com", "pitchbook.com", "apollo.io",
+)
+
+
+def find_official_site(company_name: str, client: anthropic.Anthropic) -> str:
+    """Best-effort official homepage for a company given only its name — used when
+    the input row has no URL, so the website scrape and every website-derived step
+    (description, product info, CTA…) have something to work with. Returns '' if
+    nothing confident turns up."""
+    try:
+        result = search_web(
+            query=f"{company_name} official website",
+            num_results=6,
+            summary_question=f"What is the official company homepage URL for {company_name}?",
+        )
+    except Exception as e:
+        print(f"    Official-site lookup failed: {e}")
+        return ""
+
+    seen, unique = set(), []
+    for r in result.get("results", []):
+        parsed = urlparse((r.get("url", "") or "").split("?")[0])
+        domain = _strip_www(parsed.netloc).lower()
+        if not domain or any(domain == d or domain.endswith("." + d)
+                             for d in _NON_OFFICIAL_DOMAINS):
+            continue
+        home = f"{parsed.scheme or 'https'}://{parsed.netloc}"
+        if home not in seen:
+            seen.add(home); unique.append(home)
+
+    if not unique:
+        return ""
+    if len(unique) == 1:
+        return unique[0]
+    # Multiple candidates — let Claude pick the one that's actually this company.
+    try:
+        resp = client.messages.create(
+            model=CLAUDE_MODEL, max_tokens=100,
+            messages=[{"role": "user", "content": (
+                f"Which of these is the official homepage of the company {company_name!r}?\n"
+                f"Options: {unique}\n"
+                f'Return JSON: {{"url": "https://..."}} — or {{"url": ""}} if none clearly match.\n'
+                f"Return only valid JSON."
+            )}],
+        )
+        chosen = json.loads(_strip_json_fence(resp.content[0].text)).get("url", "")
+        return chosen if chosen in unique else unique[0]
+    except Exception:
+        return unique[0]
+
+
 # ---------------------------------------------------------------------------
 # Step 2: Company LinkedIn URL
 # ---------------------------------------------------------------------------
@@ -166,10 +233,10 @@ def find_linkedin_url(company_name: str, website: str,
             if resp.ok:
                 jina_text = resp.text
                 slugs = re.findall(pattern, jina_text)
-                # Remove duplicates, keep order
+                # Remove duplicates + generic junk slugs, keep order
                 seen, unique = set(), []
                 for s in slugs:
-                    if s not in seen:
+                    if s not in seen and s.lower() not in _JUNK_LI_SLUGS:
                         seen.add(s); unique.append(s)
                 if unique:
                     # Prefer slug that matches domain prefix
@@ -190,9 +257,12 @@ def find_linkedin_url(company_name: str, website: str,
             summary_question=f"What is the LinkedIn company page URL for {company_name} ({domain})?",
         )
         li_urls = [
-            r.get("url", "").split("?")[0].rstrip("/")
-            for r in result.get("results", [])
-            if "linkedin.com/company/" in r.get("url", "")
+            u for u in (
+                r.get("url", "").split("?")[0].rstrip("/")
+                for r in result.get("results", [])
+                if "linkedin.com/company/" in r.get("url", "")
+            )
+            if _is_real_company_li(u)
         ]
         if not li_urls:
             return ""
@@ -927,215 +997,3 @@ Return only valid JSON."""
         print(f"    Final analysis failed: {e}")
         return {"Competitor Score": "", "Strength": "", "Weakness": "", "Target ICP": ""}
 
-
-# ---------------------------------------------------------------------------
-# Per-competitor orchestration (write-free — safe to run concurrently)
-# ---------------------------------------------------------------------------
-
-def process_competitor(
-    index: int,
-    total: int,
-    competitor: str,
-    website: str,
-    row: List[str],
-    col_map: Dict[str, int],
-    args,
-    client: anthropic.Anthropic,
-    icp_context: str,
-    apify_limiter,
-) -> tuple:
-    """Run all 12 enrichment steps for one competitor and return the values to write.
-
-    Does NO backend I/O: it buffers every output-column value into ``pending``
-    (col_idx → value) and collects progress into ``logs``. The caller writes the
-    row and prints the logs on the main thread, so companies can run concurrently
-    without touching the single-threaded backend from multiple threads.
-
-    ``apify_limiter`` (a shared _common.RateLimiter) spaces the throttled Apify
-    actor calls — founder posts + reviews — across all concurrent companies.
-
-    Returns ``(pending: Dict[int, str], logs: List[str])``.
-    """
-    logs: List[str] = []
-    written: Dict[str, str] = {}
-    pending: Dict[int, str] = {}
-
-    def log(msg: str = "") -> None:
-        logs.append(msg)
-
-    def get_col(name: str) -> str:
-        """Read from original row OR from this run's writes."""
-        return written.get(name) or (
-            row[col_map[name]].strip()
-            if col_map.get(name) is not None and col_map[name] < len(row)
-            else ""
-        )
-
-    def write_col(name: str, value: str) -> None:
-        if value:
-            pending[col_map[name]] = value
-            written[name] = value
-
-    log(f"{'='*60}")
-    log(f"[{index + 1}/{total}] {competitor}  ({website or 'no URL'})")
-    log(f"{'='*60}")
-
-    # ── Step 1: Website scrape ────────────────────────────────────────────
-    scraped: dict = {}
-    if website:
-        log("  [1] Scraping website...")
-        scraped = scrape_website(website)
-        log(f"    → {len(scraped.get('full_text_by_page', {}))} pages scraped")
-    else:
-        log("  [1] No website URL — skipping scrape")
-
-    # ── Steps 2–10: independent enrichment (Claude + Exa + reviews actor) ──
-    firm_cols = ["Employee Count", "Founded Year", "Last Funding Stage", "Total Funding", "Est. Revenue", "HQ Location"]
-    f1_cols = ["Founder (1) Name", "Founder (1) LinkedIn", "Founder (1) Twitter"]
-    f2_cols = ["Founder (2) Name", "Founder (2) LinkedIn", "Founder (2) Twitter"]
-    product_cols = [
-        "Target Persona (User)", "Sales Motion", "Primary CTA", "Pricing",
-        "Customer Stories", "Product Features", "Top Logos", "Marketing Messaging", "SEO",
-    ]
-    firm_missing     = [c for c in firm_cols if not get_col(c)]
-    missing_founders = [c for c in f1_cols + f2_cols if not get_col(c)]
-    product_missing  = [c for c in product_cols if not get_col(c)] if scraped else []
-
-    tasks: Dict[str, "callable"] = {}
-    if not get_col("Company LinkedIn URL"):
-        tasks["li_url"] = lambda: find_linkedin_url(competitor, website, client)
-    if not get_col("Company Description") and scraped:
-        tasks["desc"] = lambda: draft_description(competitor, scraped, client)
-    if firm_missing:
-        tasks["firm"] = lambda: get_firmographics(competitor, website, client)
-    if not get_col("Recent News"):
-        tasks["news"] = lambda: get_recent_news(competitor, website, client)
-    if missing_founders:
-        tasks["founders"] = lambda: find_founders(competitor, website, client)
-    if product_missing:
-        tasks["prod"] = lambda: extract_product_info(competitor, scraped, client)
-    if not get_col("Deal Size"):
-        tasks["deal"] = lambda: get_deal_size(competitor, website, client)
-    if not args.skip_reviews and not get_col("Customer Reviews"):
-        # Reviews hits a throttled Apify actor — gate it on the shared limiter.
-        tasks["reviews"] = lambda: (apify_limiter.acquire() or get_customer_reviews(competitor, website, client))
-
-    if tasks:
-        log(f"  [2-10] Enriching — {len(tasks)} lookups in parallel: {', '.join(tasks)}")
-        res = _run_parallel(tasks)
-        for key, (_v, err) in res.items():
-            if err:
-                log(f"    ! {key} lookup failed: {err}")
-    else:
-        res = {}
-        log("  [2-10] All enrichment columns already filled — skipping")
-
-    def _val(key, default):
-        value, _err = res.get(key, (None, None))
-        return value if value is not None else default
-
-    # Step 2: Company LinkedIn URL
-    if "li_url" in tasks:
-        write_col("Company LinkedIn URL", _val("li_url", ""))
-
-    # Step 3: Company description
-    if "desc" in tasks:
-        write_col("Company Description", _val("desc", ""))
-
-    # Step 4: Firmographics
-    if "firm" in tasks:
-        firm = _val("firm", {}) or {}
-        for c in firm_missing:
-            write_col(c, firm.get(c, ""))
-
-    # Step 5: Recent news
-    if "news" in tasks:
-        write_col("Recent News", _val("news", ""))
-
-    # Step 6: Founders (write, then rebuild the list from final cell values)
-    if "founders" in tasks:
-        found = _val("founders", []) or []
-        f1 = found[0] if len(found) > 0 else {}
-        f2 = found[1] if len(found) > 1 else {}
-        for col_name, key in [("Founder (1) Name", "name"), ("Founder (1) LinkedIn", "linkedin"), ("Founder (1) Twitter", "twitter")]:
-            if not get_col(col_name): write_col(col_name, f1.get(key, ""))
-        for col_name, key in [("Founder (2) Name", "name"), ("Founder (2) LinkedIn", "linkedin"), ("Founder (2) Twitter", "twitter")]:
-            if not get_col(col_name): write_col(col_name, f2.get(key, ""))
-    founders: List[Dict[str, str]] = [
-        {"name": get_col("Founder (1) Name"), "linkedin": get_col("Founder (1) LinkedIn"), "twitter": get_col("Founder (1) Twitter")},
-        {"name": get_col("Founder (2) Name"), "linkedin": get_col("Founder (2) LinkedIn"), "twitter": get_col("Founder (2) Twitter")},
-    ]
-
-    # Step 8: Product info
-    if "prod" in tasks:
-        prod = _val("prod", {}) or {}
-        for c in product_missing:
-            write_col(c, prod.get(c, ""))
-
-    # Step 9: Customer reviews
-    if "reviews" in tasks:
-        write_col("Customer Reviews", (_val("reviews", "") or "") or "not available")
-    elif args.skip_reviews:
-        log("  [9] Skipping reviews (--skip-reviews)")
-
-    # Step 10: Deal size
-    if "deal" in tasks:
-        write_col("Deal Size", _val("deal", ""))
-
-    # ── Step 7: Founder post types (throttled actors → gated + sequential) ─
-    founder_post_summaries: List[str] = []
-    if args.skip_founder_posts:
-        log("  [7] Skipping founder posts (--skip-founder-posts)")
-    else:
-        for fi, (founder, post_col) in enumerate(zip(
-            founders[:2],
-            ["Founder (1) Post type", "Founder (2) Post type"],
-        )):
-            fname = founder.get("name", "") if founder else ""
-            if not fname:
-                continue
-            if get_col(post_col):
-                founder_post_summaries.append(f"[{fname}] {get_col(post_col)}")
-                continue
-            log(f"  [7.{fi+1}] Getting post type for {fname}...")
-            apify_limiter.acquire()  # space actor calls across all concurrent companies
-            pt = get_founder_post_type(
-                fname,
-                founder.get("linkedin", ""),
-                founder.get("twitter", ""),
-                client,
-                skip_twitter=args.skip_twitter,
-            )
-            write_col(post_col, pt)
-            if pt:
-                founder_post_summaries.append(f"[{fname}] {pt}")
-            log(f"    → {pt[:100] or '(no data)'}")
-
-    # ── Step 11: Content type ─────────────────────────────────────────────
-    if not get_col("Content Type"):
-        log("  [11] Synthesising content type...")
-        ct = get_content_type(competitor, founder_post_summaries, scraped, client)
-        write_col("Content Type", ct)
-        log(f"    → {ct[:100] or '(none)'}")
-    else:
-        log("  [11] Content Type already filled — skipping")
-
-    # ── Step 12: Final analysis ───────────────────────────────────────────
-    if args.skip_analysis:
-        log("  [12] Skipping analysis (--skip-analysis)")
-    else:
-        analysis_cols = ["Competitor Score", "Strength", "Weakness", "Target ICP"]
-        missing_analysis = [c for c in analysis_cols if not get_col(c)]
-        if missing_analysis:
-            log("  [12] Running final analysis...")
-            profile = {c: get_col(c) for c in OUTPUT_COLUMNS if get_col(c)}
-            analysis = analyze_competitor(competitor, profile, icp_context, client)
-            for c in missing_analysis:
-                write_col(c, analysis.get(c, ""))
-            log(f"    → Score: {analysis.get('Competitor Score','?')} | ICP: {analysis.get('Target ICP','?')}")
-            log(f"    → Strength:  {analysis.get('Strength','')[:80]}")
-            log(f"    → Weakness:  {analysis.get('Weakness','')[:80]}")
-        else:
-            log("  [12] Analysis columns already filled — skipping")
-
-    return pending, logs
