@@ -85,6 +85,7 @@ python -m workflows.competitor_analysis.workflow --sheet-id SHEET_ID --auto
 | `--skip-twitter` | Skip Twitter scraping (saves Apify credits) |
 | `--skip-founder-posts` | Skip all founder post scraping |
 | `--skip-analysis` | Skip final scoring step |
+| `--concurrency N` | Number of competitors processed in parallel (default: 3). Use `1` for fully sequential. |
 | `--auto` | Run non-interactively. Errors out if `context.md` is missing required sections. |
 
 ## Output formatting (column conventions)
@@ -108,6 +109,8 @@ If the LLM doesn't have data, it writes a literal sentinel (`insufficient data` 
 ## Notes
 
 - Already-filled cells are skipped — re-runs are safe.
+- Competitors are processed concurrently (`--concurrency`, default 3). Each competitor's own enrichment lookups also run in parallel; the throttled Apify actors (founder posts, reviews) are spaced by a shared rate limiter across all in-flight competitors, and every row is persisted in a single backend write on the main thread (so a crash only loses the in-flight companies, and the sheet/CSV is never written from two threads).
+- Firmographics and deal-size lookups are anchored to the company's domain when a URL is present, so a same-named company doesn't thin the results.
 - LinkedIn URL lookup uses a co-mention Exa query (`{domain} linkedin.com/company`) — more reliable than `site:` filtering.
 - Founder LinkedIn lookup uses the same co-mention pattern per founder (`"{name}" "{company}" linkedin.com/in`).
 - `site:` operator in Exa is non-deterministic — avoid using it as a hard filter.

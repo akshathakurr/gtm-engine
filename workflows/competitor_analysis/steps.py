@@ -31,9 +31,62 @@ from concurrent.futures import ThreadPoolExecutor
 # ---------------------------------------------------------------------------
 
 # Each competitor's independent enrichment lookups (Claude + Exa) run together
-# in a bounded pool. Competitors themselves stay sequential, so throttled Apify
-# actors and the single-threaded sheet/CSV backend are never hit concurrently.
+# in a bounded pool. Web search is globally throttled + thread-safe, so many of
+# these in flight at once is safe.
 COMPETITOR_ENRICH_CONCURRENCY = 6
+
+# Companies are processed concurrently across a bounded pool. Kept modest: each
+# company already fans its own enrichment across COMPETITOR_ENRICH_CONCURRENCY
+# threads, so total in-flight work is COMPANY_CONCURRENCY x that. Backend writes
+# stay on the main thread (see workflow.py), so the sheet/CSV is never touched
+# concurrently.
+COMPANY_CONCURRENCY = 3
+
+# The founder-post and review scrapers hit throttled Apify actors. With companies
+# running concurrently, those calls would otherwise burst; a single shared
+# limiter spaces every actor call start >= this many seconds apart, process-wide
+# (replaces the old per-company time.sleep(2) between founders).
+APIFY_MIN_INTERVAL = 2.0
+
+
+# Exact Bird Eye output header names (Notes is manual, excluded). One source of
+# truth — workflow.py imports this for header setup, process_competitor for the
+# final-analysis profile.
+OUTPUT_COLUMNS = [
+    "Company LinkedIn URL",
+    "Company Description",
+    "Competitor Score",
+    "Strength",
+    "Weakness",
+    "Employee Count",
+    "Founded Year",
+    "Last Funding Stage",
+    "Total Funding",
+    "Est. Revenue",
+    "HQ Location",
+    "Recent News",
+    "Founder (1) Name",
+    "Founder (1) LinkedIn",
+    "Founder (1) Twitter",
+    "Founder (1) Post type",
+    "Founder (2) Name",
+    "Founder (2) LinkedIn",
+    "Founder (2) Twitter",
+    "Founder (2) Post type",
+    "Target Persona (User)",
+    "Primary CTA",
+    "Pricing",
+    "Customer Stories",
+    "Product Features",
+    "Customer Reviews",
+    "Target ICP",
+    "Sales Motion",
+    "Deal Size",
+    "Top Logos",
+    "Marketing Messaging",
+    "Content Type",
+    "SEO",
+]
 
 
 def _run_parallel(tasks: Dict[str, "callable"], max_workers: int = COMPETITOR_ENRICH_CONCURRENCY) -> Dict[str, tuple]:
@@ -200,17 +253,27 @@ def draft_description(company_name: str, scraped: dict, client: anthropic.Anthro
 # Step 4: Firmographics
 # ---------------------------------------------------------------------------
 
-def get_firmographics(company_name: str, client: anthropic.Anthropic) -> Dict[str, str]:
+def get_firmographics(company_name: str, website: str,
+                      client: anthropic.Anthropic) -> Dict[str, str]:
     empty = {
         "Employee Count": "", "Founded Year": "", "Last Funding Stage": "",
         "Total Funding": "", "Est. Revenue": "", "HQ Location": "",
     }
+    # Anchor to the domain when we have one so a same-named company doesn't thin
+    # the firmographics (e.g. "Bluebird" the airline vs. the SaaS).
+    domain = _strip_www(urlparse(website).netloc) if website else ""
+    label = f"{company_name} ({domain})" if domain else company_name
+    query = (
+        f'"{domain}" {company_name} employees headcount funding stage total funding founded year headquarters revenue'
+        if domain else
+        f"{company_name} employees headcount funding stage total funding founded year headquarters revenue"
+    )
     try:
         result = search_web(
-            query=f"{company_name} employees headcount funding stage total funding founded year headquarters revenue",
+            query=query,
             num_results=5,
             summary_question=(
-                f"What is {company_name}'s employee count, year founded, last funding stage, "
+                f"What is {label}'s employee count, year founded, last funding stage, "
                 f"total funding raised, estimated revenue, and HQ city?"
             ),
         )
@@ -226,7 +289,8 @@ def get_firmographics(company_name: str, client: anthropic.Anthropic) -> Dict[st
     if not snippets:
         return empty
 
-    prompt = f"""Extract firmographic data for "{company_name}" from this research.
+    prompt = f"""Extract firmographic data for "{label}" from this research.
+Only use facts about the company at {domain or company_name} — ignore any results about a different company that happens to share the name.
 
 Research:
 {chr(10).join(snippets[:15])}
@@ -742,12 +806,19 @@ Return only valid JSON."""}],
 # Step 10: Deal size
 # ---------------------------------------------------------------------------
 
-def get_deal_size(company_name: str, client: anthropic.Anthropic) -> str:
+def get_deal_size(company_name: str, website: str, client: anthropic.Anthropic) -> str:
+    domain = _strip_www(urlparse(website).netloc) if website else ""
+    label = f"{company_name} ({domain})" if domain else company_name
+    query = (
+        f'"{domain}" {company_name} average deal size ACV annual contract value pricing enterprise mid-market'
+        if domain else
+        f"{company_name} average deal size ACV annual contract value pricing enterprise mid-market"
+    )
     try:
         result = search_web(
-            query=f"{company_name} average deal size ACV annual contract value pricing enterprise mid-market",
+            query=query,
             num_results=5,
-            summary_question=f"What is the average deal size or ACV for {company_name}?",
+            summary_question=f"What is the average deal size or ACV for {label}?",
         )
     except Exception:
         return "not available"
@@ -763,7 +834,7 @@ def get_deal_size(company_name: str, client: anthropic.Anthropic) -> str:
     try:
         resp = client.messages.create(
             model=CLAUDE_MODEL, max_tokens=100,
-            messages=[{"role": "user", "content": f"""Find the average deal size or ACV for {company_name}.
+            messages=[{"role": "user", "content": f"""Find the average deal size or ACV for {label}.
 
 Research:
 {chr(10).join(snippets[:10])}
@@ -855,3 +926,216 @@ Return only valid JSON."""
     except Exception as e:
         print(f"    Final analysis failed: {e}")
         return {"Competitor Score": "", "Strength": "", "Weakness": "", "Target ICP": ""}
+
+
+# ---------------------------------------------------------------------------
+# Per-competitor orchestration (write-free — safe to run concurrently)
+# ---------------------------------------------------------------------------
+
+def process_competitor(
+    index: int,
+    total: int,
+    competitor: str,
+    website: str,
+    row: List[str],
+    col_map: Dict[str, int],
+    args,
+    client: anthropic.Anthropic,
+    icp_context: str,
+    apify_limiter,
+) -> tuple:
+    """Run all 12 enrichment steps for one competitor and return the values to write.
+
+    Does NO backend I/O: it buffers every output-column value into ``pending``
+    (col_idx → value) and collects progress into ``logs``. The caller writes the
+    row and prints the logs on the main thread, so companies can run concurrently
+    without touching the single-threaded backend from multiple threads.
+
+    ``apify_limiter`` (a shared _common.RateLimiter) spaces the throttled Apify
+    actor calls — founder posts + reviews — across all concurrent companies.
+
+    Returns ``(pending: Dict[int, str], logs: List[str])``.
+    """
+    logs: List[str] = []
+    written: Dict[str, str] = {}
+    pending: Dict[int, str] = {}
+
+    def log(msg: str = "") -> None:
+        logs.append(msg)
+
+    def get_col(name: str) -> str:
+        """Read from original row OR from this run's writes."""
+        return written.get(name) or (
+            row[col_map[name]].strip()
+            if col_map.get(name) is not None and col_map[name] < len(row)
+            else ""
+        )
+
+    def write_col(name: str, value: str) -> None:
+        if value:
+            pending[col_map[name]] = value
+            written[name] = value
+
+    log(f"{'='*60}")
+    log(f"[{index + 1}/{total}] {competitor}  ({website or 'no URL'})")
+    log(f"{'='*60}")
+
+    # ── Step 1: Website scrape ────────────────────────────────────────────
+    scraped: dict = {}
+    if website:
+        log("  [1] Scraping website...")
+        scraped = scrape_website(website)
+        log(f"    → {len(scraped.get('full_text_by_page', {}))} pages scraped")
+    else:
+        log("  [1] No website URL — skipping scrape")
+
+    # ── Steps 2–10: independent enrichment (Claude + Exa + reviews actor) ──
+    firm_cols = ["Employee Count", "Founded Year", "Last Funding Stage", "Total Funding", "Est. Revenue", "HQ Location"]
+    f1_cols = ["Founder (1) Name", "Founder (1) LinkedIn", "Founder (1) Twitter"]
+    f2_cols = ["Founder (2) Name", "Founder (2) LinkedIn", "Founder (2) Twitter"]
+    product_cols = [
+        "Target Persona (User)", "Sales Motion", "Primary CTA", "Pricing",
+        "Customer Stories", "Product Features", "Top Logos", "Marketing Messaging", "SEO",
+    ]
+    firm_missing     = [c for c in firm_cols if not get_col(c)]
+    missing_founders = [c for c in f1_cols + f2_cols if not get_col(c)]
+    product_missing  = [c for c in product_cols if not get_col(c)] if scraped else []
+
+    tasks: Dict[str, "callable"] = {}
+    if not get_col("Company LinkedIn URL"):
+        tasks["li_url"] = lambda: find_linkedin_url(competitor, website, client)
+    if not get_col("Company Description") and scraped:
+        tasks["desc"] = lambda: draft_description(competitor, scraped, client)
+    if firm_missing:
+        tasks["firm"] = lambda: get_firmographics(competitor, website, client)
+    if not get_col("Recent News"):
+        tasks["news"] = lambda: get_recent_news(competitor, website, client)
+    if missing_founders:
+        tasks["founders"] = lambda: find_founders(competitor, website, client)
+    if product_missing:
+        tasks["prod"] = lambda: extract_product_info(competitor, scraped, client)
+    if not get_col("Deal Size"):
+        tasks["deal"] = lambda: get_deal_size(competitor, website, client)
+    if not args.skip_reviews and not get_col("Customer Reviews"):
+        # Reviews hits a throttled Apify actor — gate it on the shared limiter.
+        tasks["reviews"] = lambda: (apify_limiter.acquire() or get_customer_reviews(competitor, website, client))
+
+    if tasks:
+        log(f"  [2-10] Enriching — {len(tasks)} lookups in parallel: {', '.join(tasks)}")
+        res = _run_parallel(tasks)
+        for key, (_v, err) in res.items():
+            if err:
+                log(f"    ! {key} lookup failed: {err}")
+    else:
+        res = {}
+        log("  [2-10] All enrichment columns already filled — skipping")
+
+    def _val(key, default):
+        value, _err = res.get(key, (None, None))
+        return value if value is not None else default
+
+    # Step 2: Company LinkedIn URL
+    if "li_url" in tasks:
+        write_col("Company LinkedIn URL", _val("li_url", ""))
+
+    # Step 3: Company description
+    if "desc" in tasks:
+        write_col("Company Description", _val("desc", ""))
+
+    # Step 4: Firmographics
+    if "firm" in tasks:
+        firm = _val("firm", {}) or {}
+        for c in firm_missing:
+            write_col(c, firm.get(c, ""))
+
+    # Step 5: Recent news
+    if "news" in tasks:
+        write_col("Recent News", _val("news", ""))
+
+    # Step 6: Founders (write, then rebuild the list from final cell values)
+    if "founders" in tasks:
+        found = _val("founders", []) or []
+        f1 = found[0] if len(found) > 0 else {}
+        f2 = found[1] if len(found) > 1 else {}
+        for col_name, key in [("Founder (1) Name", "name"), ("Founder (1) LinkedIn", "linkedin"), ("Founder (1) Twitter", "twitter")]:
+            if not get_col(col_name): write_col(col_name, f1.get(key, ""))
+        for col_name, key in [("Founder (2) Name", "name"), ("Founder (2) LinkedIn", "linkedin"), ("Founder (2) Twitter", "twitter")]:
+            if not get_col(col_name): write_col(col_name, f2.get(key, ""))
+    founders: List[Dict[str, str]] = [
+        {"name": get_col("Founder (1) Name"), "linkedin": get_col("Founder (1) LinkedIn"), "twitter": get_col("Founder (1) Twitter")},
+        {"name": get_col("Founder (2) Name"), "linkedin": get_col("Founder (2) LinkedIn"), "twitter": get_col("Founder (2) Twitter")},
+    ]
+
+    # Step 8: Product info
+    if "prod" in tasks:
+        prod = _val("prod", {}) or {}
+        for c in product_missing:
+            write_col(c, prod.get(c, ""))
+
+    # Step 9: Customer reviews
+    if "reviews" in tasks:
+        write_col("Customer Reviews", (_val("reviews", "") or "") or "not available")
+    elif args.skip_reviews:
+        log("  [9] Skipping reviews (--skip-reviews)")
+
+    # Step 10: Deal size
+    if "deal" in tasks:
+        write_col("Deal Size", _val("deal", ""))
+
+    # ── Step 7: Founder post types (throttled actors → gated + sequential) ─
+    founder_post_summaries: List[str] = []
+    if args.skip_founder_posts:
+        log("  [7] Skipping founder posts (--skip-founder-posts)")
+    else:
+        for fi, (founder, post_col) in enumerate(zip(
+            founders[:2],
+            ["Founder (1) Post type", "Founder (2) Post type"],
+        )):
+            fname = founder.get("name", "") if founder else ""
+            if not fname:
+                continue
+            if get_col(post_col):
+                founder_post_summaries.append(f"[{fname}] {get_col(post_col)}")
+                continue
+            log(f"  [7.{fi+1}] Getting post type for {fname}...")
+            apify_limiter.acquire()  # space actor calls across all concurrent companies
+            pt = get_founder_post_type(
+                fname,
+                founder.get("linkedin", ""),
+                founder.get("twitter", ""),
+                client,
+                skip_twitter=args.skip_twitter,
+            )
+            write_col(post_col, pt)
+            if pt:
+                founder_post_summaries.append(f"[{fname}] {pt}")
+            log(f"    → {pt[:100] or '(no data)'}")
+
+    # ── Step 11: Content type ─────────────────────────────────────────────
+    if not get_col("Content Type"):
+        log("  [11] Synthesising content type...")
+        ct = get_content_type(competitor, founder_post_summaries, scraped, client)
+        write_col("Content Type", ct)
+        log(f"    → {ct[:100] or '(none)'}")
+    else:
+        log("  [11] Content Type already filled — skipping")
+
+    # ── Step 12: Final analysis ───────────────────────────────────────────
+    if args.skip_analysis:
+        log("  [12] Skipping analysis (--skip-analysis)")
+    else:
+        analysis_cols = ["Competitor Score", "Strength", "Weakness", "Target ICP"]
+        missing_analysis = [c for c in analysis_cols if not get_col(c)]
+        if missing_analysis:
+            log("  [12] Running final analysis...")
+            profile = {c: get_col(c) for c in OUTPUT_COLUMNS if get_col(c)}
+            analysis = analyze_competitor(competitor, profile, icp_context, client)
+            for c in missing_analysis:
+                write_col(c, analysis.get(c, ""))
+            log(f"    → Score: {analysis.get('Competitor Score','?')} | ICP: {analysis.get('Target ICP','?')}")
+            log(f"    → Strength:  {analysis.get('Strength','')[:80]}")
+            log(f"    → Weakness:  {analysis.get('Weakness','')[:80]}")
+        else:
+            log("  [12] Analysis columns already filled — skipping")
+
+    return pending, logs

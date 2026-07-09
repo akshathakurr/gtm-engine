@@ -551,6 +551,19 @@ class GoogleSheetsBackend:
         rng = f"{self.sheet_name}!{ltr}2:{ltr}{len(values) + 1}"
         gws_write_range(self.sheet_id, rng, [[v] for v in values])
 
+    def write_row(self, row_num: int, updates: Dict[int, str], base_row: List[str]) -> None:
+        """Persist every cell in ``updates`` (col_idx → value) for ``row_num`` in a
+        SINGLE Sheets write, instead of one API call per column. Writes one
+        contiguous range spanning the touched columns; any untouched cell inside
+        that span is re-sent from ``base_row`` so it isn't clobbered."""
+        if not updates:
+            return
+        lo, hi = min(updates), max(updates)
+        vals = [updates.get(idx, base_row[idx] if idx < len(base_row) else "")
+                for idx in range(lo, hi + 1)]
+        rng = f"{self.sheet_name}!{col_letter(lo)}{row_num}:{col_letter(hi)}{row_num}"
+        gws_write_range(self.sheet_id, rng, [vals])
+
 
 class CsvBackend:
     """In-memory rows; rewrites the output CSV after every write so partial progress survives crashes."""
@@ -598,6 +611,18 @@ class CsvBackend:
             idx = i + 1  # data starts at row index 1 (sheet row 2)
             self._ensure(idx, col_idx)
             self.rows[idx][col_idx] = v
+        self._flush()
+
+    def write_row(self, row_num: int, updates: Dict[int, str], base_row: List[str]) -> None:
+        """Apply every cell in ``updates`` for ``row_num`` then rewrite the CSV
+        once, instead of a full rewrite per column. ``base_row`` is unused (rows
+        are edited in place by index)."""
+        if not updates:
+            return
+        idx = row_num - 1
+        for col_idx, value in updates.items():
+            self._ensure(idx, col_idx)
+            self.rows[idx][col_idx] = value
         self._flush()
 
 
