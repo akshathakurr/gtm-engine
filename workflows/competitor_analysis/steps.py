@@ -411,9 +411,10 @@ def get_recent_news(company_name: str, website: str, client: anthropic.Anthropic
 
     candidates = []
     for r in result.get("results", []):
-        url   = r.get("url", "")
-        title = r.get("title", "")
-        snip  = r.get("snippet") or r.get("summary", "")
+        # .get(key, "") still yields None when the key exists with a null value
+        url   = r.get("url") or ""
+        title = r.get("title") or ""
+        snip  = r.get("snippet") or r.get("summary") or ""
         if url and title:
             candidates.append({"title": title, "url": url, "snippet": snip[:200]})
     if not candidates:

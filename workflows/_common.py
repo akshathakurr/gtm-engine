@@ -288,9 +288,12 @@ class TabularStore:
             with open(self.csv_path, "a", newline="") as f:
                 csv.writer(f).writerows([[str(c) for c in r] for r in rows])
             return
+        # Anchor the range at A1: the append API "detects a table" around the
+        # given range and can anchor at a non-A column on sheets with stray
+        # cells; pinning A1 makes appends land at column A deterministically.
         cmd = ["gws", "sheets", "spreadsheets", "values", "append",
                "--params", json.dumps({
-                   "spreadsheetId": self.sheet_id, "range": self.sheet_name,
+                   "spreadsheetId": self.sheet_id, "range": f"{self.sheet_name}!A1",
                    "valueInputOption": "USER_ENTERED", "insertDataOption": "INSERT_ROWS",
                }),
                "--json", json.dumps({"values": [[str(c) for c in r] for r in rows]})]
@@ -437,7 +440,7 @@ APIFY_UNIT_COST = {
     "linkedin_post_search":   0.005,    # apimaestro posts-search   ($5/1k)
     "linkedin_profile_posts": 0.005,    # apimaestro profile-posts  ($5/1k)
     "linkedin_comments":      0.0012,   # apimaestro comments       ($1.2/1k)
-    "linkedin_profile":       0.003,    # apimaestro profile        ($3/1k)
+    "linkedin_profile":       0.005,    # apimaestro profile batch  ($5/1k)
     "twitter":                0.00025,  # kaitoeasyapi tweets  (~$0.25/1k, upper bound)
 }
 

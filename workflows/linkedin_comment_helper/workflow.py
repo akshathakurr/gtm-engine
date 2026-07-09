@@ -88,7 +88,9 @@ def _parse_keyword_lines(body: str) -> List[str]:
         line = line.strip()
         if line.startswith(("- ", "* ")):
             line = line[2:].strip()
-        if not line or line.startswith("#") or line.startswith("("):
+        # Skip blanks, comments, placeholders, and markdown horizontal rules
+        # ("---" separators are included in section bodies).
+        if not line or line.startswith("#") or line.startswith("(") or set(line) <= set("-*_"):
             continue
         out.append(line)
     return out
@@ -498,20 +500,10 @@ def read_profile_urls(store: TabularStore, url_column: str) -> List[str]:
 def append_to_sheet(store: TabularStore, posts: List[dict],
                     scores: List[Optional[dict]], intent_label: str) -> int:
     existing = store.read_all() or []
-    is_new_sheet = not existing
-    headers = existing[0] if existing else SHEET_HEADERS
-
-    # Schema-divergence guard: don't rewrite headers if data rows exist under a
-    # different schema. Warn and append in workflow's column order — caller
-    # should reconcile manually if alignment matters.
-    if not is_new_sheet and headers != SHEET_HEADERS and len(existing) > 1:
-        print(f"  Note: {store.label()} has data rows under a different header schema. "
-              f"Keeping existing header; new rows append in workflow's column order "
-              f"(may not align with existing labels).")
 
     existing_urls: set = set()
-    if not is_new_sheet:
-        url_idx = find_col(headers, "Post URL")
+    if existing:
+        url_idx = find_col(existing[0], "Post URL")
         if url_idx is not None:
             for row in existing[1:]:
                 u = cell(row, url_idx)
@@ -535,21 +527,20 @@ def append_to_sheet(store: TabularStore, posts: List[dict],
             p["source"],
             intent_label,
             p["posted_at"],
-            s.get("relevance", ""),
-            s.get("angle", ""),
+            s.get("relevance") or "",
+            s.get("angle") or "",
             str(p["reactions"]),
             str(p["comments"]),
             "",
-            s.get("summary", ""),
+            s.get("summary") or "",
         ])
 
     if not new_rows:
         return 0
 
-    if is_new_sheet:
-        store.append([headers] + new_rows)
-    else:
-        store.append(new_rows)
+    # Align by header name (writes SHEET_HEADERS if the store is empty; warns
+    # and drops values whose column doesn't exist in a foreign-schema store).
+    store.append_mapped(SHEET_HEADERS, [dict(zip(SHEET_HEADERS, r)) for r in new_rows])
     return len(new_rows)
 
 

@@ -98,7 +98,9 @@ def _parse_lines(body: str) -> List[str]:
         line = line.strip()
         if line.startswith(("- ", "* ")):
             line = line[2:].strip()
-        if not line or line.startswith("#") or line.startswith("("):
+        # Skip blanks, comments, placeholders, and markdown horizontal rules
+        # ("---" separators are included in section bodies).
+        if not line or line.startswith("#") or line.startswith("(") or set(line) <= set("-*_"):
             continue
         out.append(line)
     return out
