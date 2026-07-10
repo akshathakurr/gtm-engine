@@ -87,7 +87,3 @@ most battle-tested today: linkedin outreach · email outreach · competitor anal
 ## license
 
 MIT
-
-<p align="center">
-  <img src="gtm-engine-banner.png" alt="GTM Engine — the GTM stack you actually own" width="100%">
-</p>
