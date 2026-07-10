@@ -23,10 +23,6 @@ no SaaS subscriptions, no data lock-in, no per-seat pricing. you bring an Anthro
 | linkedin comment helper | surface LinkedIn posts worth commenting on | ranked list with suggested takes |
 | blog builder | research a topic deeply, draft a blog post | full article + sources |
 
-<p align="center">
-  <img src="gtm_engine_launch_table.png" alt="What GTM Engine can do — task types and example tasks" width="100%">
-</p>
-
 ## how to use it
 
 ```bash
@@ -91,3 +87,7 @@ most battle-tested today: linkedin outreach · email outreach · competitor anal
 ## license
 
 MIT
+
+<p align="center">
+  <img src="gtm-engine-banner.png" alt="GTM Engine — the GTM stack you actually own" width="100%">
+</p>
