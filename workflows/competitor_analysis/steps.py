@@ -782,12 +782,38 @@ Return only valid JSON."""}],
 # Step 9: Customer reviews
 # ---------------------------------------------------------------------------
 
+def _slug_matches_company(slug: str, company_name: str) -> bool:
+    """True if a G2 product slug plausibly belongs to `company_name`.
+
+    Conservative: accepts when the compacted names are substrings of each other
+    (``notion`` ⊂ ``notion``, ``hubspot`` ⊂ ``hubspot-crm``) or share a
+    meaningful (len≥4) token. Rejects near-miss strangers like ``goco`` for
+    "Gojiberry" or ``altair-monarch`` for "Monaco", so their reviews aren't
+    misattributed.
+    """
+    def _compact(s: str) -> str:
+        return re.sub(r"[^a-z0-9]", "", s.lower())
+
+    ck, sk = _compact(company_name), _compact(slug)
+    if not ck or not sk:
+        return False
+    if ck in sk or sk in ck:
+        return True
+    ctoks = {t for t in re.split(r"[^a-z0-9]+", company_name.lower()) if len(t) >= 4}
+    stoks = {t for t in re.split(r"[^a-z0-9]+", slug.lower()) if len(t) >= 4}
+    return bool(ctoks & stoks)
+
+
 def get_customer_reviews(
     company_name: str,
     website: str,
     client: anthropic.Anthropic,
 ) -> str:
-    # Find G2 URL
+    # Find G2 URL — but only trust it if the product slug plausibly matches the
+    # company. Exa's site:g2.com search happily returns the *nearest* product
+    # when the company has no G2 page (e.g. "Gojiberry" → g2.com/products/goco,
+    # "Monaco" → altair-monarch), which would otherwise attribute a stranger's
+    # reviews to this competitor. Reject non-matching slugs and fall through.
     g2_url = ""
     try:
         result = search_web(
@@ -798,8 +824,10 @@ def get_customer_reviews(
         for r in result.get("results", []):
             url = r.get("url", "")
             if "g2.com/products/" in url:
-                g2_url = url.split("?")[0]
-                break
+                slug = url.split("g2.com/products/", 1)[1].split("/")[0]
+                if _slug_matches_company(slug, company_name):
+                    g2_url = url.split("?")[0]
+                    break
     except Exception:
         pass
 

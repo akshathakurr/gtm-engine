@@ -33,6 +33,28 @@ except Exception:
 _BATCH_SIZE = 5  # Google Trends max
 _SLEEP_BETWEEN_BATCHES = 1.0
 
+# Google Trends 429s the default pytrends User-Agent from datacenter IPs; a real
+# browser UA is what gets it to answer. See _new_client for the urllib3 caveat.
+_BROWSER_UA = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "en-US,en;q=0.9",
+}
+_MAX_RETRIES = 4  # transient 429/5xx from Google Trends
+
+
+def _new_client(hl: str = "en-US", tz: int = 360):
+    """Build a pytrends client with a browser User-Agent.
+
+    We deliberately do NOT pass ``retries=``/``backoff_factor=``: on urllib3 2.x
+    pytrends builds its Retry with the removed ``method_whitelist`` kwarg and
+    raises ``TypeError``. We run our own backoff loop instead (see below).
+    """
+    return TrendReq(hl=hl, tz=tz, timeout=(10, 25),
+                    requests_args={"headers": _BROWSER_UA})
+
 
 def validate_keywords(
     keywords: List[str],
@@ -68,7 +90,6 @@ def validate_keywords(
     if not keywords:
         return {}
 
-    pytrends = TrendReq(hl="en-US", tz=0)
     out: Dict[str, Dict] = {}
 
     # Process in batches of 5 (Google Trends limit)
@@ -79,46 +100,54 @@ def validate_keywords(
         related: Dict[str, List[str]] = {kw: [] for kw in batch}
         rising:  Dict[str, List[str]] = {kw: [] for kw in batch}
 
-        try:
-            pytrends.build_payload(batch, cat=0, timeframe=timeframe, geo=geo, gprop="")
-        except Exception as e:
-            for kw in batch:
-                batch_errors[kw].append(f"build_payload failed: {e}")
-            for kw in batch:
-                out[kw] = {
-                    "interest_score": 0,
-                    "related_queries": [],
-                    "rising_queries":  [],
-                    "errors": batch_errors[kw],
-                }
-            continue
+        # PRIMARY: payload + interest_over_time (the score callers actually use)
+        # with our own exponential backoff on a fresh browser-UA client each try.
+        # Google occasionally 429s even a browser UA; a fresh client + short wait
+        # usually clears it. Only recorded as an error after all retries fail.
+        pytrends = None
+        last_err = None
+        for attempt in range(_MAX_RETRIES):
+            try:
+                pytrends = _new_client(tz=0 if geo else 360)
+                pytrends.build_payload(batch, cat=0, timeframe=timeframe, geo=geo, gprop="")
+                df = pytrends.interest_over_time()
+                if not df.empty:
+                    for kw in batch:
+                        if kw in df.columns:
+                            # mean is more stable than max; int for sheet/CSV friendliness
+                            scores[kw] = int(round(float(df[kw].mean())))
+                last_err = None
+                break
+            except Exception as e:
+                last_err = e
+                pytrends = None
+                if attempt < _MAX_RETRIES - 1:
+                    time.sleep(2 ** attempt)  # 1s, 2s, 4s
 
-        # Interest over time → average across the period
-        try:
-            df = pytrends.interest_over_time()
-            if not df.empty:
-                for kw in batch:
-                    if kw in df.columns:
-                        # mean is more stable than max; cast to int for sheet/CSV friendliness
-                        scores[kw] = int(round(float(df[kw].mean())))
-        except Exception as e:
+        if last_err is not None:
             for kw in batch:
-                batch_errors[kw].append(f"interest_over_time failed: {e}")
+                batch_errors[kw].append(f"Google Trends failed after {_MAX_RETRIES} tries: {last_err}")
 
-        # Related + rising queries
-        try:
-            rq = pytrends.related_queries()
-            for kw in batch:
-                rq_kw = rq.get(kw) or {}
-                top = rq_kw.get("top")
-                rs  = rq_kw.get("rising")
-                if top is not None and not top.empty:
-                    related[kw] = [str(q) for q in top["query"].head(10).tolist()]
-                if rs is not None and not rs.empty:
-                    rising[kw] = [str(q) for q in rs["query"].head(10).tolist()]
-        except Exception as e:
-            for kw in batch:
-                batch_errors[kw].append(f"related_queries failed: {e}")
+        # OPTIONAL: related/rising queries. This endpoint is throttled far more
+        # aggressively than interest_over_time, so it's strictly best-effort —
+        # if it 429s we keep the score and just leave related/rising empty
+        # (no error, since the useful signal already landed above).
+        if pytrends is not None:
+            for attempt in range(_MAX_RETRIES):
+                try:
+                    rq = pytrends.related_queries()
+                    for kw in batch:
+                        rq_kw = rq.get(kw) or {}
+                        top = rq_kw.get("top")
+                        rs  = rq_kw.get("rising")
+                        if top is not None and not top.empty:
+                            related[kw] = [str(q) for q in top["query"].head(10).tolist()]
+                        if rs is not None and not rs.empty:
+                            rising[kw] = [str(q) for q in rs["query"].head(10).tolist()]
+                    break
+                except Exception:
+                    if attempt < _MAX_RETRIES - 1:
+                        time.sleep(2 ** attempt)
 
         for kw in batch:
             out[kw] = {
