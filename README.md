@@ -1,4 +1,4 @@
-# gtm engine
+# GTM Engine
 
 <p align="center">
   <img src="gtm-engine-hero.png" alt="GTM Engine running in Claude Code" width="100%">
