@@ -78,12 +78,6 @@ skills/                    reusable claude prompt modules
 
 every workflow folder has its own README — open it for the full details.
 
-## status
-
-early. opinionated. all 6 workflows are built and end-to-end tested — some more battle-tested than others. expect rough edges; PRs welcome.
-
-most battle-tested today: linkedin outreach · email outreach · competitor analysis · content idea finder.
-
 ## license
 
 MIT
