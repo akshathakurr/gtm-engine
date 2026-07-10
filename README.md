@@ -1,5 +1,9 @@
 # gtm engine
 
+<p align="center">
+  <img src="gtm-engine-hero.png" alt="GTM Engine running in Claude Code" width="100%">
+</p>
+
 your GTM team is a folder of python scripts and a markdown file describing your business. open it in claude code, answer some questions, ship campaigns.
 
 **this is the sales / marketing / content stack you actually own.**
@@ -18,6 +22,10 @@ no SaaS subscriptions, no data lock-in, no per-seat pricing. you bring an Anthro
 | content idea finder | scan twitter + HN daily, cluster into post ideas | 5 daily ideas, classified by genre + platform |
 | linkedin comment helper | surface LinkedIn posts worth commenting on | ranked list with suggested takes |
 | blog builder | research a topic deeply, draft a blog post | full article + sources |
+
+<p align="center">
+  <img src="gtm_engine_launch_table.png" alt="What GTM Engine can do — task types and example tasks" width="100%">
+</p>
 
 ## how to use it
 
