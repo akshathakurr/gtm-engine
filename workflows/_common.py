@@ -11,6 +11,7 @@ import os
 import re
 import csv
 import json
+import math
 import shutil
 import subprocess
 import time
@@ -604,10 +605,11 @@ def collect_chunk_results(chunks, results, errors, blank, *, label):
 # ---------------------------------------------------------------------------
 # A checkpoint is a local JSONL file (one record per line) written the instant
 # each paid API result comes back. Local disk is instant and free, so we save
-# there DURING the run and push to the Sheet in one batch at the END. If the run
-# dies midway (crash, credit-exhaustion, Ctrl-C), the checkpoint still holds
-# everything completed — the next run loads it, skips those items, and only pays
-# for what's missing. Keyed by a stable id (e.g. company name) so re-runs dedup.
+# there DURING the run and push to the Sheet incrementally (per result, or at the
+# milestones below for batched column writes). If the run dies midway (crash,
+# credit-exhaustion, Ctrl-C), the checkpoint still holds everything completed —
+# the next run loads it, skips those items, and only pays for what's missing.
+# Keyed by a stable id (e.g. company name) so re-runs dedup.
 
 CHECKPOINT_DIR = os.path.join(os.getcwd(), ".cache", "checkpoints")
 
@@ -644,6 +646,54 @@ def checkpoint_load(path: str) -> Dict[str, object]:
             if isinstance(rec, dict) and "key" in rec:
                 out[rec["key"]] = rec.get("value")
     return out
+
+
+# ---------------------------------------------------------------------------
+# Milestone flushing — push partial results to the Sheet DURING a run
+# ---------------------------------------------------------------------------
+# The JSONL checkpoint (above) is the crash-safety net, but the Sheet is the
+# actual deliverable and it stays empty until the end-of-run batched write. If
+# the checkpoint file is lost/clobbered, or the final write itself dies, a long
+# run leaves nothing usable in the Sheet. Milestone flushing pushes partial
+# results to the Sheet as the run progresses, so a big run is durable in the
+# Sheet too — without a Sheets call per item (which would risk 429s when several
+# workflow runs hit the same spreadsheet at once).
+#
+# Cadence: a batch larger than ``small_threshold`` rows flushes at the 25/50/75/
+# 100% marks; a smaller batch just at halves (50/100%). The full count is always
+# the final mark, so the last flush writes everything.
+
+def flush_milestones(total: int, small_threshold: int = 200) -> List[int]:
+    """Completed-counts at which to flush a batch of ``total`` items to the Sheet."""
+    if total <= 0:
+        return []
+    fractions = (0.25, 0.5, 0.75, 1.0) if total > small_threshold else (0.5, 1.0)
+    return sorted({max(1, math.ceil(total * f)) for f in fractions} | {total})
+
+
+class MilestoneFlusher:
+    """Fire ``flush_fn(done)`` once each 25%/50% milestone of ``total`` is reached.
+
+    ``tick()`` is called on the MAIN THREAD (from a ``map_rate_limited`` on_result
+    callback) as each item finishes; it triggers ``flush_fn`` when a milestone is
+    crossed. ``flush_fn`` must write everything completed so far — it is a full
+    (idempotent) re-write of the partial result, so a later flush supersedes an
+    earlier one and a mid-run crash still leaves the last milestone in the Sheet.
+    """
+
+    def __init__(self, total: int, flush_fn, small_threshold: int = 200):
+        self.total = total
+        self._flush_fn = flush_fn
+        self._pending = flush_milestones(total, small_threshold)
+        self.done = 0
+
+    def tick(self, n: int = 1) -> None:
+        self.done += n
+        if self._pending and self.done >= self._pending[0]:
+            # Collapse every milestone we've passed into a single flush.
+            while self._pending and self.done >= self._pending[0]:
+                self._pending.pop(0)
+            self._flush_fn(self.done)
 
 
 # ---------------------------------------------------------------------------

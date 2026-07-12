@@ -28,7 +28,7 @@ Usage:
 """
 
 import argparse
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 import anthropic
 
@@ -37,6 +37,7 @@ from workflows._common import (
     GoogleSheetsBackend, CsvBackend,
     detect_columns, cell_combined, get_or_create_col, parse_post_config,
     map_rate_limited, checkpoint_path, checkpoint_load, checkpoint_append,
+    MilestoneFlusher,
 )
 from workflows.email_outreach.steps import (
     ENRICH_CONCURRENCY, APOLLO_MIN_INTERVAL, APOLLO_CONCURRENCY,
@@ -231,7 +232,8 @@ def main() -> None:
         # JSONL checkpoint the instant they come back (instant + free). If the
         # run dies midway, the checkpoint still holds every company done so far;
         # a re-run loads it, skips those, and only pays for what's missing. The
-        # Sheet is written ONCE at the end in a batched per-field column write.
+        # Sheet is flushed at 25/50/75/100% milestones during the run (see
+        # _flush_enrich below).
         ck_path = checkpoint_path(f"email_outreach_enrich_{ck_id}")
         company_cache: Dict[str, Dict[str, str]] = {
             k: v for k, v in checkpoint_load(ck_path).items() if isinstance(v, dict)
@@ -252,14 +254,37 @@ def main() -> None:
             if company not in company_cache:
                 to_enrich.append(company)
 
+        # Push enrichment to the Sheet as one batched per-field column write,
+        # reconstructed from the checkpoint cache + existing cells so nothing
+        # else is clobbered. Fired at 25/50/75/100% milestones DURING the run
+        # (halves for <=200 companies) — not just at the very end — so a long
+        # enrich is durable in the Sheet even if the local checkpoint is lost or
+        # the process dies late.
+        def _flush_enrich(done: Optional[int] = None) -> None:
+            if done is not None:
+                print(f"  Flushing enrichment to the sheet ({done}/{len(to_enrich)} companies)...")
+            for f in enrich_fields:
+                col_idx = col_idx_by_key[f["key"]]
+                column: List[str] = []
+                for i, row in enumerate(data_rows):
+                    company = leads[i]["company"] if i < len(leads) else ""
+                    if company in company_cache:
+                        column.append(company_cache[company].get(f["key"], "") or cell(row, col_idx))
+                    else:
+                        column.append(cell(row, col_idx))  # preserve whatever's there
+                backend.write_column(col_idx, column)
+
+        flusher = MilestoneFlusher(len(to_enrich), _flush_enrich)
+
         def _persist_enrich(_idx, company, enriched, err):
             """Main-thread callback: checkpoint one company's firmographics to
-            local disk the moment its enrichment finishes (no Sheets call here)."""
+            local disk the instant it finishes, then flush the Sheet on milestones."""
             if err:
                 print(f"    ! {company} enrichment failed: {err}")
             enriched = enriched or {}
             company_cache[company] = enriched
             checkpoint_append(ck_path, company, enriched)
+            flusher.tick()
 
         if to_enrich:
             print(f"  Enriching {len(to_enrich)} unique company(ies) — checkpointing each to {ck_path} ...")
@@ -267,20 +292,10 @@ def main() -> None:
                 lambda c: enrich_company(c, enrich_fields, client),
                 to_enrich, max_workers=ENRICH_CONCURRENCY, on_result=_persist_enrich,
             )
-
-        # Batched write to the Sheet: one column per enrich field, reconstructed
-        # from the checkpoint cache + existing cells so nothing else is clobbered.
-        print("  Writing enrichment to the sheet (batched)...")
-        for f in enrich_fields:
-            col_idx = col_idx_by_key[f["key"]]
-            column: List[str] = []
-            for i, row in enumerate(data_rows):
-                company = leads[i]["company"] if i < len(leads) else ""
-                if company in company_cache:
-                    column.append(company_cache[company].get(f["key"], "") or cell(row, col_idx))
-                else:
-                    column.append(cell(row, col_idx))  # preserve whatever's there
-            backend.write_column(col_idx, column)
+        else:
+            # All companies were already cached — nothing runs this pass, but
+            # still write the columns from cache so the Sheet reflects it.
+            _flush_enrich()
 
         # Apply enrichment to every lead in memory (for scoring / copy downstream).
         for i, lead in enumerate(leads):

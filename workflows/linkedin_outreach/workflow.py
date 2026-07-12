@@ -29,7 +29,7 @@ Usage:
 """
 
 import argparse
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 import anthropic
 
@@ -38,6 +38,7 @@ from workflows._common import (
     GoogleSheetsBackend, CsvBackend,
     detect_columns, cell_combined, get_or_create_col, parse_post_config,
     map_rate_limited, checkpoint_path, checkpoint_load, checkpoint_append,
+    MilestoneFlusher,
 )
 from workflows.linkedin_outreach.steps import (
     ENRICH_CONCURRENCY, POSTS_MIN_INTERVAL, POSTS_CONCURRENCY,
@@ -278,8 +279,8 @@ def main() -> None:
         # instant it comes back (instant + free — no Sheets call per company).
         # If the run dies midway (crash, credit-exhaustion, Ctrl-C), the
         # checkpoint still holds every company done so far; a re-run loads it,
-        # skips those, and only pays for what's missing. The Sheet is written
-        # ONCE at the end, in a batched per-field column write.
+        # skips those, and only pays for what's missing. The Sheet is flushed at
+        # 25/50/75/100% milestones during the run (see _flush_enrich below).
         ck_id = args.sheet_id or (args.input_csv or "csv")
         ck_path = checkpoint_path(f"linkedin_outreach_enrich_{ck_id}")
         company_cache: Dict[str, Dict[str, str]] = {
@@ -305,14 +306,37 @@ def main() -> None:
                 seen_companies.add(company)
                 to_enrich.append(company)
 
+        # Push enrichment to the Sheet as one batched per-field column write,
+        # reconstructed from the checkpoint cache + existing cells so nothing
+        # else is clobbered. Fired at 25/50/75/100% milestones DURING the run
+        # (halves for <=200 companies) — not just at the very end — so a long
+        # enrich is durable in the Sheet even if the local checkpoint is lost or
+        # the process dies late.
+        def _flush_enrich(done: Optional[int] = None) -> None:
+            if done is not None:
+                print(f"  Flushing enrichment to the sheet ({done}/{len(to_enrich)} companies)...")
+            for f in enrich_fields:
+                col_idx = col_idx_by_key[f["key"]]
+                column: List[str] = []
+                for i, row in enumerate(data_rows):
+                    company = leads[i]["company"] if i < len(leads) else ""
+                    if company in company_cache:
+                        column.append(company_cache[company].get(f["key"], "") or cell(row, col_idx))
+                    else:
+                        column.append(cell(row, col_idx))  # preserve whatever's there
+                backend.write_column(col_idx, column)
+
+        flusher = MilestoneFlusher(len(to_enrich), _flush_enrich)
+
         def _persist(_idx, company, enriched, err):
             """Main-thread callback: checkpoint one company's firmographics to
-            local disk the moment its enrichment finishes (no Sheets call here)."""
+            local disk the instant it finishes, then flush the Sheet on milestones."""
             if err:
                 print(f"    ! {company} enrichment failed: {err}")
             enriched = enriched or {}
             company_cache[company] = enriched
             checkpoint_append(ck_path, company, enriched)
+            flusher.tick()
 
         if to_enrich:
             print(f"  Enriching {len(to_enrich)} unique company(ies) — checkpointing each to {ck_path} ...")
@@ -320,20 +344,10 @@ def main() -> None:
                 lambda c: enrich_company(c, enrich_fields, client),
                 to_enrich, max_workers=ENRICH_CONCURRENCY, on_result=_persist,
             )
-
-        # Batched write to the Sheet: one column per enrich field, reconstructed
-        # from the checkpoint cache + existing cells so nothing else is clobbered.
-        print("  Writing enrichment to the sheet (batched)...")
-        for f in enrich_fields:
-            col_idx = col_idx_by_key[f["key"]]
-            column: List[str] = []
-            for i, row in enumerate(data_rows):
-                company = leads[i]["company"] if i < len(leads) else ""
-                if company in company_cache:
-                    column.append(company_cache[company].get(f["key"], "") or cell(row, col_idx))
-                else:
-                    column.append(cell(row, col_idx))  # preserve whatever's there
-            backend.write_column(col_idx, column)
+        else:
+            # All companies were already cached — nothing runs this pass, but
+            # still write the columns from cache so the Sheet reflects it.
+            _flush_enrich()
 
         # Apply enrichment to every lead in memory (for scoring / copy downstream).
         for i in dm_indices:
@@ -547,6 +561,23 @@ def main() -> None:
         hooks_col_idx = get_or_create_col(headers, mapping, "hooks", "Personalisation Hook")
         backend.write_header(hooks_col_idx, headers[hooks_col_idx])
 
+        # Checkpoint each hook + write it to the sheet the instant it's done, so a
+        # crash mid-run keeps every hook already generated (never re-paid) and
+        # leaves it in the sheet — no end-only batched write left to lose.
+        hooks_ck = checkpoint_path(f"linkedin_outreach_hooks_{args.sheet_id or (args.input_csv or 'csv')}")
+        hooks_done = checkpoint_load(hooks_ck)
+        hook_indices = []
+        for i in outreach_indices:
+            key = leads[i].get("linkedin") or f"{leads[i]['name']}|{leads[i]['company']}"
+            if key in hooks_done:
+                hooks = hooks_done[key] or ""
+                hooks_by_lead[i] = hooks
+                backend.write_cell(i + 2, hooks_col_idx, hooks)
+            else:
+                hook_indices.append(i)
+        if hooks_done:
+            print(f"  Resuming from checkpoint: {len(outreach_indices) - len(hook_indices)} lead(s) already done.")
+
         def _hook_task(i: int) -> str:
             lead = leads[i]
             return generate_personalisation_hooks(
@@ -562,14 +593,17 @@ def main() -> None:
                 hq=lead.get("hq", ""),
             )
 
-        results, errors = map_rate_limited(_hook_task, outreach_indices, max_workers=ENRICH_CONCURRENCY)
-        for i, r, e in zip(outreach_indices, results, errors):
+        def _persist_hook(_idx, i, r, e):
             hooks = "" if e else (r or "")
             if e:
                 print(f"  {leads[i]['name']} — hook generation failed: {e}")
             hooks_by_lead[i] = hooks  # keep in memory for Step 9
+            key = leads[i].get("linkedin") or f"{leads[i]['name']}|{leads[i]['company']}"
+            checkpoint_append(hooks_ck, key, hooks)
             backend.write_cell(i + 2, hooks_col_idx, hooks)
             print(f"  {leads[i]['name']} ({leads[i]['company']}) → {(hooks[:100] + '...') if len(hooks) > 100 else (hooks or '(none)')}")
+
+        map_rate_limited(_hook_task, hook_indices, max_workers=ENRICH_CONCURRENCY, on_result=_persist_hook)
 
     # ------------------------------------------------------------------
     # Step 9: Write LinkedIn copy
@@ -583,6 +617,21 @@ def main() -> None:
 
         copy_col_idx = get_or_create_col(headers, mapping, "copy", "LinkedIn Copy")
         backend.write_header(copy_col_idx, headers[copy_col_idx])
+
+        # Checkpoint each finished message + write it to the sheet immediately, so
+        # a crash never re-pays for copy already written and never loses it to an
+        # end-only batched write.
+        copy_ck = checkpoint_path(f"linkedin_outreach_copy_{args.sheet_id or (args.input_csv or 'csv')}")
+        copy_done = checkpoint_load(copy_ck)
+        copy_indices = []
+        for i in outreach_indices:
+            key = leads[i].get("linkedin") or f"{leads[i]['name']}|{leads[i]['company']}"
+            if key in copy_done:
+                backend.write_cell(i + 2, copy_col_idx, copy_done[key] or "")
+            else:
+                copy_indices.append(i)
+        if copy_done:
+            print(f"  Resuming from checkpoint: {len(outreach_indices) - len(copy_indices)} lead(s) already done.")
 
         def _copy_task(i: int) -> str:
             lead = leads[i]
@@ -601,13 +650,16 @@ def main() -> None:
                 hq=lead.get("hq", ""),
             )
 
-        results, errors = map_rate_limited(_copy_task, outreach_indices, max_workers=ENRICH_CONCURRENCY)
-        for i, r, e in zip(outreach_indices, results, errors):
+        def _persist_copy(_idx, i, r, e):
             copy = "" if e else (r or "")
             if e:
                 print(f"  {leads[i]['name']} — copy generation failed: {e}")
+            key = leads[i].get("linkedin") or f"{leads[i]['name']}|{leads[i]['company']}"
+            checkpoint_append(copy_ck, key, copy)
             backend.write_cell(i + 2, copy_col_idx, copy)
             print(f"  {leads[i]['name']} ({leads[i]['company']}) → {(copy[:100] + '...') if len(copy) > 100 else (copy or '(none)')}")
+
+        map_rate_limited(_copy_task, copy_indices, max_workers=ENRICH_CONCURRENCY, on_result=_persist_copy)
 
     # ------------------------------------------------------------------
     # Summary
