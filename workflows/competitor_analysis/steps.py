@@ -12,8 +12,11 @@ from urllib.parse import urlparse
 
 import anthropic
 
-from config import CLAUDE_MODEL
-from workflows._common import strip_json_fence as _strip_json_fence, map_rate_limited
+from config import CLAUDE_MODEL, cached_system
+from workflows._common import (
+    strip_json_fence as _strip_json_fence,
+    map_rate_limited,
+)
 from scrapers.web_search.scraper import search_web
 from scrapers.website_scraper import scraper as _website_mod
 from scrapers.linkedin_profile_post_scraper import scraper as _li_posts_mod
@@ -103,6 +106,11 @@ def _run_parallel(tasks: Dict[str, "callable"], max_workers: int = COMPETITOR_EN
 def _strip_www(netloc: str) -> str:
     """Drop a leading 'www.' (str.lstrip('www.') would strip stray w/./3 chars)."""
     return netloc[4:] if netloc.startswith("www.") else netloc
+
+
+def _cap(snippets: List[str], limit: int) -> List[str]:
+    """Trim each snippet to ~500 chars (keeps Claude input small) then cap count."""
+    return [(s or "")[:500] for s in snippets[:limit]]
 
 
 # ---------------------------------------------------------------------------
@@ -244,7 +252,7 @@ def find_linkedin_url(company_name: str, website: str,
     try:
         result = search_web(
             query=f'{anchor} linkedin.com/company',
-            num_results=5,
+            num_results=3,
             summary_question=f"What is the LinkedIn company page URL for {company_name} ({domain})?",
         )
         li_urls = [
@@ -332,7 +340,7 @@ def get_firmographics(company_name: str, website: str,
     try:
         result = search_web(
             query=query,
-            num_results=5,
+            num_results=3,
             summary_question=(
                 f"What is {label}'s employee count, year founded, last funding stage, "
                 f"total funding raised, estimated revenue, and HQ city?"
@@ -354,7 +362,7 @@ def get_firmographics(company_name: str, website: str,
 Only use facts about the company at {domain or company_name} — ignore any results about a different company that happens to share the name.
 
 Research:
-{chr(10).join(snippets[:15])}
+{chr(10).join(_cap(snippets, 6))}
 
 Return JSON with exactly these keys:
 - "Employee Count": exact number, no range (e.g. "120", "350"). If only a range, use midpoint.
@@ -402,7 +410,7 @@ def get_recent_news(company_name: str, website: str, client: anthropic.Anthropic
     try:
         result = search_web(
             query=query,
-            num_results=5,
+            num_results=3,
             summary_question=f"What are the most recent notable news items about {company_name} ({domain})? Events, funding, customers, launches.",
         )
     except Exception as e:
@@ -448,7 +456,8 @@ Return only valid JSON."""}],
         )
         items = json.loads(_strip_json_fence(resp.content[0].text)).get("news", [])
         return "\n".join(items)
-    except Exception:
+    except Exception as e:
+        print(f"    News extraction failed for {company_name}: {e}")
         return ""
 
 
@@ -461,7 +470,7 @@ def _find_linkedin_in_url(founder_name: str, company_name: str) -> str:
     try:
         result = search_web(
             query=f'"{founder_name}" "{company_name}" linkedin.com/in',
-            num_results=5,
+            num_results=3,
             summary_question=f"What is the LinkedIn profile URL for {founder_name} from {company_name}?",
         )
         # First look for a linkedin.com/in/ URL directly in result URLs
@@ -492,7 +501,7 @@ def find_founders(company_name: str, website: str, client: anthropic.Anthropic) 
     try:
         result = search_web(
             query=f"{name_query} founder CEO co-founder",
-            num_results=5,
+            num_results=3,
             summary_question=f"Who are the founders of {company_name} ({domain})? List their full names.",
         )
     except Exception as e:
@@ -526,7 +535,7 @@ def find_founders(company_name: str, website: str, client: anthropic.Anthropic) 
             messages=[{"role": "user", "content": f"""Extract up to 2 founder names of {company_name} ({domain}).
 
 Research:
-{chr(10).join(snippets[:12])}
+{chr(10).join(_cap(snippets, 6))}
 
 Twitter URLs / handles found: {json.dumps(list(dict.fromkeys(tw_urls))[:10])}
 
@@ -561,7 +570,7 @@ Return only valid JSON."""}],
             try:
                 tw_res = search_web(
                     query=f'"{f["name"]}" {company_name} Twitter',
-                    num_results=5,
+                    num_results=3,
                     summary_question=f"What is the Twitter/X handle of {f['name']} from {company_name}?",
                 )
                 for tr in tw_res.get("results", []):
@@ -618,7 +627,7 @@ def get_founder_post_type(
             for p in res.get("posts", []):
                 txt = p.get("text", "").strip()
                 if txt:
-                    posts.append(f"[LinkedIn] {txt[:300]}")
+                    posts.append(f"[LinkedIn] {txt[:200]}")
         except Exception as e:
             print(f"    LinkedIn posts failed for {founder_name}: {e}")
 
@@ -633,7 +642,7 @@ def get_founder_post_type(
             for t in res.get("tweets", []):
                 txt = t.get("text", "").strip()
                 if txt:
-                    posts.append(f"[Twitter] {txt[:300]}")
+                    posts.append(f"[Twitter] {txt[:200]}")
         except Exception as e:
             print(f"    Twitter failed for {founder_name}: {e}")
 
@@ -646,7 +655,7 @@ def get_founder_post_type(
             messages=[{"role": "user", "content": f"""Describe {founder_name}'s content strategy in 1-2 sentences based on these posts.
 
 Posts:
-{"---".join(posts[:20])}
+{"---".join(posts[:12])}
 
 Cover: what topics they post about (company metrics, industry insights, product updates, customer stories, funding, thought leadership, ICP engagement). Is this active founder-led content?
 
@@ -692,7 +701,7 @@ def extract_product_info(
                 product_t = text[:2500]
         elif any(kw in kl for kw in ["pricing", "plan"]):
             if len(text) > len(pricing_t):
-                pricing_t = text[:9000]
+                pricing_t = text[:3000]
         elif any(kw in kl for kw in ["customer", "case", "stor", "client", "logo"]):
             if len(text) > len(customers_t):
                 customers_t = text[:1500]
@@ -907,7 +916,7 @@ def get_deal_size(company_name: str, website: str, client: anthropic.Anthropic) 
     try:
         result = search_web(
             query=query,
-            num_results=5,
+            num_results=3,
             summary_question=f"What is the average deal size or ACV for {label}?",
         )
     except Exception:
@@ -927,7 +936,7 @@ def get_deal_size(company_name: str, website: str, client: anthropic.Anthropic) 
             messages=[{"role": "user", "content": f"""Find the average deal size or ACV for {label}.
 
 Research:
-{chr(10).join(snippets[:10])}
+{chr(10).join(_cap(snippets, 6))}
 
 If found, write concisely (e.g. "$15k/year", "$5k–$50k", "enterprise $100k+").
 If not found, write "not available".
@@ -991,25 +1000,30 @@ def analyze_competitor(
 ) -> Dict[str, str]:
     profile_block = "\n".join(f"- {k}: {v}" for k, v in profile.items() if v)
 
-    prompt = f"""You are a competitive intelligence analyst. Analyze {company_name} from the perspective of a competing product.
+    # Our ICP/positioning + the JSON spec are identical for every competitor in a
+    # run, so cache them in the system prefix; only the target profile varies.
+    system = f"""You are a competitive intelligence analyst. Analyze the target company from the perspective of a competing product.
 
 Our product context (ICP / positioning):
 {icp_context}
 
-{company_name} profile:
-{profile_block}
-
 Return JSON with:
 - "Competitor Score": score out of 5 as a string (e.g. "3.5", "4.0"). Base it on funding, market traction, product depth, and GTM execution relative to our product.
-- "Strength": MAX 2 short lines (~30 words total) on their key competitive advantages. Punchy, specific, grounded in the data above. No preamble, no hedging. If genuinely no signal, write "insufficient data".
+- "Strength": MAX 2 short lines (~30 words total) on their key competitive advantages. Punchy, specific, grounded in the data provided. No preamble, no hedging. If genuinely no signal, write "insufficient data".
 - "Weakness": MAX 2 short lines (~30 words total) on their key gaps relative to our positioning. Punchy, specific. If genuinely no signal, write "insufficient data".
 - "Target ICP": who they sell to. Use one or more of these exact categories separated by " + ": "SMB", "Mid-Market", "Enterprise", "Early-Stage Startups", "All". E.g. "Mid-Market + Enterprise".
 
 Return only valid JSON."""
 
+    prompt = f"""Analyze {company_name} from the perspective of our competing product.
+
+{company_name} profile:
+{profile_block}"""
+
     try:
         resp = client.messages.create(
             model=CLAUDE_MODEL, max_tokens=600,
+            system=cached_system(system),
             messages=[{"role": "user", "content": prompt}],
         )
         return json.loads(_strip_json_fence(resp.content[0].text))

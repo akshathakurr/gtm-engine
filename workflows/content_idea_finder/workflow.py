@@ -46,7 +46,8 @@ from workflows._common import (
     read_context_file as _read_context_file,
     append_to_context_file as _append_to_context_file,
     section_body as _section_body,
-    preview_and_confirm, TabularStore, find_col, cell,
+    preview_and_confirm, estimate_apify_cost, TabularStore, find_col, cell,
+    checkpoint_path, checkpoint_append, checkpoint_load,
 )
 from scrapers.twitter_profile_scraper.scraper import scrape_twitter_profiles_batch
 from scrapers.twitter_research_scraper.scraper import search_tweets
@@ -279,11 +280,25 @@ def resolve_inputs(auto: bool) -> Dict:
 # Signal fetchers
 # ---------------------------------------------------------------------------
 
-def fetch_trend_tweets(queries: List[Dict], min_likes: int, lookback_days: int, max_per_query: int = 25) -> List[Dict]:
+def fetch_trend_tweets(queries: List[Dict], min_likes: int, lookback_days: int, max_per_query: int = 25,
+                       ck_path: str = None) -> List[Dict]:
     posts: List[Dict] = []
 
-    print(f"  Searching {len(queries)} Twitter trend queries (min {min_likes} likes)...")
-    for i, q in enumerate(queries):
+    # CRASH-SAFETY: each query's kept posts are checkpointed (keyed by query
+    # string) as they return, so a crash in a later phase never loses paid
+    # Apify work — a re-run reloads finished queries and skips re-paying.
+    done = checkpoint_load(ck_path) if ck_path else {}
+    resumed = 0
+    for q in queries:
+        if q["query"] in done and isinstance(done[q["query"]], list):
+            posts.extend(done[q["query"]])
+            resumed += 1
+    if resumed:
+        print(f"  Resuming from checkpoint: {resumed} trend query(ies) already fetched.")
+
+    pending = [q for q in queries if q["query"] not in done]
+    print(f"  Searching {len(pending)} Twitter trend queries (min {min_likes} likes)...")
+    for i, q in enumerate(pending):
         if i > 0:
             time.sleep(2)  # small gap; actor rotates guest tokens internally
 
@@ -297,9 +312,10 @@ def fetch_trend_tweets(queries: List[Dict], min_likes: int, lookback_days: int, 
         kept = [t for t in tweets if (t.get("likes", 0) or 0) >= min_likes]
         print(f"    [{q['bucket']}] '{q['query']}': {len(tweets)} fetched → {len(kept)} above threshold")
 
+        query_posts: List[Dict] = []
         for t in kept:
             author = t.get("author") or {}
-            posts.append({
+            query_posts.append({
                 "source":     "trend",
                 "query":      q["query"],
                 "bucket":     q["bucket"],
@@ -310,6 +326,9 @@ def fetch_trend_tweets(queries: List[Dict], min_likes: int, lookback_days: int, 
                 "created_at": t.get("created_at", ""),
                 "engagement": (t.get("likes", 0) or 0) + (t.get("retweets", 0) or 0) * 2,
             })
+        posts.extend(query_posts)
+        if ck_path:
+            checkpoint_append(ck_path, q["query"], query_posts)
 
     return posts
 
@@ -347,35 +366,55 @@ def fetch_hn_stories(queries: List[Dict], min_points: int, lookback_days: int, m
     return stories
 
 
-def fetch_creator_posts(creators: List[Dict], lookback_days: int, max_per_profile: int = 25) -> List[Dict]:
-    """Pull recent tweets from trusted creators. Called after topics are known."""
-    profile_urls = [f"https://twitter.com/{c['twitter']}" for c in creators]
+def fetch_creator_posts(creators: List[Dict], lookback_days: int, max_per_profile: int = 25,
+                        ck_path: str = None) -> List[Dict]:
+    """Pull recent tweets from trusted creators. Called after topics are known.
 
-    print(f"  Fetching tweets from {len(profile_urls)} creators ({lookback_days}d lookback)...")
-    results = scrape_twitter_profiles_batch(
-        profile_urls=profile_urls,
-        max_tweets=max_per_profile,
-        days_back=lookback_days,
-        include_retweets=False,
-    )
+    CRASH-SAFETY: each creator's posts are checkpointed (keyed by handle) as
+    they return, so paid Apify work from earlier handles survives a later crash.
+    scrape_twitter_profiles_batch is sequential, so a simple per-handle loop is
+    fine — pending handles are fetched one at a time and persisted immediately.
+    """
+    done = checkpoint_load(ck_path) if ck_path else {}
 
     posts: List[Dict] = []
-    for creator, result in zip(creators, results):
+    resumed = 0
+    for c in creators:
+        if c["twitter"] in done and isinstance(done[c["twitter"]], list):
+            posts.extend(done[c["twitter"]])
+            resumed += 1
+    if resumed:
+        print(f"  Resuming from checkpoint: {resumed} creator(s) already fetched.")
+
+    pending = [c for c in creators if c["twitter"] not in done]
+    print(f"  Fetching tweets from {len(pending)} creators ({lookback_days}d lookback)...")
+    for creator in pending:
+        results = scrape_twitter_profiles_batch(
+            profile_urls=[f"https://twitter.com/{creator['twitter']}"],
+            max_tweets=max_per_profile,
+            days_back=lookback_days,
+            include_retweets=False,
+        )
+        result = results[0] if results else {}
         tweets = result.get("tweets", [])
+        creator_posts: List[Dict] = []
         if not tweets:
             print(f"    {creator['name']}: 0 tweets ({result.get('errors', [])})")
-            continue
-        print(f"    {creator['name']}: {len(tweets)} tweets")
-        for t in tweets:
-            posts.append({
-                "source":     "creator",
-                "author":     creator["name"],
-                "handle":     creator["twitter"],
-                "text":       t.get("text", ""),
-                "url":        t.get("url", ""),
-                "created_at": t.get("created_at", ""),
-                "engagement": (t.get("likes", 0) or 0) + (t.get("retweets", 0) or 0) * 2,
-            })
+        else:
+            print(f"    {creator['name']}: {len(tweets)} tweets")
+            for t in tweets:
+                creator_posts.append({
+                    "source":     "creator",
+                    "author":     creator["name"],
+                    "handle":     creator["twitter"],
+                    "text":       t.get("text", ""),
+                    "url":        t.get("url", ""),
+                    "created_at": t.get("created_at", ""),
+                    "engagement": (t.get("likes", 0) or 0) + (t.get("retweets", 0) or 0) * 2,
+                })
+        posts.extend(creator_posts)
+        if ck_path:
+            checkpoint_append(ck_path, creator["twitter"], creator_posts)
 
     return posts
 
@@ -384,19 +423,39 @@ def fetch_creator_posts(creators: List[Dict], lookback_days: int, max_per_profil
 # Phase 1 — Discover topics from Twitter trends + HN
 # ---------------------------------------------------------------------------
 
-def _build_signal_block(trend_posts: List[Dict], hn_stories: List[Dict]) -> str:
+# Cap how many signals are fed to Claude. Only num_ideas topics come out, so
+# sending every trend post + HN story (unbounded) wastes input tokens. Keep the
+# top signals by engagement so the strongest trends still drive discovery.
+SIGNAL_CAP = 60
+
+
+def _build_signal_block(trend_posts: List[Dict], hn_stories: List[Dict], cap: int = SIGNAL_CAP) -> str:
     lines: List[str] = []
 
-    if trend_posts:
-        lines.append("=== TWITTER TRENDS ===")
-        for i, p in enumerate(trend_posts, 1):
-            text = (p.get("text") or "").replace("\n", " ")[:240]
-            lines.append(f"T{i}. [{p['bucket']}/@{p['handle']}] [{p['engagement']}eng]: {text}")
+    # Rank by engagement and take the top `cap` of each source, but keep the
+    # T#/H# indices aligned to the ORIGINAL lists — hydrate_source_quotes()
+    # resolves those IDs positionally against the full trend_posts/hn_stories.
+    trend_top = sorted(
+        range(len(trend_posts)),
+        key=lambda i: trend_posts[i].get("engagement", 0), reverse=True,
+    )[:cap]
+    hn_top = sorted(
+        range(len(hn_stories)),
+        key=lambda i: hn_stories[i].get("engagement", 0), reverse=True,
+    )[:cap]
 
-    if hn_stories:
+    if trend_top:
+        lines.append("=== TWITTER TRENDS ===")
+        for i in sorted(trend_top):
+            p = trend_posts[i]
+            text = (p.get("text") or "").replace("\n", " ")[:240]
+            lines.append(f"T{i+1}. [{p['bucket']}/@{p['handle']}] [{p['engagement']}eng]: {text}")
+
+    if hn_top:
         lines.append("\n=== HACKER NEWS ===")
-        for i, s in enumerate(hn_stories, 1):
-            lines.append(f"H{i}. [{s['bucket']}] [{s['engagement']}pts]: {s['title']}")
+        for i in sorted(hn_top):
+            s = hn_stories[i]
+            lines.append(f"H{i+1}. [{s['bucket']}] [{s['engagement']}pts]: {s['title']}")
 
     return "\n".join(lines)
 
@@ -676,6 +735,8 @@ def main() -> None:
     parser.add_argument("--skip-hn",       action="store_true")
     parser.add_argument("--auto",          action="store_true",
                         help="Run non-interactively. Skips prompts; falls back to built-in defaults for any context.md section that's empty.")
+    parser.add_argument("--max-spend", type=float, default=None,
+                        help="In --auto mode, abort before any Apify run if the estimated worst-case cost exceeds this dollar amount. No effect in interactive mode.")
     args = parser.parse_args()
 
     if args.mode == "idea" and not args.idea:
@@ -707,14 +768,32 @@ def main() -> None:
     TWEETS_PER_PULL = 25  # matches fetch_trend_tweets / fetch_creator_posts defaults
     # Idea mode runs exactly ONE seed-idea search, not one per trend query.
     trend_pulls = 1 if args.mode == "idea" else len(trend_queries)
-    if not preview_and_confirm([
+    spend_items = [
         ("Twitter trend search", "twitter",
          (0 if args.skip_trends else trend_pulls * TWEETS_PER_PULL)),
         ("Creator tweet pulls",  "twitter",
          (0 if args.skip_creators else len(creators_list) * TWEETS_PER_PULL)),
-    ], interactive=not args.auto):
+    ]
+
+    # Auto-mode spend ceiling: interactive mode already gates on y/N, but an
+    # unattended run has no one to say no — so abort if the worst-case estimate
+    # blows past --max-spend before any paid Apify actor is touched.
+    if args.auto and args.max_spend is not None:
+        _, est_total = estimate_apify_cost([i for i in spend_items if i[2] > 0])
+        if est_total > args.max_spend:
+            print(f"Aborted — estimated worst-case Apify cost ${est_total:.2f} "
+                  f"exceeds --max-spend ${args.max_spend:.2f}. No Apify runs were started.")
+            return
+
+    if not preview_and_confirm(spend_items, interactive=not args.auto):
         print("Aborted — no Apify runs were started.")
         return
+
+    # Crash-safe checkpoints for the paid Twitter fan-out. Keyed per-run so a
+    # re-run of the same target/date resumes; different targets stay separate.
+    ck_tag = args.sheet_id or args.output_csv or "csv"
+    trend_ck   = checkpoint_path(f"content_idea_finder_trends_{ck_tag}_{run_date}_{args.mode}")
+    creator_ck = checkpoint_path(f"content_idea_finder_creators_{ck_tag}_{run_date}_{args.mode}")
 
     trend_posts: List[Dict] = []
     hn_stories:  List[Dict] = []
@@ -731,6 +810,7 @@ def main() -> None:
                 queries=trend_queries,
                 min_likes=min_likes,
                 lookback_days=args.lookback_days,
+                ck_path=trend_ck,
             )
             print(f"  Total: {len(trend_posts)} tweets")
         else:
@@ -768,6 +848,7 @@ def main() -> None:
             creator_posts = fetch_creator_posts(
                 creators=creators_list,
                 lookback_days=args.lookback_days,
+                ck_path=creator_ck,
             )
             print(f"  Total: {len(creator_posts)} creator tweets")
             print("\n  Matching creator views to topics...")
@@ -793,6 +874,7 @@ def main() -> None:
             print("\n--- Searching Twitter for seed idea ---")
             trend_posts = fetch_trend_tweets(
                 queries=seed_query, min_likes=0, lookback_days=args.lookback_days,
+                ck_path=trend_ck,
             )
         if not args.skip_hn:
             print("\n--- Searching HN for seed idea ---")
@@ -823,6 +905,7 @@ def main() -> None:
             creator_posts = fetch_creator_posts(
                 creators=creators_list,
                 lookback_days=args.lookback_days,
+                ck_path=creator_ck,
             )
             print(f"  Total: {len(creator_posts)} creator tweets")
             print("\n  Matching creator views to seed topic...")

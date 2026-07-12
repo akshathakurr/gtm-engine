@@ -35,6 +35,8 @@ from workflows._common import (
     section_body as _section_body,
     preview_and_confirm, TabularStore,
     map_rate_limited as _map_rate_limited,
+    checkpoint_path, checkpoint_load, checkpoint_append,
+    estimate_apify_cost,
     CONTEXT_FILE as _CONTEXT_FILE,
 )
 from scrapers.linkedin_profile_post_scraper import scraper as _post_scraper
@@ -221,14 +223,30 @@ def _normalize_search_post(post: dict, source: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def pull_profile_posts(profile_urls: List[str], max_per_profile: int, days_back: int,
-                       source: str) -> List[dict]:
+                       source: str, ck_path: Optional[str] = None) -> List[dict]:
     """Pull recent posts from a list of profile URLs, tagged with `source`.
 
     Used for both the prospect (ICP) list and the authority-accounts list — same
     actor, different `source` tag so downstream can tell the two plays apart.
     One run per URL, starts spaced SLEEP_BETWEEN_PROFILES apart, run-times
     overlapped across a small pool.
+
+    CRASH-SAFETY: if ``ck_path`` is given, each profile's raw posts are appended
+    to a local JSONL checkpoint keyed by profile URL the instant they come back,
+    and already-fetched URLs are skipped on a re-run — so a mid-pull crash or
+    credit-exhaustion never re-pays for a profile already scraped.
     """
+    done: Dict[str, object] = checkpoint_load(ck_path) if ck_path else {}
+    posts: List[dict] = []
+    pending: List[str] = []
+    for url in profile_urls:
+        if url in done and isinstance(done[url], list):
+            posts.extend(_normalize_profile_post(p, source) for p in done[url])
+        else:
+            pending.append(url)
+    if done and pending:
+        print(f"  Resuming from checkpoint: {len(profile_urls) - len(pending)} {source} profile(s) already pulled.")
+
     def scrape_one(url: str) -> dict:
         return _post_scraper.scrape_linkedin_profile_posts(
             profile_url=url,
@@ -236,32 +254,63 @@ def pull_profile_posts(profile_urls: List[str], max_per_profile: int, days_back:
             days_back=days_back,
         )
 
-    results, errors = _map_rate_limited(
-        scrape_one, profile_urls,
-        min_interval=SLEEP_BETWEEN_PROFILES, max_workers=ICP_CONCURRENCY,
-    )
-    posts: List[dict] = []
-    for url, res, err in zip(profile_urls, results, errors):
+    def _persist(_idx, url, res, err):
         if err:
             print(f"  {source} profile {url} failed: {err}")
-            continue
-        posts.extend(_normalize_profile_post(p, source) for p in (res or {}).get("posts", []))
+            return
+        raw = (res or {}).get("posts", [])
+        if ck_path:
+            checkpoint_append(ck_path, url, raw)
+        posts.extend(_normalize_profile_post(p, source) for p in raw)
+
+    _map_rate_limited(
+        scrape_one, pending,
+        min_interval=SLEEP_BETWEEN_PROFILES, max_workers=ICP_CONCURRENCY,
+        on_result=_persist,
+    )
     return posts
 
 
-def _search_keywords(keywords: List[str], sort: str, max_posts: int) -> List[dict]:
-    """Run posts-search for each keyword concurrently (starts spaced), in order."""
+def _search_keywords(keywords: List[str], sort: str, max_posts: int,
+                     ck_path: Optional[str] = None) -> List[dict]:
+    """Run posts-search for each keyword concurrently (starts spaced), in order.
+
+    CRASH-SAFETY: if ``ck_path`` is given, each keyword's raw result is
+    checkpointed keyed by keyword the instant it comes back, and already-searched
+    keywords are skipped on a re-run — so a mid-search crash never re-pays for a
+    keyword already fetched. The checkpoint key embeds the sort so a prospect and
+    engagement run against the same keyword never collide.
+    """
+    done: Dict[str, object] = checkpoint_load(ck_path) if ck_path else {}
+    results: List[dict] = []
+    pending: List[str] = []
+    for kw in keywords:
+        key = f"{sort}::{kw}"
+        if key in done and isinstance(done[key], dict):
+            results.append(done[key])
+        else:
+            pending.append(kw)
+    if done and pending:
+        print(f"  Resuming from checkpoint: {len(keywords) - len(pending)} keyword(s) already searched.")
+
     def search_one(kw: str) -> dict:
         return _search_scraper.search_linkedin_posts(kw, sort=sort, max_posts=max_posts)
 
-    results, errors = _map_rate_limited(
-        search_one, keywords,
-        min_interval=SEARCH_MIN_INTERVAL, max_workers=SEARCH_CONCURRENCY,
-    )
-    for kw, err in zip(keywords, errors):
+    def _persist(_idx, kw, res, err):
         if err:
             print(f"  Search keyword '{kw}' failed: {err}")
-    return [r for r in results if r]
+            return
+        if res:
+            if ck_path:
+                checkpoint_append(ck_path, f"{sort}::{kw}", res)
+            results.append(res)
+
+    _map_rate_limited(
+        search_one, pending,
+        min_interval=SEARCH_MIN_INTERVAL, max_workers=SEARCH_CONCURRENCY,
+        on_result=_persist,
+    )
+    return results
 
 
 def _hours_since(timestamp_ms: Optional[float]) -> Optional[float]:
@@ -302,14 +351,16 @@ def _rank_by_velocity(posts: List[dict]) -> List[dict]:
 
 
 def pull_trending_posts(keywords: List[str], max_per_keyword: int, days_back: int,
-                        commentable_max_comments: int = 0) -> List[dict]:
+                        commentable_max_comments: int = 0,
+                        ck_path: Optional[str] = None) -> List[dict]:
     """Search genre keywords, keep recent + still-commentable, rank by engagement velocity.
 
     Ranking by velocity (engagement / hours-since-posted) rather than absolute
     engagement favors *rising* posts where an early comment is still visible,
     instead of saturated posts where it lands at comment #300.
     """
-    results = _search_keywords(keywords, sort="relevance", max_posts=max_per_keyword)
+    results = _search_keywords(keywords, sort="relevance", max_posts=max_per_keyword,
+                               ck_path=ck_path)
     posts: List[dict] = []
     for r in results:
         for p in r.get("posts", []):
@@ -322,9 +373,11 @@ def pull_trending_posts(keywords: List[str], max_per_keyword: int, days_back: in
 
 
 def pull_signal_posts(keywords: List[str], max_per_keyword: int, days_back: int,
-                      commentable_max_comments: int = 0) -> List[dict]:
+                      commentable_max_comments: int = 0,
+                      ck_path: Optional[str] = None) -> List[dict]:
     """Search signal keywords (date sort — intent recency matters), keep recent + commentable."""
-    results = _search_keywords(keywords, sort="date_posted", max_posts=max_per_keyword)
+    results = _search_keywords(keywords, sort="date_posted", max_posts=max_per_keyword,
+                               ck_path=ck_path)
     posts: List[dict] = []
     for r in results:
         for p in r.get("posts", []):
@@ -337,13 +390,15 @@ def pull_signal_posts(keywords: List[str], max_per_keyword: int, days_back: int,
 
 
 def pull_authority_posts(profile_urls: List[str], max_per_profile: int, days_back: int,
-                         commentable_max_comments: int = 0) -> List[dict]:
+                         commentable_max_comments: int = 0,
+                         ck_path: Optional[str] = None) -> List[dict]:
     """Pull posts from the curated authority accounts, drop buried threads, rank by velocity.
 
     Reach play: you want to comment *early* on a big account's rising post, so we
     rank their recent posts by engagement velocity just like the trending source.
     """
-    posts = pull_profile_posts(profile_urls, max_per_profile, days_back, "authority")
+    posts = pull_profile_posts(profile_urls, max_per_profile, days_back, "authority",
+                               ck_path=ck_path)
     posts = _drop_saturated(posts, commentable_max_comments)
     return _rank_by_velocity(posts)
 
@@ -388,17 +443,55 @@ _INTENT_ANGLE_GUIDANCE = {
 
 
 SCORE_CHUNK_SIZE = 40  # posts per Claude call — keeps each reply well under max_tokens
+# The full ICP context is re-sent in EVERY scoring chunk. Cap it so a large
+# context.md doesn't multiply input-token spend across dozens of chunks; the
+# leading section carries the genre/audience signal the scorer actually needs.
+MAX_CONTEXT_CHARS = 4000
 
 
 def score_relevance(posts: List[dict], project_context: str, client: anthropic.Anthropic,
-                    intent: str = "prospect") -> List[Optional[dict]]:
-    """Score posts in chunks so one long run can't truncate the reply mid-array."""
-    scores: List[Optional[dict]] = []
-    for start in range(0, len(posts), SCORE_CHUNK_SIZE):
-        chunk = posts[start:start + SCORE_CHUNK_SIZE]
+                    intent: str = "prospect", ck_path: Optional[str] = None) -> List[Optional[dict]]:
+    """Score posts in chunks so one long run can't truncate the reply mid-array.
+
+    INPUT TRIMMING: the project context is capped to MAX_CONTEXT_CHARS before it's
+    injected into every chunk (see _score_chunk), so a large context.md doesn't
+    inflate spend across many chunks.
+
+    CRASH-SAFETY: if ``ck_path`` is given, each post's score is checkpointed keyed
+    by post_id the instant its chunk returns, and already-scored posts are skipped
+    on a re-run — so a mid-scoring crash never re-pays Claude for a post already
+    scored.
+    """
+    if len(project_context) > MAX_CONTEXT_CHARS:
+        project_context = project_context[:MAX_CONTEXT_CHARS]
+
+    done: Dict[str, object] = checkpoint_load(ck_path) if ck_path else {}
+
+    def _pid(p: dict) -> str:
+        return p.get("post_id") or p.get("post_url") or ""
+
+    scores: List[Optional[dict]] = [None] * len(posts)
+    pending: List[int] = []
+    for i, p in enumerate(posts):
+        pid = _pid(p)
+        if pid and pid in done:
+            scores[i] = done[pid]  # may be None (a prior chunk that failed to parse)
+        else:
+            pending.append(i)
+    if done and len(pending) < len(posts):
+        print(f"  Resuming from checkpoint: {len(posts) - len(pending)} post(s) already scored.")
+
+    for start in range(0, len(pending), SCORE_CHUNK_SIZE):
+        idx_chunk = pending[start:start + SCORE_CHUNK_SIZE]
+        chunk = [posts[i] for i in idx_chunk]
         if start:
-            print(f"  ...scoring posts {start + 1}-{start + len(chunk)} of {len(posts)}")
-        scores.extend(_score_chunk(chunk, project_context, client, intent))
+            print(f"  ...scoring posts {start + 1}-{start + len(chunk)} of {len(pending)}")
+        chunk_scores = _score_chunk(chunk, project_context, client, intent)
+        for i, sc in zip(idx_chunk, chunk_scores):
+            scores[i] = sc
+            pid = _pid(posts[i])
+            if ck_path and pid:
+                checkpoint_append(ck_path, pid, sc)
     return scores
 
 
@@ -635,6 +728,10 @@ def main():
     parser.add_argument("--skip-signal", action="store_true", help="Prospect intent: skip the signal-keyword search.")
     parser.add_argument("--auto", action="store_true",
                         help="Run non-interactively. Errors out if context.md is missing required sections.")
+    parser.add_argument("--max-spend", type=float, default=None,
+                        help="Auto-mode only: abort before scraping if the estimated worst-case "
+                             "Apify cost exceeds this many USD. No effect in interactive mode "
+                             "(where you confirm the estimate directly).")
     args = parser.parse_args()
 
     if args.output_csv and args.output_sheet_id:
@@ -736,10 +833,22 @@ def main():
     # ---- Spend preview (only this intent's two sources). Worst case = every
     # requested item returned + billed.
     disc_items = 0 if skip_discovery else len(disc_keywords) * max_per_keyword
-    if not preview_and_confirm([
+    spend_items = [
         (f"{cur_label} profile posts", "linkedin_profile_posts", len(curated_urls) * max_per_profile),
         (f"{disc_label.title()} post search", "linkedin_post_search", disc_items),
-    ], interactive=interactive):
+    ]
+    # Auto mode has no y/N gate, so enforce a spend ceiling here: if the worst-case
+    # estimate exceeds --max-spend, abort before a single actor runs. Interactive
+    # mode is unchanged — the user confirms the printed estimate directly.
+    if not interactive and args.max_spend is not None:
+        _, est_total = estimate_apify_cost(spend_items)
+        if est_total > args.max_spend:
+            print(f"\nERROR: estimated worst-case Apify cost ${est_total:.2f} exceeds "
+                  f"--max-spend ${args.max_spend:.2f}. Aborted before any Apify runs.")
+            print("Raise --max-spend, or narrow the run (fewer profiles/keywords, "
+                  "lower --max-per-profile / --max-per-keyword) and re-run.")
+            sys.exit(3)
+    if not preview_and_confirm(spend_items, interactive=interactive):
         print("Aborted — no Apify runs were started.")
         return
 
@@ -748,6 +857,16 @@ def main():
     # concurrently (different actors → no shared throttle); interactive runs
     # them sequentially so the between-source pauses make sense.
 
+    # Checkpoint files are keyed by the output target + intent so concurrent /
+    # sequential runs against different sheets don't share a checkpoint. Each paid
+    # actor pull and each Claude score is saved the instant it returns; a crash /
+    # credit-exhaustion mid-run leaves everything done-so-far on disk, and a
+    # re-run skips it — never re-paying for work already completed.
+    run_key = f"{args.output_csv or out_sheet_id}_{intent}"
+    curated_ck   = checkpoint_path(f"linkedin_comment_helper_curated_{run_key}")
+    discovery_ck = checkpoint_path(f"linkedin_comment_helper_discovery_{run_key}")
+    score_ck     = checkpoint_path(f"linkedin_comment_helper_score_{run_key}")
+
     def run_curated() -> List[dict]:
         if not curated_urls:
             return []
@@ -755,11 +874,12 @@ def main():
         if intent == "engagement":
             # Reach play — rank the big accounts' posts by velocity, comment early.
             posts = pull_authority_posts(curated_urls, max_per_profile, days_back,
-                                         commentable_max_comments)[:authority_top_n]
+                                         commentable_max_comments, ck_path=curated_ck)[:authority_top_n]
             print(f"  Got {len(posts)} authority posts (top {authority_top_n} by engagement velocity).")
         else:
             # Warm play — presence matters, so keep all recent posts (no velocity cull).
-            posts = pull_profile_posts(curated_urls, max_per_profile, days_back, "icp")
+            posts = pull_profile_posts(curated_urls, max_per_profile, days_back, "icp",
+                                       ck_path=curated_ck)
             print(f"  Got {len(posts)} prospect posts.")
         return posts
 
@@ -769,11 +889,11 @@ def main():
         print(f"[{disc_label}] Searching {len(disc_keywords)} {disc_label.lower()} keywords...")
         if intent == "engagement":
             posts = pull_trending_posts(disc_keywords, max_per_keyword, days_back,
-                                        commentable_max_comments)[:trending_top_n]
+                                        commentable_max_comments, ck_path=discovery_ck)[:trending_top_n]
             print(f"  Got {len(posts)} trending posts (top {trending_top_n} by engagement velocity).")
         else:
             posts = pull_signal_posts(disc_keywords, max_per_keyword, days_back,
-                                      commentable_max_comments)
+                                      commentable_max_comments, ck_path=discovery_ck)
             print(f"  Got {len(posts)} signal posts.")
         return posts
 
@@ -807,7 +927,7 @@ def main():
     print(f"\n[SCORE] Scoring {len(all_posts)} posts via Claude...")
     project_context = _load_project_context()
     client = anthropic.Anthropic()
-    scores = score_relevance(all_posts, project_context, client, intent=intent)
+    scores = score_relevance(all_posts, project_context, client, intent=intent, ck_path=score_ck)
     surfaced = sum(1 for s in scores
                    if s and s.get("worth_commenting") and _author_ok(s))
     print(f"  {surfaced} of {len(all_posts)} posts worth commenting AND by a relevant author.")

@@ -35,8 +35,10 @@ from scrapers.web_search.scraper import search_web, search_web_batch  # noqa: E4
 from scrapers.twitter_profile_scraper.scraper import scrape_twitter_profile  # noqa: E402
 
 
-DEFAULT_NUM_SEARCH_QUERIES = 5
-DEFAULT_TWEETS_TO_PULL = 60
+# Cost control: this scraper fires per-lead searches + a Twitter pull + Claude
+# calls, so it multiplies fast across a list. Keep the fan-out modest.
+DEFAULT_NUM_SEARCH_QUERIES = 3   # was 5
+DEFAULT_TWEETS_TO_PULL = 30      # was 60
 DEFAULT_TWITTER_DAYS_BACK = 180
 DEFAULT_MAX_SIGNALS = 3
 
@@ -114,7 +116,7 @@ def resolve_identity(
     try:
         result = search_web(
             query=f'"{name}" {company} twitter OR x.com profile',
-            num_results=10,
+            num_results=5,
             summary_question=f"Is this the Twitter/X profile of {name} who works at {company}? What is their bio?",
         )
     except Exception as e:

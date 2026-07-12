@@ -37,7 +37,7 @@ from workflows._common import (
     col_letter, cell, load_icp,
     GoogleSheetsBackend, CsvBackend,
     detect_columns, cell_combined, get_or_create_col, parse_post_config,
-    map_rate_limited,
+    map_rate_limited, checkpoint_path, checkpoint_load, checkpoint_append,
 )
 from workflows.linkedin_outreach.steps import (
     ENRICH_CONCURRENCY, POSTS_MIN_INTERVAL, POSTS_CONCURRENCY,
@@ -104,6 +104,11 @@ def main() -> None:
                         help="Also include P2 leads in the outreach batch (default: P0 only)")
     parser.add_argument("--skip-enrich", action="store_true",
                         help="Skip company enrichment step (Step 2)")
+    parser.add_argument("--enrich-all", action="store_true",
+                        help="Enrich every lead's company in Step 2, not just Decision Makers "
+                             "(use when the sheet is all Champion-level contacts)")
+    parser.add_argument("--skip-competitors", action="store_true",
+                        help="Skip competitor lookup step (Step 5) — no Competitors column is added")
     parser.add_argument("--skip-posts", action="store_true",
                         help="Skip LinkedIn post scraping step (Step 6)")
     parser.add_argument("--skip-small-talk", action="store_true",
@@ -239,12 +244,19 @@ def main() -> None:
     print(f"  Written to column {col_letter(buyer_col_idx)}")
 
     # ------------------------------------------------------------------
-    # Step 2: Enrich Decision Maker companies
+    # Step 2: Enrich company firmographics
     # ------------------------------------------------------------------
-    dm_indices = [i for i, c in enumerate(classifications) if c == "Decision Maker"]
+    # By default only Decision Makers' companies are enriched (cost control).
+    # --enrich-all widens this to every lead, for sheets that are all
+    # Champion-level contacts where scoring still needs firmographics.
+    if args.enrich_all:
+        dm_indices = list(range(len(classifications)))
+    else:
+        dm_indices = [i for i, c in enumerate(classifications) if c == "Decision Maker"]
 
     if dm_indices and enrich_fields:
-        print(f"\n--- Step 2: Enriching {len(dm_indices)} Decision Maker company(ies) ---")
+        label = "company(ies)" if args.enrich_all else "Decision Maker company(ies)"
+        print(f"\n--- Step 2: Enriching {len(dm_indices)} {label} ---")
         print(f"  Fields: {', '.join(f['key'] for f in enrich_fields)}")
 
         # For each field: locate (or create) the destination column on the sheet.
@@ -260,44 +272,73 @@ def main() -> None:
                 for f in enrich_fields
             )
 
-        # Enrich each UNIQUE DM company that still needs it, concurrently
-        # (Claude + Exa). Deduping by name avoids paying twice when two DMs
-        # share a company.
-        company_cache: Dict[str, Dict[str, str]] = {}
+        # Enrich each UNIQUE company that still needs it, concurrently.
+        # CRASH-SAFETY: each result is appended to a local JSONL checkpoint the
+        # instant it comes back (instant + free — no Sheets call per company).
+        # If the run dies midway (crash, credit-exhaustion, Ctrl-C), the
+        # checkpoint still holds every company done so far; a re-run loads it,
+        # skips those, and only pays for what's missing. The Sheet is written
+        # ONCE at the end, in a batched per-field column write.
+        ck_id = args.sheet_id or (args.input_csv or "csv")
+        ck_path = checkpoint_path(f"linkedin_outreach_enrich_{ck_id}")
+        company_cache: Dict[str, Dict[str, str]] = {
+            k: v for k, v in checkpoint_load(ck_path).items() if isinstance(v, dict)
+        }
+        if company_cache:
+            print(f"  Resuming from checkpoint: {len(company_cache)} company(ies) already enriched.")
+
+        rows_by_company: Dict[str, List[int]] = {}
         to_enrich: List[str] = []
         seen_companies: set = set()
         for i in dm_indices:
             company = leads[i]["company"]
-            if not company or _all_filled(data_rows[i]) or company in seen_companies:
-                continue
-            seen_companies.add(company)
-            to_enrich.append(company)
-
-        if to_enrich:
-            print(f"  Enriching {len(to_enrich)} unique company(ies) in parallel...")
-            results, errors = map_rate_limited(
-                lambda c: enrich_company(c, enrich_fields, client),
-                to_enrich, max_workers=ENRICH_CONCURRENCY,
-            )
-            for c, r, e in zip(to_enrich, results, errors):
-                if e:
-                    print(f"    ! {c} enrichment failed: {e}")
-                company_cache[c] = r or {}
-
-        # Apply + write sequentially so the backend is never touched concurrently.
-        for i in dm_indices:
-            company = leads[i]["company"]
             if not company:
                 continue
-            row     = data_rows[i]
-            row_num = i + 2
-            if _all_filled(row):
-                enriched = {f["key"]: cell(row, col_idx_by_key[f["key"]]) for f in enrich_fields}
-            else:
-                enriched = company_cache.get(company, {})
-                for f in enrich_fields:
-                    backend.write_cell(row_num, col_idx_by_key[f["key"]], enriched.get(f["key"], ""))
-            _apply_enrichment(leads[i], enriched)
+            if _all_filled(data_rows[i]):
+                enriched = {f["key"]: cell(data_rows[i], col_idx_by_key[f["key"]]) for f in enrich_fields}
+                _apply_enrichment(leads[i], enriched)
+                continue
+            rows_by_company.setdefault(company, []).append(i)
+            # Skip companies already in the checkpoint — never re-pay for them.
+            if company not in seen_companies and company not in company_cache:
+                seen_companies.add(company)
+                to_enrich.append(company)
+
+        def _persist(_idx, company, enriched, err):
+            """Main-thread callback: checkpoint one company's firmographics to
+            local disk the moment its enrichment finishes (no Sheets call here)."""
+            if err:
+                print(f"    ! {company} enrichment failed: {err}")
+            enriched = enriched or {}
+            company_cache[company] = enriched
+            checkpoint_append(ck_path, company, enriched)
+
+        if to_enrich:
+            print(f"  Enriching {len(to_enrich)} unique company(ies) — checkpointing each to {ck_path} ...")
+            map_rate_limited(
+                lambda c: enrich_company(c, enrich_fields, client),
+                to_enrich, max_workers=ENRICH_CONCURRENCY, on_result=_persist,
+            )
+
+        # Batched write to the Sheet: one column per enrich field, reconstructed
+        # from the checkpoint cache + existing cells so nothing else is clobbered.
+        print("  Writing enrichment to the sheet (batched)...")
+        for f in enrich_fields:
+            col_idx = col_idx_by_key[f["key"]]
+            column: List[str] = []
+            for i, row in enumerate(data_rows):
+                company = leads[i]["company"] if i < len(leads) else ""
+                if company in company_cache:
+                    column.append(company_cache[company].get(f["key"], "") or cell(row, col_idx))
+                else:
+                    column.append(cell(row, col_idx))  # preserve whatever's there
+            backend.write_column(col_idx, column)
+
+        # Apply enrichment to every lead in memory (for scoring / copy downstream).
+        for i in dm_indices:
+            company = leads[i]["company"]
+            if company in company_cache:
+                _apply_enrichment(leads[i], company_cache[company])
 
     elif not enrich_fields:
         print("\n--- Step 2: Skipping enrichment (--skip-enrich) ---")
@@ -355,36 +396,39 @@ def main() -> None:
     # ------------------------------------------------------------------
     # Step 5: Find competitors for each filtered lead's company
     # ------------------------------------------------------------------
-    print(f"\n--- Step 5: Finding competitors for {len(outreach_indices)} leads ---")
+    if args.skip_competitors:
+        print("\n--- Step 5: Skipping competitor lookup (--skip-competitors) ---")
+    else:
+        print(f"\n--- Step 5: Finding competitors for {len(outreach_indices)} leads ---")
 
-    competitors_col_idx = get_or_create_col(headers, mapping, "competitors", "Competitors")
-    backend.write_header(competitors_col_idx, headers[competitors_col_idx])
+        competitors_col_idx = get_or_create_col(headers, mapping, "competitors", "Competitors")
+        backend.write_header(competitors_col_idx, headers[competitors_col_idx])
 
-    # Look up competitors for each UNIQUE company in the batch, in parallel.
-    competitor_cache: Dict[str, List[str]] = {}
-    uniq_companies: List[str] = []
-    seen_companies = set()
-    for i in outreach_indices:
-        c = leads[i]["company"]
-        if c and c not in seen_companies:
-            seen_companies.add(c)
-            uniq_companies.append(c)
+        # Look up competitors for each UNIQUE company in the batch, in parallel.
+        competitor_cache: Dict[str, List[str]] = {}
+        uniq_companies: List[str] = []
+        seen_companies = set()
+        for i in outreach_indices:
+            c = leads[i]["company"]
+            if c and c not in seen_companies:
+                seen_companies.add(c)
+                uniq_companies.append(c)
 
-    results, errors = map_rate_limited(
-        lambda c: find_competitors(c, client), uniq_companies, max_workers=ENRICH_CONCURRENCY,
-    )
-    for c, r, e in zip(uniq_companies, results, errors):
-        if e:
-            print(f"  {c} — competitor lookup failed: {e}")
-        competitor_cache[c] = r or []
+        results, errors = map_rate_limited(
+            lambda c: find_competitors(c, client), uniq_companies, max_workers=ENRICH_CONCURRENCY,
+        )
+        for c, r, e in zip(uniq_companies, results, errors):
+            if e:
+                print(f"  {c} — competitor lookup failed: {e}")
+            competitor_cache[c] = r or []
 
-    # Write per lead sequentially.
-    for i in outreach_indices:
-        comps = competitor_cache.get(leads[i]["company"], [])
-        competitors_by_lead[i] = comps  # keep in memory for Step 9
-        backend.write_cell(i + 2, competitors_col_idx, ", ".join(comps))
-        if comps:
-            print(f"  {leads[i]['company']} → {', '.join(comps)}")
+        # Write per lead sequentially.
+        for i in outreach_indices:
+            comps = competitor_cache.get(leads[i]["company"], [])
+            competitors_by_lead[i] = comps  # keep in memory for Step 9
+            backend.write_cell(i + 2, competitors_col_idx, ", ".join(comps))
+            if comps:
+                print(f"  {leads[i]['company']} → {', '.join(comps)}")
 
     # ------------------------------------------------------------------
     # Step 6: Scrape + filter LinkedIn posts
@@ -404,24 +448,43 @@ def main() -> None:
             if i not in has_linkedin:
                 post_data_by_lead[i] = []
 
+        # Checkpoint Apify post results per LinkedIn URL — a crash mid-scrape
+        # keeps everything already pulled; a re-run skips those profiles.
+        posts_ck = checkpoint_path(f"linkedin_outreach_posts_{args.sheet_id or (args.input_csv or 'csv')}")
+        posts_done = checkpoint_load(posts_ck)
+        pending_posts = []
+        for i in has_linkedin:
+            url = leads[i]["linkedin"]
+            if url in posts_done and isinstance(posts_done[url], dict):
+                r = posts_done[url]
+                post_data_by_lead[i] = r.get("posts_data", [])
+                backend.write_cell(i + 2, post_links_col_idx, "\n".join(r.get("urls", [])))
+            else:
+                pending_posts.append(i)
+        if posts_done:
+            print(f"  Resuming from checkpoint: {len(has_linkedin) - len(pending_posts)} profile(s) already scraped.")
+
+        def _persist_posts(_idx, i, r, e):
+            if e or not r:
+                if e:
+                    print(f"  {leads[i]['name']} — post scraping failed: {e}")
+                post_data_by_lead[i] = []
+                return
+            post_data_by_lead[i] = r["posts_data"]  # full text kept in memory
+            checkpoint_append(posts_ck, leads[i]["linkedin"], {"urls": r["urls"], "posts_data": r["posts_data"]})
+            backend.write_cell(i + 2, post_links_col_idx, "\n".join(r["urls"]) if r["urls"] else "")
+            print(f"  {leads[i]['name']} ({leads[i]['company']}) → {len(r['urls'])} post(s) matched")
+
         # profile-posts actor throttles on bursts — space starts POSTS_MIN_INTERVAL
         # apart, overlap run-times across a small pool.
-        results, errors = map_rate_limited(
+        map_rate_limited(
             lambda i: scrape_and_filter_posts(
                 profile_url=leads[i]["linkedin"], icp_context=icp_context,
                 max_posts=post_config["max_posts"], days_back=post_config["days_back"], client=client,
             ),
-            has_linkedin, min_interval=POSTS_MIN_INTERVAL, max_workers=POSTS_CONCURRENCY,
+            pending_posts, min_interval=POSTS_MIN_INTERVAL, max_workers=POSTS_CONCURRENCY,
+            on_result=_persist_posts,
         )
-        for i, r, e in zip(has_linkedin, results, errors):
-            if e:
-                print(f"  {leads[i]['name']} — post scraping failed: {e}")
-                post_data_by_lead[i] = []
-                continue
-            post_data_by_lead[i] = r["posts_data"]  # full text kept in memory
-            cell_value = "\n".join(r["urls"]) if r["urls"] else ""
-            backend.write_cell(i + 2, post_links_col_idx, cell_value)
-            print(f"  {leads[i]['name']} ({leads[i]['company']}) → {len(r['urls'])} post(s) matched")
 
     # ------------------------------------------------------------------
     # Step 7: Small talk personalisation
@@ -436,20 +499,38 @@ def main() -> None:
         small_talk_col_idx = get_or_create_col(headers, mapping, "small_talk", "Small Talk")
         backend.write_header(small_talk_col_idx, headers[small_talk_col_idx])
 
-        st_indices = [i for i in outreach_indices if (leads[i].get("name") or "").strip()]
-        results, errors = map_rate_limited(
-            lambda i: scrape_small_talk(
-                profile_url=leads[i].get("linkedin", ""), name=leads[i]["name"], company=leads[i]["company"],
-            ),
-            st_indices, max_workers=ENRICH_CONCURRENCY,
-        )
-        for i, r, e in zip(st_indices, results, errors):
+        all_st = [i for i in outreach_indices if (leads[i].get("name") or "").strip()]
+        # Checkpoint small-talk results (Apify) per LinkedIn URL / name key.
+        st_ck = checkpoint_path(f"linkedin_outreach_smalltalk_{args.sheet_id or (args.input_csv or 'csv')}")
+        st_done = checkpoint_load(st_ck)
+        st_indices = []
+        for i in all_st:
+            key = leads[i].get("linkedin") or f"{leads[i]['name']}|{leads[i]['company']}"
+            if key in st_done:
+                detail = st_done[key] or ""
+                small_talk_by_lead[i] = detail
+                backend.write_cell(i + 2, small_talk_col_idx, detail)
+            else:
+                st_indices.append(i)
+        if st_done:
+            print(f"  Resuming from checkpoint: {len(all_st) - len(st_indices)} lead(s) already done.")
+
+        def _persist_st(_idx, i, r, e):
             detail = "" if e else (r or "")
             if e:
                 print(f"  {leads[i]['name']} — small talk failed: {e}")
             small_talk_by_lead[i] = detail  # keep in memory for Step 8
+            key = leads[i].get("linkedin") or f"{leads[i]['name']}|{leads[i]['company']}"
+            checkpoint_append(st_ck, key, detail)
             backend.write_cell(i + 2, small_talk_col_idx, detail)
             print(f"  {leads[i]['name']} ({leads[i]['company']}) → {(detail[:80] + '...') if len(detail) > 80 else (detail or '(none)')}")
+
+        map_rate_limited(
+            lambda i: scrape_small_talk(
+                profile_url=leads[i].get("linkedin", ""), name=leads[i]["name"], company=leads[i]["company"],
+            ),
+            st_indices, max_workers=ENRICH_CONCURRENCY, on_result=_persist_st,
+        )
 
     # ------------------------------------------------------------------
     # Step 8: Personalisation hooks

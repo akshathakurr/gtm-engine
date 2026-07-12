@@ -26,13 +26,41 @@ DEFAULT_SUMMARY_QUESTION = "What is most important or notable about this?"
 #   parallel           — force Parallel only.
 #   both               — query both and merge+dedup results (broader coverage).
 #
-# When both keys are present, SEARCH_PRIMARY picks the primary (default
-# "parallel" — spares paid Exa credits and leans on Parallel's free tier;
-# set to "exa" to prefer Exa). If a user only sets one key, that provider is
-# used and the other is never touched — so existing Exa-only setups are
-# unchanged.
+# When both keys are present, SEARCH_PRIMARY picks the primary (default "exa" —
+# Exa first, Parallel as the fallback; set to "parallel" to prefer Parallel). If
+# a user only sets one key, that provider is used and the other is never touched.
+#
+# A provider that hits a HARD failure mid-run (402/credit exhausted, 401/403
+# auth) is disabled for the rest of the process (see _disable_provider) so we
+# fail straight over to the fallback instead of re-hitting a dead account on
+# every subsequent search and burning time / the fallback's credits.
 
 _VALID_PROVIDERS = ("exa", "parallel")
+
+# Providers that hard-failed this run — skipped by every later search_web call.
+_disabled_providers = set()
+_disabled_lock = threading.Lock()
+
+# Substrings that mark an UNRECOVERABLE provider failure (vs. a transient blip).
+# On these we stop using the provider for the rest of the run rather than retry.
+_HARD_FAIL_MARKERS = (
+    "402", "401", "403", "payment required", "insufficient", "quota",
+    "credit", "exhaust", "unauthorized", "forbidden", "out of credits",
+)
+
+
+def _is_hard_fail(err) -> bool:
+    s = str(err).lower()
+    return any(m in s for m in _HARD_FAIL_MARKERS)
+
+
+def _disable_provider(prov: str, err) -> None:
+    """Latch a provider off for the rest of the run after a hard failure."""
+    with _disabled_lock:
+        if prov not in _disabled_providers:
+            _disabled_providers.add(prov)
+            print(f"  ⚠ disabling '{prov}' for the rest of this run after a hard "
+                  f"failure ({err}); later searches skip it and use the fallback.")
 
 
 def _resolve_providers():
@@ -49,35 +77,45 @@ def _resolve_providers():
     if setting == "exa":
         if not exa_key:
             raise EnvironmentError("SEARCH_PROVIDER=exa but EXA_API_KEY is not set.")
-        return "single", ["exa"]
-
-    if setting == "parallel":
+        mode, providers = "single", ["exa"]
+    elif setting == "parallel":
         if not par_key:
             raise EnvironmentError("SEARCH_PROVIDER=parallel but PARALLEL_API_KEY is not set.")
-        return "single", ["parallel"]
-
-    available = [p for p, k in (("parallel", par_key), ("exa", exa_key)) if k]
-
-    if setting == "both":
-        if not available:
+        mode, providers = "single", ["parallel"]
+    else:
+        available = [p for p, k in (("exa", exa_key), ("parallel", par_key)) if k]
+        if setting == "both":
+            if not available:
+                raise EnvironmentError(
+                    "SEARCH_PROVIDER=both but neither EXA_API_KEY nor PARALLEL_API_KEY is set."
+                )
+            mode, providers = "both", available
+        elif not available:  # auto, no keys
             raise EnvironmentError(
-                "SEARCH_PROVIDER=both but neither EXA_API_KEY nor PARALLEL_API_KEY is set."
+                "No search key set. Add EXA_API_KEY and/or PARALLEL_API_KEY to .env."
             )
-        return "both", available
+        elif len(available) == 1:
+            mode, providers = "single", available
+        else:
+            # Both keys present: Exa primary by default, Parallel as fallback.
+            primary = (os.environ.get("SEARCH_PRIMARY") or "exa").strip().lower()
+            if primary not in _VALID_PROVIDERS:
+                primary = "exa"
+            providers = [primary] + [p for p in ("exa", "parallel") if p != primary]
+            mode = "fallback"
 
-    # auto
-    if not available:
+    # Drop any provider that hard-failed earlier this run so we don't re-hit a
+    # dead account. If that leaves nothing, everything usable is exhausted.
+    with _disabled_lock:
+        active = [p for p in providers if p not in _disabled_providers]
+    if not active:
         raise EnvironmentError(
-            "No search key set. Add EXA_API_KEY and/or PARALLEL_API_KEY to .env."
+            "All configured search providers are disabled this run (exhausted "
+            "credits or auth failure). Top up or fix EXA_API_KEY / PARALLEL_API_KEY."
         )
-    if len(available) == 1:
-        return "single", available
-
-    primary = (os.environ.get("SEARCH_PRIMARY") or "parallel").strip().lower()
-    if primary not in _VALID_PROVIDERS:
-        primary = "parallel"
-    order = [primary] + [p for p in ("parallel", "exa") if p != primary]
-    return "fallback", order
+    if mode == "fallback" and len(active) == 1:
+        mode = "single"
+    return mode, active
 
 
 def _dedup(results: List[dict]) -> List[dict]:
@@ -226,27 +264,47 @@ def _search_parallel(
     import requests  # lazy: keeps provider resolution importable without it
 
     want = max(1, min(int(num_results), 40))  # Parallel caps max_results at 40
-    # When a client-side filter is active, ask for the max so enough results
-    # survive filtering; unfiltered searches fetch exactly what's wanted.
+    # When a client-side filter is active, over-fetch enough that some survive
+    # filtering — but a BOUNDED multiple, not the max-40 (Parallel bills by
+    # results, so always buying 40 for a 3-result ask wasted credits).
     filters_active = bool(include_domains or exclude_domains) or days_back is not None
-    fetch = 40 if filters_active else want
+    fetch = min(40, max(want * 3, 10)) if filters_active else want
 
-    processor = (os.environ.get("SEARCH_PARALLEL_PROCESSOR") or "base").strip().lower()
+    # Parallel Search API: 'mode' replaced the old 'processor'; result/char
+    # limits moved under 'advanced_settings'. Modes: turbo | basic | advanced.
+    mode = (os.environ.get("SEARCH_PARALLEL_MODE")
+            or os.environ.get("SEARCH_PARALLEL_PROCESSOR") or "base").strip().lower()
+    if mode in ("base", "pro"):  # legacy processor names → nearest mode
+        mode = {"base": "basic", "pro": "advanced"}[mode]
+    if mode not in ("turbo", "basic", "advanced"):
+        mode = "basic"
     body = {
         "objective": question or DEFAULT_SUMMARY_QUESTION,
         "search_queries": [query],
-        "processor": processor,
-        "max_results": fetch,
-        "max_chars_per_result": _PARALLEL_MAX_CHARS,
+        "mode": mode,
+        "advanced_settings": {
+            "max_results": fetch,
+            "excerpt_settings": {"max_chars_per_result": _PARALLEL_MAX_CHARS},
+        },
     }
 
-    _parallel_throttle()
-    resp = requests.post(
-        _PARALLEL_ENDPOINT,
-        headers={"x-api-key": api_key, "Content-Type": "application/json"},
-        json=body,
-        timeout=90,  # 'pro' processor can take 15-60s
-    )
+    # A burst of concurrent searches can trip Parallel's rate limit (429). That's
+    # transient, so back off and retry a couple times before giving up — otherwise
+    # one 429 wastes the call. Non-429 errors (incl. 402 credit exhaustion) fail
+    # fast so the caller can latch the provider off and fall over.
+    resp = None
+    for attempt in range(3):
+        _parallel_throttle()
+        resp = requests.post(
+            _PARALLEL_ENDPOINT,
+            headers={"x-api-key": api_key, "Content-Type": "application/json"},
+            json=body,
+            timeout=90,  # 'advanced' mode can take 15-60s
+        )
+        if resp.status_code == 429 and attempt < 2:
+            time.sleep(2 ** (attempt + 1))  # 2s, 4s
+            continue
+        break
     if resp.status_code != 200:
         raise RuntimeError(f"Parallel search HTTP {resp.status_code}: {resp.text[:200]}")
 
@@ -335,6 +393,9 @@ def search_web(
     Returns:
         dict with keys: query, total, results, errors
     """
+    # Hard cap: no caller can accidentally request a huge (billable) result set.
+    # Exa is not otherwise clamped, so a bad num_results would go straight through.
+    num_results = max(1, min(int(num_results), 40))
     mode, providers = _resolve_providers()
     question = summary_question or DEFAULT_SUMMARY_QUESTION
     print(f"Searching: {query!r} ({num_results} results) via {'+'.join(providers)}")
@@ -347,6 +408,8 @@ def search_web(
                                         include_domains, exclude_domains, question))
             except Exception as e:  # one backend failing must not lose the other's hits
                 errors.append(f"{prov}: {e}")
+                if _is_hard_fail(e):
+                    _disable_provider(prov, e)
         merged = _dedup(merged)
         return {"query": query, "total": len(merged), "results": merged, "errors": errors}
 
@@ -359,6 +422,10 @@ def search_web(
             return {"query": query, "total": len(results), "results": results, "errors": []}
         except Exception as e:
             last_err = e
+            # A hard failure (exhausted credits, auth) means this provider is dead
+            # for the run — latch it off so later searches skip it entirely.
+            if _is_hard_fail(e):
+                _disable_provider(prov, e)
             has_next = mode == "fallback" and i + 1 < len(providers)
             if has_next:
                 print(f"  {prov} search failed ({e}); falling back to {providers[i + 1]}")

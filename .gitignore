@@ -1,6 +1,8 @@
 # Secrets
 .env
 .env.local
+.env.*
+!.env.example
 
 # User context — keep .example committed, ignore the rest (including archives
 # in subfolders, which hold private business data and must never be published)
@@ -38,3 +40,6 @@ Thumbs.db
 
 # Claude Code local state
 .claude/
+
+# local API-result checkpoints (crash-safety)
+.cache/

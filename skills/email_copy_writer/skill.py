@@ -46,8 +46,10 @@ from skills._copy_core import (
     extract_json,
     extract_signals,
     build_lead_data_block,
+    build_system,
     audit_copy,
     repair_copy,
+    strip_dashes,
 )
 
 
@@ -194,12 +196,9 @@ OUTPUT FORMAT (JSON only, after your self-review):
 
 
 def _build_email_prompt(
-    name: str,
-    company: str,
     lead_data_block: str,
     signals: List[Dict[str, Any]],
     signal_strength: str,
-    icp_context: str,
 ) -> str:
     if signals:
         signals_text = "\n".join(
@@ -209,8 +208,9 @@ def _build_email_prompt(
     else:
         signals_text = "(no strong signal found — write a sharp company-level email)"
 
+    # Sender context is cached in the system prefix (see build_system); the user
+    # message carries only the per-lead data so the cache stays warm across leads.
     return (
-        f"## Sender Context\n{icp_context.strip() or '(none provided)'}\n\n"
         f"## Lead Data\n{lead_data_block}\n\n"
         f"## Signals to lead with (strength: {signal_strength})\n{signals_text}\n\n"
         "Now write the email. Do your self-review. Return only the final JSON."
@@ -266,18 +266,16 @@ def write_copy(
 
     # Call 2: write email with self-review
     email_prompt = _build_email_prompt(
-        name=name, company=company,
         lead_data_block=lead_data_block,
         signals=signals,
         signal_strength=signal_strength,
-        icp_context=icp_context,
     )
 
     try:
         resp = client.messages.create(
             model=CLAUDE_MODEL,
             max_tokens=1200,
-            system=_EMAIL_SYSTEM,
+            system=build_system(_EMAIL_SYSTEM, icp_context),
             messages=[{"role": "user", "content": email_prompt}],
         )
         text = "".join(b.text for b in resp.content if hasattr(b, "text"))
@@ -296,10 +294,13 @@ def write_copy(
     audit = audit_copy(parsed, check_banned=True)
     if audit:
         errors.extend(f"review_fail: {v}" for v in audit)
-        parsed = repair_copy(_EMAIL_SYSTEM, email_prompt, copy, audit, max_tokens=1200)
+        parsed = repair_copy(_EMAIL_SYSTEM, email_prompt, copy, audit,
+                             max_tokens=1200, icp_context=icp_context)
         copy = (parsed.get("copy") or copy).strip()
         post_audit = audit_copy(parsed, check_banned=True)
         errors.extend(f"unresolved: {v}" for v in post_audit)
+
+    copy = strip_dashes(copy)  # no em/en dashes (user rule, all channels)
 
     return {
         "copy":         copy,

@@ -37,7 +37,7 @@ default** (across the daily → idea → write modes). One row per blog.
 | Python 3.9+ | always |
 | `pip install -r requirements.txt` (run at repo root) | always |
 | `ANTHROPIC_API_KEY` in `.env` | every step |
-| `EXA_API_KEY` in `.env` | reference + topic research |
+| `EXA_API_KEY` **or** `PARALLEL_API_KEY` in `.env` | reference + topic research (either works; if both are set, Exa is tried first with Parallel as automatic backup) |
 | `gws` CLI installed and authed | always (Sheets + Docs) |
 | `context/context.md` with **Project**, **Blog Goals & Topics**, **Blog Reference Sources** | every run |
 
@@ -70,8 +70,8 @@ python -m workflows.blog_builder.workflow --mode write \
 
 1. **Pre-step:** read `context.md`. If `Project`, `Blog Goals & Topics`, or `Blog Reference Sources` is empty, prompt you for it and (with permission) save your answers back to `context.md`.
 2. **Derive topic queries** from your Blog Goals & Topics — Claude turns your free-text goals into 5 concrete search queries.
-3. **Fetch reference posts** — Exa search on each domain in your Blog Reference Sources (last 90 days, 3 posts each).
-4. **Fetch topic posts** — Exa search on the derived queries (last 60 days, 5 results each).
+3. **Fetch reference posts** — web search on each domain in your Blog Reference Sources (last 90 days, 3 posts each).
+4. **Fetch topic posts** — web search on the derived queries (last 60 days, 5 results each).
 5. **Generate N ideas** — Claude takes refs + topic posts + project context, returns N ideas with `blog_idea`, `talking_points`, `keywords`, `seo_target`, `assets`, `posting_date`, `references`, `why`.
 6. (Optional) **Validate keywords** via Google Trends if `--validate-keywords` is set.
 7. **Append rows** to the sheet with Status = `Idea`.
@@ -80,7 +80,7 @@ python -m workflows.blog_builder.workflow --mode write \
 
 1. **Pre-step** — same context check.
 2. **Read sheet** — pick rows where Blog Idea is filled but Keywords is empty and Status is non-terminal.
-3. **For each row:** run Exa for that specific idea (references + topic search), then Claude fills in `talking_points`, `keywords`, `seo_target`, `assets`, `posting_date`, `references`, `why`.
+3. **For each row:** run a web search for that specific idea (references + topic search), then Claude fills in `talking_points`, `keywords`, `seo_target`, `assets`, `posting_date`, `references`, `why`.
 4. (Optional) **Validate keywords** via Google Trends if `--validate-keywords`.
 5. **Update the row in place.**
 
@@ -195,7 +195,7 @@ python -m workflows.blog_builder.workflow --mode write \
 
 For a `--num-ideas 5` daily run with 9 reference companies and 5 topic queries:
 
-- Exa: ~30 search calls (9 references × 3 + 5 topics × 5)
+- Web search (Exa or Parallel): ~14 search calls (9 reference companies + 5 topic queries)
 - Anthropic: 2 Claude calls (topic-query derivation + idea generation). ~$0.10-0.30 with Sonnet 4.6.
 - Pytrends (only if `--validate-keywords`): up to 5 keywords × 5 ideas = 25 keyword scores via Google Trends. Free, but Google rate-limits aggressively — see `scrapers/keyword_validator/README.md`.
 - Google Sheets API: ~5 cell writes.

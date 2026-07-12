@@ -37,13 +37,12 @@ import sys
 import json
 import subprocess
 import argparse
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, List, Dict
 
 import anthropic
-from exa_py import Exa
 
-from config import CLAUDE_MODEL, CONTEXT_DIR, EXA_API_KEY
+from config import CLAUDE_MODEL, CONTEXT_DIR
 from workflows._common import (
     strip_json_fence as _strip_json_fence,
     TabularStore, find_col, ensure_col,
@@ -51,7 +50,9 @@ from workflows._common import (
     append_to_context_file as _append_to_context_file,
     section_body as _section_body,
     _parse_gws_json,
+    checkpoint_path, checkpoint_load, checkpoint_append,
 )
+from scrapers.web_search.scraper import search_web
 
 try:
     from scrapers.keyword_validator.scraper import validate_keywords as _validate_keywords  # type: ignore
@@ -304,18 +305,43 @@ def resolve_columns(store: TabularStore):
 
 
 # ---------------------------------------------------------------------------
-# Exa research
+# Web research (Exa or Parallel, via search_web — auto-fails over between them)
 # ---------------------------------------------------------------------------
 
+def _today_tag() -> str:
+    """Today's date, stamped into the research checkpoint keys. A same-day re-run
+    resumes from the checkpoint (crash-safety); a new day starts fresh so a daily
+    idea run never serves yesterday's cached search hits."""
+    return datetime.now().strftime("%Y-%m-%d")
+
+
+def _result_excerpt(r: dict) -> str:
+    """Join a search_web result's highlights into a short excerpt, falling back
+    to its summary.
+
+    search_web requests highlights/excerpts (not full page text) — the full-text
+    extract is billed richer and we only ever use a ~500-600 char snippet, so
+    highlights give the same signal at lower cost and token size.
+    """
+    hl = r.get("highlights") or []
+    text = hl if isinstance(hl, str) else " … ".join(str(h) for h in hl if h)
+    return text or (r.get("summary") or "")
+
+
 def fetch_reference_posts(
-    exa_client: Exa,
     references: List[Dict[str, str]],
     topic_hint: str,
     lookback_days: int = 90,
     num_per_company: int = 3,
 ) -> List[Dict]:
     posts: List[Dict] = []
-    cutoff = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # CRASH-SAFETY: checkpoint each reference company's search result the instant
+    # it comes back, keyed by domain (+ the topic hint so a different search
+    # doesn't reuse a stale cache). The date stamp keeps a same-day re-run resuming
+    # but forces fresh searches on a new day — a daily run must not serve stale hits.
+    ck_path = checkpoint_path(f"blog_builder_refposts_{_today_tag()}_{topic_hint}")
+    cache = checkpoint_load(ck_path)
 
     for ref in references:
         domain = (ref.get("domain") or "").strip()
@@ -323,24 +349,29 @@ def fetch_reference_posts(
         if not domain:
             print(f"  {name}: skipped (no domain)")
             continue
+        if domain in cache:
+            cached = cache.get(domain) or []
+            posts.extend(cached)
+            print(f"  {name}: {len(cached)} post(s) (cached)")
+            continue
         try:
-            results = exa_client.search(
-                topic_hint,
-                include_domains=[domain],
+            result = search_web(
+                query=topic_hint,
                 num_results=num_per_company,
-                type="fast",
-                contents={"text": True, "highlights": True},
-                start_published_date=cutoff,
+                days_back=lookback_days,
+                include_domains=[domain],
+                summary_question=f"What is most relevant about: {topic_hint}?",
             )
-            for r in results.results:
-                posts.append({
-                    "company":        name,
-                    "title":          r.title or "",
-                    "url":            r.url or "",
-                    "text":           (r.text or "")[:600],
-                    "published_date": r.published_date or "",
-                })
-            print(f"  {name}: {len(results.results)} post(s)")
+            company_posts = [{
+                "company":        name,
+                "title":          r.get("title") or "",
+                "url":            r.get("url") or "",
+                "text":           _result_excerpt(r)[:600],
+                "published_date": r.get("published_date") or "",
+            } for r in result.get("results", [])]
+            posts.extend(company_posts)
+            checkpoint_append(ck_path, domain, company_posts)
+            print(f"  {name}: {len(company_posts)} post(s)")
         except Exception as e:
             print(f"  {name}: skipped ({e})")
 
@@ -348,32 +379,41 @@ def fetch_reference_posts(
 
 
 def fetch_topic_posts(
-    exa_client: Exa,
     queries: List[str],
     num_per_query: int = 5,
     lookback_days: int = 60,
 ) -> List[Dict]:
     posts: List[Dict] = []
-    cutoff = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # CRASH-SAFETY: checkpoint each derived query's search result the instant it
+    # comes back, keyed by the query string. A crash after some searches doesn't
+    # re-pay the provider — cached queries are loaded and skipped on re-run. The
+    # date stamp scopes the cache to today so a new day's run searches fresh.
+    ck_path = checkpoint_path(f"blog_builder_topicposts_{_today_tag()}")
+    cache = checkpoint_load(ck_path)
 
     for q in queries:
+        if q in cache:
+            cached = cache.get(q) or []
+            posts.extend(cached)
+            continue
         try:
-            results = exa_client.search(
-                q,
+            result = search_web(
+                query=q,
                 num_results=num_per_query,
-                type="fast",
-                contents={"text": True},
-                start_published_date=cutoff,
+                days_back=lookback_days,
+                summary_question=q,
             )
-            for r in results.results:
-                posts.append({
-                    "source":         "topic",
-                    "query":          q,
-                    "title":          r.title or "",
-                    "url":            r.url or "",
-                    "text":           (r.text or "")[:500],
-                    "published_date": r.published_date or "",
-                })
+            query_posts = [{
+                "source":         "topic",
+                "query":          q,
+                "title":          r.get("title") or "",
+                "url":            r.get("url") or "",
+                "text":           _result_excerpt(r)[:500],
+                "published_date": r.get("published_date") or "",
+            } for r in result.get("results", [])]
+            posts.extend(query_posts)
+            checkpoint_append(ck_path, q, query_posts)
         except Exception as e:
             print(f"  Topic '{q[:50]}': skipped ({e})")
 
@@ -434,11 +474,11 @@ def generate_daily_ideas(
 
     ref_block = "\n".join(
         f"[{p['company']}] {p['title']}\n{p['text'][:300]}\nURL: {p['url']}"
-        for p in ref_posts[:40]
+        for p in ref_posts[:12]
     ) or "(no reference posts available)"
     topic_block = "\n".join(
         f"[{p['query']}] {p['title']}\n{p['text'][:300]}\nURL: {p['url']}"
-        for p in topic_posts[:20]
+        for p in topic_posts[:8]
     ) or "(no recent topic posts found)"
     ctx_block = (
         f"=== PROJECT CONTEXT ===\n{full_context}"
@@ -605,7 +645,6 @@ def format_keyword_scores(scores: Dict[str, int]) -> str:
 def run_daily(
     args: argparse.Namespace,
     client: anthropic.Anthropic,
-    exa_client: Exa,
     store: TabularStore,
 ) -> None:
     print(f"\n=== Blog Builder | mode=daily | ideas={args.num_ideas} ===\n")
@@ -645,7 +684,7 @@ def run_daily(
         topic_hint = (sections.get("goals") or "").strip().splitlines()
         topic_hint = topic_hint[0] if topic_hint else "B2B SaaS strategy"
         ref_posts = fetch_reference_posts(
-            exa_client, references,
+            references,
             topic_hint=topic_hint,
             lookback_days=90,
             num_per_company=3,
@@ -655,7 +694,7 @@ def run_daily(
     print(f"Total reference posts: {len(ref_posts)}")
 
     print("\n--- Fetching topic-driven posts ---")
-    topic_posts = fetch_topic_posts(exa_client, topic_queries) if topic_queries else []
+    topic_posts = fetch_topic_posts(topic_queries) if topic_queries else []
     print(f"Total topic posts: {len(topic_posts)}")
 
     print("\n--- Generating ideas with Claude ---")
@@ -700,7 +739,6 @@ def run_daily(
 def run_idea(
     args: argparse.Namespace,
     client: anthropic.Anthropic,
-    exa_client: Exa,
     store: TabularStore,
 ) -> None:
     print("\n=== Blog Builder | mode=idea ===\n")
@@ -742,10 +780,10 @@ def run_idea(
         print(f"Row {row_idx}: '{idea}'")
 
         print("  Fetching research from references and topic searches...")
-        ref_posts = (fetch_reference_posts(exa_client, references, topic_hint=idea,
+        ref_posts = (fetch_reference_posts(references, topic_hint=idea,
                                            lookback_days=120, num_per_company=2)
                      if references else [])
-        topic_posts = fetch_topic_posts(exa_client, [idea, f"{idea} B2B SaaS"], num_per_query=4)
+        topic_posts = fetch_topic_posts([idea, f"{idea} B2B SaaS"], num_per_query=4)
 
         meta = research_specific_idea(idea, ref_posts + topic_posts, full_context, client)
 
@@ -939,17 +977,18 @@ def main() -> None:
 
     client = anthropic.Anthropic()
 
-    # Exa is only used to research ideas (daily/idea); write mode drafts an
-    # existing row and needs no research, so don't require the key for it.
+    # Web search is only used to research ideas (daily/idea); write mode drafts
+    # an existing row and needs no research, so don't require a key for it.
     if args.mode == "daily" or args.mode == "idea":
-        if not EXA_API_KEY:
-            print("Exa key missing — add EXA_API_KEY to .env to research blog ideas.")
+        if not (os.environ.get("EXA_API_KEY") or os.environ.get("PARALLEL_API_KEY")):
+            print("No web-search key set — add EXA_API_KEY or PARALLEL_API_KEY to "
+                  ".env to research blog ideas (either one works; if both are set, "
+                  "Exa is tried first and Parallel is the automatic backup).")
             sys.exit(1)
-        exa_client = Exa(api_key=EXA_API_KEY)
         if args.mode == "daily":
-            run_daily(args, client, exa_client, store)
+            run_daily(args, client, store)
         else:
-            run_idea(args, client, exa_client, store)
+            run_idea(args, client, store)
     elif args.mode == "write":
         run_write(args, client, store)
 

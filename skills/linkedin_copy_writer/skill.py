@@ -56,8 +56,10 @@ from skills._copy_core import (
     extract_json,
     extract_signals,
     build_lead_data_block,
+    build_system,
     audit_copy,
     repair_copy,
+    strip_dashes,
 )
 
 
@@ -183,7 +185,6 @@ def _build_message_prompt(
     lead_data_block: str,
     signals: List[Dict[str, Any]],
     signal_strength: str,
-    icp_context: str,
     previous_messages: str,
 ) -> str:
     if signals:
@@ -194,8 +195,9 @@ def _build_message_prompt(
     else:
         signals_text = "(no strong signal found — lead with a sharp, specific observation)"
 
+    # Sender context is cached in the system prefix (see build_system); the user
+    # message carries only the per-lead data so the cache stays warm across leads.
     prompt = (
-        f"## Sender Context\n{icp_context.strip() or '(none provided)'}\n\n"
         f"## Lead Data\n{lead_data_block}\n\n"
         f"## Signals to lead with (strength: {signal_strength})\n{signals_text}\n\n"
     )
@@ -262,7 +264,6 @@ def write_copy(
         lead_data_block=lead_data_block,
         signals=signals,
         signal_strength=signal_strength,
-        icp_context=icp_context,
         previous_messages=previous_messages,
     )
 
@@ -270,7 +271,7 @@ def write_copy(
         resp = client.messages.create(
             model=CLAUDE_MODEL,
             max_tokens=800,
-            system=_MESSAGE_SYSTEM,
+            system=build_system(_MESSAGE_SYSTEM, icp_context),
             messages=[{"role": "user", "content": message_prompt}],
         )
         text = "".join(b.text for b in resp.content if hasattr(b, "text"))
@@ -289,10 +290,13 @@ def write_copy(
     audit = audit_copy(parsed)
     if audit:
         errors.extend(f"review_fail: {v}" for v in audit)
-        parsed = repair_copy(_MESSAGE_SYSTEM, message_prompt, copy, audit, max_tokens=800)
+        parsed = repair_copy(_MESSAGE_SYSTEM, message_prompt, copy, audit,
+                             max_tokens=800, icp_context=icp_context)
         copy = (parsed.get("copy") or copy).strip()
         post_audit = audit_copy(parsed)
         errors.extend(f"unresolved: {v}" for v in post_audit)
+
+    copy = strip_dashes(copy)  # no em/en dashes (user rule, all channels)
 
     return {
         "copy":         copy,

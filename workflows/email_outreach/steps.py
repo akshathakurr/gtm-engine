@@ -11,8 +11,12 @@ from typing import List, Dict
 
 import anthropic
 
-from config import CLAUDE_MODEL
-from workflows._common import strip_json_fence as _strip_json_fence, map_rate_limited
+from config import CLAUDE_MODEL, cached_system
+from workflows._common import (
+    strip_json_fence as _strip_json_fence,
+    map_rate_limited,
+    collect_chunk_results,
+)
 from scrapers.web_search.scraper import search_web
 from scrapers.contact_finder import scraper as _contact_scraper
 from scrapers.linkedin_profile_post_scraper import scraper as _post_scraper
@@ -69,7 +73,7 @@ def enrich_company(
         search_result = search_web(
             query=(f"{company_name} company official website linkedin employees revenue funding "
                    f"headquarters founded year competitors"),
-            num_results=5,
+            num_results=3,
             summary_question=(
                 f"What is {company_name}'s official website URL, LinkedIn company page URL, "
                 f"employee count, estimated annual revenue, year founded, total funding raised, "
@@ -94,7 +98,7 @@ def enrich_company(
     prompt = f"""Extract company information for "{company_name}" from the research below.
 
 Research:
-{chr(10).join(snippets[:20])}
+{chr(10).join(snippets[:6])}
 
 Required fields (use empty string if not found):
 {field_block}
@@ -154,7 +158,9 @@ def score_companies(
             for i, l in enumerate(chunk)
         )
 
-        prompt = f"""You are a GTM analyst prioritizing companies for outbound email outreach.
+        # Static instructions + ICP go in a cached system prefix (identical across
+        # every chunk); only the per-chunk company list rides in the user message.
+        system = f"""You are a GTM analyst prioritizing companies for outbound email outreach.
 
 ICP Context:
 {icp_context}
@@ -168,9 +174,6 @@ ICP segments are defined in the ICP Context above. If named segments exist
 (e.g. "Series-A AI infra", "Mid-market fintech"), assign each company to the
 best-fitting segment. If none are defined, return "" for icp_segment.
 
-Companies:
-{leads_block}
-
 For each company, return:
 - index (1-based)
 - icp_segment (one of the named segments, or "")
@@ -179,8 +182,11 @@ For each company, return:
 
 Return only valid JSON, no explanation."""
 
+        prompt = f"Companies:\n{leads_block}"
+
         resp = client.messages.create(
             model=CLAUDE_MODEL, temperature=0, max_tokens=4000,
+            system=cached_system(system),
             messages=[{"role": "user", "content": prompt}],
         )
         parsed = json.loads(_strip_json_fence(resp.content[0].text))
@@ -200,14 +206,11 @@ Return only valid JSON, no explanation."""
     # One call per chunk — avoids JSON truncation on large sheets and keeps each
     # company scored against only its chunk. Chunks are independent → run in parallel.
     chunks = [leads[i:i + LLM_BATCH_SIZE] for i in range(0, len(leads), LLM_BATCH_SIZE)]
-    chunk_results, _ = map_rate_limited(_score_chunk, chunks, max_workers=ENRICH_CONCURRENCY)
-    result: List[Dict[str, str]] = []
-    for chunk, res in zip(chunks, chunk_results):
-        if res is not None:
-            result.extend(res)
-        else:
-            result.extend({"priority": "", "icp_segment": "", "reasoning": ""} for _ in chunk)
-    return result
+    chunk_results, chunk_errors = map_rate_limited(_score_chunk, chunks, max_workers=ENRICH_CONCURRENCY)
+    return collect_chunk_results(
+        chunks, chunk_results, chunk_errors, label="scoring",
+        blank=lambda chunk: [{"priority": "", "icp_segment": "", "reasoning": ""} for _ in chunk],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -224,7 +227,7 @@ def find_buyer_at_company(
     try:
         result = search_web(
             query=f"{company_name} founder CEO CTO head of engineering leadership team",
-            num_results=5,
+            num_results=3,
             summary_question=(
                 f"Who are the founders, CEO, and senior leaders at {company_name}? "
                 f"List their full names, titles, and LinkedIn URLs if available."
@@ -249,7 +252,7 @@ ICP Context (focus on Decision Maker / buyer persona titles — usually founders
 {icp_context}
 
 Research about {company_name}'s leadership:
-{chr(10).join(snippets[:15])}
+{chr(10).join(snippets[:6])}
 
 Return a JSON object with the best person to target:
 {{"name": "Full Name", "position": "Their Title", "linkedin": "https://www.linkedin.com/in/... or empty string"}}
@@ -329,7 +332,9 @@ def classify_personas(
             f"{i+1}. Name: {l['name']} | Title: {l['position']} | Company: {l['company']}"
             for i, l in enumerate(chunk)
         )
-        prompt = f"""You are a B2B sales analyst classifying leads by buyer role.
+        # Static instructions + ICP + per-run overrides go in a cached system
+        # prefix; only the per-chunk leads list varies between calls.
+        system = f"""You are a B2B sales analyst classifying leads by buyer role.
 
 ICP / Buyer Persona Context:
 {icp_context}
@@ -340,14 +345,14 @@ Definitions (use ICP context to map titles; fall back to general B2B conventions
 - Champion: Influences the buying decision but cannot sign alone.
 - Non Decision Maker: Not involved in the buying decision.
 
-Leads:
-{leads_block}
-
 Return a JSON array — one object per lead — with "index" (1-based) and "classification".
 Only return valid JSON, no explanation."""
 
+        prompt = f"Leads:\n{leads_block}"
+
         resp = client.messages.create(
             model=CLAUDE_MODEL, temperature=0, max_tokens=2000,
+            system=cached_system(system),
             messages=[{"role": "user", "content": prompt}],
         )
         parsed = json.loads(_strip_json_fence(resp.content[0].text))
@@ -360,11 +365,11 @@ Only return valid JSON, no explanation."""
 
     # One call per chunk — no truncation, each lead judged against only its chunk.
     chunks = [leads[i:i + LLM_BATCH_SIZE] for i in range(0, len(leads), LLM_BATCH_SIZE)]
-    chunk_results, _ = map_rate_limited(_classify_chunk, chunks, max_workers=ENRICH_CONCURRENCY)
-    result: List[str] = []
-    for chunk, res in zip(chunks, chunk_results):
-        result.extend(res if res is not None else [""] * len(chunk))
-    return result
+    chunk_results, chunk_errors = map_rate_limited(_classify_chunk, chunks, max_workers=ENRICH_CONCURRENCY)
+    return collect_chunk_results(
+        chunks, chunk_results, chunk_errors, label="persona classification",
+        blank=lambda chunk: [""] * len(chunk),
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -63,6 +63,11 @@ def _scrape_g2(product_url: str, max_reviews: int) -> dict:
         return _error_result("g2", product_url, "APIFY_API_TOKEN not set")
 
     client = ApifyClient(api_key)
+    # G2's actor bills a ~$0.036 per-run minimum (~13 reviews), so fetching fewer
+    # than 13 costs the same as fetching 13 — always pull at least that many to
+    # maximize data-per-dollar. We then RETURN all of them (not just the first
+    # max_reviews): they're already paid for, so slicing them off would waste the
+    # spend. The caller trims to what it needs.
     platform_max = max(max_reviews, 13)
 
     print(f"Scraping G2 reviews: {product_url}", file=sys.stderr)
@@ -79,7 +84,7 @@ def _scrape_g2(product_url: str, max_reviews: int) -> dict:
 
     reviews = []
     overall_rating = None  # G2 doesn't return an overall rating in items
-    for item in raw_items[:max_reviews]:
+    for item in raw_items[:platform_max]:
         reviews.append({
             "reviewer": item.get("reviewerName", ""),
             "reviewer_title": item.get("reviewerTitle", ""),
@@ -227,7 +232,9 @@ def scrape_reviews(
         product_url: Direct URL to the product's review page.
                      G2: https://www.g2.com/products/{slug}/reviews
                      Trustpilot: https://www.trustpilot.com/review/{domain}
-        max_reviews: Max reviews to return.
+        max_reviews: Target number of reviews. G2 pulls (and returns) at least
+                     ~13 regardless — the actor's per-run minimum charge covers
+                     them, so they're returned rather than wasted.
 
     Returns:
         dict with: platform, product_url, overall_rating, total_review_count,

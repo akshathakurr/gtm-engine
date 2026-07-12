@@ -30,15 +30,17 @@ import os
 import sys
 import argparse
 import re
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Dict
+from typing import Dict, List, Optional
 
 import anthropic
 
 from config import CONTEXT_DIR
 from workflows._common import (
     GoogleSheetsBackend, CsvBackend, find_col, ensure_col, cell, load_icp,
-    RateLimiter,
+    RateLimiter, checkpoint_path, checkpoint_load, checkpoint_append,
+    preview_and_confirm,
 )
 from workflows.competitor_analysis.steps import (
     OUTPUT_COLUMNS, COMPANY_CONCURRENCY, APIFY_MIN_INTERVAL,
@@ -48,6 +50,54 @@ from workflows.competitor_analysis.steps import (
     extract_product_info, get_customer_reviews, get_deal_size, get_content_type,
     analyze_competitor,
 )
+
+
+# ---------------------------------------------------------------------------
+# Per-SUB-STEP checkpoint — resume a half-finished competitor without re-paying
+# ---------------------------------------------------------------------------
+# The per-competitor checkpoint in main() only records a competitor once its
+# WHOLE row is written, so a competitor that dies mid-enrichment (crash, Ctrl-C,
+# credit-exhaustion) has NOTHING saved and re-pays every web search / Claude call
+# / Apify scrape on resume. This finer checkpoint persists each column value the
+# instant it's produced (keyed by competitor + column), so a resumed run reuses
+# the completed lookups and only pays for what's still missing.
+
+# Sentinel "column" for the resolved website URL (from find_official_site), so a
+# no-URL competitor doesn't re-run that paid search on resume.
+WEBSITE_KEY = "__website__"
+
+
+class SubstepCheckpoint:
+    """Thread-safe (competitor, column) → value cache backed by a JSONL file.
+
+    Loaded once up front (before any worker threads start), then appended to
+    concurrently as competitors run — each ``save`` is guarded by a lock and
+    fsync'd, so a hard kill mid-write can't corrupt earlier entries.
+    """
+
+    def __init__(self, path: str):
+        self.path = path
+        self._lock = threading.Lock()
+        self._data = checkpoint_load(path)  # {"competitor\tcolumn": value}
+
+    @staticmethod
+    def _key(competitor: str, column: str) -> str:
+        return f"{competitor}\t{column}"
+
+    def prefilled(self, competitor: str) -> Dict[str, str]:
+        """Already-completed {column: value} for one competitor (truthy only)."""
+        prefix = f"{competitor}\t"
+        return {
+            k[len(prefix):]: v
+            for k, v in self._data.items()
+            if k.startswith(prefix) and v
+        }
+
+    def save(self, competitor: str, column: str, value: str) -> None:
+        if not value:
+            return
+        with self._lock:
+            checkpoint_append(self.path, self._key(competitor, column), value)
 
 
 # ---------------------------------------------------------------------------
@@ -132,6 +182,7 @@ def process_competitor(
     icp_context: str,
     apify_limiter,
     url_col=None,
+    substep_ck: Optional["SubstepCheckpoint"] = None,
 ) -> tuple:
     """Run all 12 enrichment steps for one competitor and return the values to write.
 
@@ -164,29 +215,27 @@ def process_competitor(
         if value:
             pending[col_map[name]] = value
             written[name] = value
+            if substep_ck is not None:
+                substep_ck.save(competitor, name, value)
+
+    # Resume: seed values this competitor already produced on a prior run. They
+    # both (a) make get_col truthy so the paid lookup that produced them is
+    # skipped, and (b) go into `pending` so they're re-written to the row — the
+    # row was never persisted if the competitor died mid-run, so the cache is the
+    # only copy. The resolved website (WEBSITE_KEY) is handled separately below.
+    if substep_ck is not None:
+        for name, value in substep_ck.prefilled(competitor).items():
+            if name == WEBSITE_KEY:
+                if not website:
+                    website = value
+            elif name in col_map:
+                written[name] = value
+                pending[col_map[name]] = value
 
     log(f"{'='*60}")
     log(f"[{index + 1}/{total}] {competitor}  ({website or 'no URL'})")
     log(f"{'='*60}")
 
-    # ── Step 1: Website scrape ────────────────────────────────────────────
-    scraped: dict = {}
-    if not website:
-        # No URL on the row — find the official site first so website-derived
-        # columns (description, product info, CTA…) still populate. Persisted to
-        # the input URL column via pending (written on the main thread).
-        log("  [1] No website URL — searching for the official site...")
-        website = find_official_site(competitor, client)
-        if website and url_col is not None:
-            pending[url_col] = website
-    if website:
-        log(f"  [1] Scraping website ({website})...")
-        scraped = scrape_website(website)
-        log(f"    → {len(scraped.get('full_text_by_page', {}))} pages scraped")
-    else:
-        log("  [1] No website found — skipping scrape")
-
-    # ── Steps 2–10: independent enrichment (Claude + Exa + reviews actor) ──
     firm_cols = ["Employee Count", "Founded Year", "Last Funding Stage", "Total Funding", "Est. Revenue", "HQ Location"]
     f1_cols = ["Founder (1) Name", "Founder (1) LinkedIn", "Founder (1) Twitter"]
     f2_cols = ["Founder (2) Name", "Founder (2) LinkedIn", "Founder (2) Twitter"]
@@ -194,6 +243,36 @@ def process_competitor(
         "Target Persona (User)", "Sales Motion", "Primary CTA", "Pricing",
         "Customer Stories", "Product Features", "Top Logos", "Marketing Messaging", "SEO",
     ]
+
+    # ── Step 1: Website scrape ────────────────────────────────────────────
+    # Only scrape when something scrape-derived is still missing. On resume, if
+    # those columns are already checkpointed, we skip the (paid Firecrawl) scrape
+    # entirely — the same set gates the desc/product/content-type lookups below,
+    # so skipping the scrape can't strand a lookup that needed it.
+    scrape_dependent = ["Company Description", "Content Type"] + product_cols
+    scraped: dict = {}
+    if not website:
+        # No URL on the row — find the official site first so website-derived
+        # columns (description, product info, CTA…) still populate. Persisted to
+        # the input URL column via pending (written on the main thread) and to the
+        # sub-step checkpoint so a resumed run skips this paid search.
+        log("  [1] No website URL — searching for the official site...")
+        website = find_official_site(competitor, client)
+        if website:
+            if url_col is not None:
+                pending[url_col] = website
+            if substep_ck is not None:
+                substep_ck.save(competitor, WEBSITE_KEY, website)
+    if website and any(not get_col(c) for c in scrape_dependent):
+        log(f"  [1] Scraping website ({website})...")
+        scraped = scrape_website(website)
+        log(f"    → {len(scraped.get('full_text_by_page', {}))} pages scraped")
+    elif website:
+        log("  [1] Scrape-derived columns already filled — skipping scrape")
+    else:
+        log("  [1] No website found — skipping scrape")
+
+    # ── Steps 2–10: independent enrichment (Claude + Exa + reviews actor) ──
     firm_missing     = [c for c in firm_cols if not get_col(c)]
     missing_founders = [c for c in f1_cols + f2_cols if not get_col(c)]
     product_missing  = [c for c in product_cols if not get_col(c)] if scraped else []
@@ -418,6 +497,45 @@ def main() -> None:
         print("No competitors to process.")
         return
 
+    # ---------------------------------------------------------------------------
+    # CRASH-SAFETY: a checkpoint (local JSONL) records each competitor the instant
+    # its row is written. If the run dies midway (crash, credit-exhaustion,
+    # Ctrl-C), a re-run loads the checkpoint, skips every competitor already done,
+    # and never re-pays for its searches / Claude calls / Apify actors.
+    ck_id = args.sheet_id or (args.input_csv or "csv")
+    ck_path = checkpoint_path(f"competitor_analysis_{ck_id}")
+    # Finer per-sub-step checkpoint: a competitor interrupted mid-enrichment
+    # (never reached the per-competitor checkpoint below) resumes from its
+    # already-completed column lookups instead of re-paying every scrape.
+    substep_ck = SubstepCheckpoint(checkpoint_path(f"competitor_analysis_substeps_{ck_id}"))
+    done_competitors = set(checkpoint_load(ck_path).keys())
+    if done_competitors:
+        before = len(work)
+        work = [w for w in work if w[1] not in done_competitors]
+        skipped = before - len(work)
+        if skipped:
+            print(f"\n  Resuming from checkpoint: {skipped} competitor(s) already done — skipping.")
+        if not work:
+            print("  All competitors already completed. Nothing to do.")
+            return
+
+    # ---------------------------------------------------------------------------
+    # SPEND GUARD: preview worst-case Apify spend before any actor runs. Worst
+    # case per competitor = reviews (10) + founder LinkedIn posts (10) + founder
+    # tweets (15), scaled by --skip-* flags. Gated on confirmation in interactive
+    # mode; just printed under --auto.
+    n = len(work)
+    if not preview_and_confirm([
+        ("Customer reviews (G2/Trustpilot)", "reviews",
+         (0 if args.skip_reviews else n * 10)),
+        ("Founder LinkedIn posts", "linkedin_profile_posts",
+         (0 if args.skip_founder_posts else n * 10)),
+        ("Founder tweets", "twitter",
+         (0 if (args.skip_founder_posts or args.skip_twitter) else n * 15)),
+    ], interactive=not args.auto):
+        print("Aborted — no Apify runs were started.")
+        return
+
     total = len(data_rows)
     concurrency = max(1, min(args.concurrency, len(work)))
     # One shared limiter so the throttled Apify actors (founder posts + reviews)
@@ -435,11 +553,12 @@ def main() -> None:
     with ThreadPoolExecutor(max_workers=concurrency) as ex:
         futures = {
             ex.submit(process_competitor, i, total, competitor, website, row,
-                      col_map, args, client, icp_context, apify_limiter, url_col): (i, row)
+                      col_map, args, client, icp_context, apify_limiter, url_col,
+                      substep_ck): (i, competitor, row)
             for (i, competitor, website, row) in work
         }
         for fut in as_completed(futures):
-            i, row = futures[fut]
+            i, competitor, row = futures[fut]
             row_num = i + 2
             try:
                 pending, logs = fut.result()
@@ -452,6 +571,11 @@ def main() -> None:
             if pending:
                 backend.write_row(row_num, pending, row)
                 print(f"  ✓ Wrote {len(pending)} field(s) in one update")
+            # Checkpoint the instant the row is persisted, so a resumed run skips
+            # this competitor entirely (per-company granularity is enough).
+            row_dict = {name: pending[col_map[name]] for name in OUTPUT_COLUMNS
+                        if col_map.get(name) in pending}
+            checkpoint_append(ck_path, competitor, row_dict)
             done += 1
 
     print(f"\n{'='*60}")

@@ -15,7 +15,7 @@ import shutil
 import subprocess
 import time
 import threading
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Sequence
 
 import anthropic
@@ -441,6 +441,7 @@ APIFY_UNIT_COST = {
     "linkedin_profile_posts": 0.002,    # harvestapi profile-posts  ($2/1k)
     "linkedin_comments":      0.0012,   # apimaestro comments       ($1.2/1k)
     "linkedin_profile":       0.004,    # harvestapi profile detail ($4/1k)
+    "reviews":                0.003,    # zen-studio g2 reviews     ($3/1k)
     "twitter":                0.00025,  # kaitoeasyapi tweets  (~$0.25/1k, upper bound)
 }
 
@@ -540,12 +541,17 @@ class RateLimiter:
 
 
 def map_rate_limited(fn, items: list, *, min_interval: float = 0.0,
-                     max_workers: int = DEFAULT_CONCURRENCY):
+                     max_workers: int = DEFAULT_CONCURRENCY, on_result=None):
     """Run fn(item) over a bounded pool, starts spaced >= min_interval.
 
     Returns (results, errors) aligned to ``items``. fn exceptions are captured
     (result None, error set), never raised, so one bad item can't kill the batch.
     Results preserve input order.
+
+    ``on_result(idx, item, result, error)``, if given, is called ON THE MAIN
+    THREAD as each item finishes (in completion order) — use it to persist
+    partial progress incrementally, so a mid-run crash or credit-exhaustion
+    leaves everything completed-so-far already saved (never re-pay for it).
     """
     n = len(items)
     if n == 0:
@@ -562,11 +568,82 @@ def map_rate_limited(fn, items: list, *, min_interval: float = 0.0,
             return idx, None, e
 
     with ThreadPoolExecutor(max_workers=min(max_workers, n)) as ex:
-        for fut in [ex.submit(task, i, it) for i, it in enumerate(items)]:
+        futs = [ex.submit(task, i, it) for i, it in enumerate(items)]
+        for fut in as_completed(futs):
             idx, res, err = fut.result()
             results[idx] = res
             errors[idx] = err
+            if on_result is not None:
+                # Runs on the main thread — safe to touch the sheet backend here.
+                on_result(idx, items[idx], res, err)
     return results, errors
+
+
+def collect_chunk_results(chunks, results, errors, blank, *, label):
+    """Flatten per-chunk LLM results back to one per-row list, in order.
+
+    The chunked score/classify steps all share this tail: a failed chunk comes
+    back as ``None`` and must be padded with ``blank(chunk)`` so later chunks stay
+    row-aligned — but a silent pad is indistinguishable from genuinely-empty data,
+    so log which chunk failed and why. Centralised here so all channels report
+    failures the same way instead of each re-inlining (and drifting from) it.
+    """
+    out = []
+    for i, (chunk, res, err) in enumerate(zip(chunks, results, errors)):
+        if res is not None:
+            out.extend(res)
+        else:
+            print(f"    ⚠ {label} failed for chunk {i + 1}/{len(chunks)} "
+                  f"({len(chunk)} rows) — leaving blank: {err}")
+            out.extend(blank(chunk))
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Checkpoints — never re-pay an API for work already done
+# ---------------------------------------------------------------------------
+# A checkpoint is a local JSONL file (one record per line) written the instant
+# each paid API result comes back. Local disk is instant and free, so we save
+# there DURING the run and push to the Sheet in one batch at the END. If the run
+# dies midway (crash, credit-exhaustion, Ctrl-C), the checkpoint still holds
+# everything completed — the next run loads it, skips those items, and only pays
+# for what's missing. Keyed by a stable id (e.g. company name) so re-runs dedup.
+
+CHECKPOINT_DIR = os.path.join(os.getcwd(), ".cache", "checkpoints")
+
+
+def checkpoint_path(name: str) -> str:
+    """Return the on-disk path for a checkpoint, sanitising ``name`` to a safe file."""
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("_") or "checkpoint"
+    return os.path.join(CHECKPOINT_DIR, f"{safe}.jsonl")
+
+
+def checkpoint_append(path: str, key: str, value) -> None:
+    """Append one ``{key, value}`` record. O(1) — no rewrite of prior entries."""
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps({"key": key, "value": value}, ensure_ascii=False) + "\n")
+        f.flush()
+        os.fsync(f.fileno())  # survive a hard kill, not just a clean exit
+
+
+def checkpoint_load(path: str) -> Dict[str, object]:
+    """Load a checkpoint into a ``{key: value}`` dict (last write wins per key)."""
+    out: Dict[str, object] = {}
+    if not os.path.exists(path):
+        return out
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except ValueError:
+                continue  # tolerate a torn final line from a hard kill mid-write
+            if isinstance(rec, dict) and "key" in rec:
+                out[rec["key"]] = rec.get("value")
+    return out
 
 
 # ---------------------------------------------------------------------------
