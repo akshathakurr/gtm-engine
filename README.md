@@ -43,7 +43,7 @@ if you'd rather run things directly, every workflow has its own README with the 
 
 - **anthropic api key** — claude does the thinking. ~$1–5 per workflow run depending on which one. [console.anthropic.com](https://console.anthropic.com)
 - **apify token** — for LinkedIn / Twitter / review scraping. pay-per-run, usually $0.50–$3 per workflow. [apify.com](https://apify.com)
-- **exa key** *(optional)* — for web research. only blog builder + competitor analysis need it. [exa.ai](https://exa.ai)
+- **web-search key — exa *or* parallel** *(optional)* — for web research. needed by competitor analysis, blog builder, and both outreach workflows. either one works; set both and exa is primary with parallel as automatic backup. [exa.ai](https://exa.ai) / [platform.parallel.ai](https://platform.parallel.ai)
 - **firecrawl key** *(optional)* — for competitor analysis only. reads JS-heavy pages (pricing, case studies) the basic scraper can't. free tier (1,000 pages/mo) is plenty; without it, those pages just fall back to the basic scraper. [firecrawl.dev](https://firecrawl.dev)
 - **google account** *(optional)* — most workflows can write to a google sheet. csv mode works if you'd rather not.
 

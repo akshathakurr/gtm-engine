@@ -278,7 +278,7 @@ Use `Optional[X]` from `typing`, not `X | None`. The system runs Python 3.9.
 ## Exa (Web Search) — key patterns
 
 - **No Apify** — Exa is a direct Python SDK (`exa_py`), not an Apify actor. No discovery call needed, no `raw_sample.json` process.
-- **Use `search_and_contents` with `highlights + summary` mode** — never fetch full `text`. Highlights + summary gives rich signal at a fraction of the cost.
+- **Use `search(query, contents={...})` with `highlights + summary`** — never fetch full `text`. Highlights + summary gives rich signal at a fraction of the cost. (The old top-level `search_and_contents()` kwargs are deprecated; contents now go under the `contents=` arg.)
 - **No native batch API** — Exa has no batch endpoint. Use `ThreadPoolExecutor` with `max_workers=5` to parallelise multiple queries. Tested: 3 queries go from 26s sequential → 9s parallel (~3x speedup). This compounds significantly at 10+ queries.
 - **Scraper already has `search_web_batch(queries=[...])`** — workflows should always use this instead of looping over `search_web`.
 - **`use_autoprompt` is not a valid option** in the current exa_py SDK version — do not pass it.

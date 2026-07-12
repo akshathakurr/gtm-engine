@@ -7,7 +7,7 @@ Fetches structured web results and insights about a company, person, or topic. B
 | Provider | Key | Notes |
 |---|---|---|
 | **Exa** | `EXA_API_KEY` | Semantic search; native date + domain filters; `type=fast` (<425ms). |
-| **Parallel** | `PARALLEL_API_KEY` | LLM-optimized excerpts; generous free tier. Date/domain filters applied client-side. |
+| **Parallel** | `PARALLEL_API_KEY` | LLM-optimized excerpts (~$20 free credits, then paid). Date/domain filters applied client-side. |
 
 Neither is required individually — you need **at least one**. Both callers and output shape are identical regardless of provider.
 
@@ -20,13 +20,14 @@ Neither is required individually — you need **at least one**. Both callers and
 | `parallel` | Force Parallel only. |
 | `both` | Query both and **merge + dedup** results (broader coverage). |
 
-- `SEARCH_PRIMARY` — when both keys are set, picks the primary: `parallel` (default — spares paid Exa credits and leans on Parallel's free tier) or `exa`.
-- `SEARCH_PARALLEL_PROCESSOR` — Parallel tier: `base` (default, fast/cheap, ~$0.005/req) or `pro` (higher quality, 15–60s).
+- `SEARCH_PRIMARY` — when both keys are set, picks the primary: `exa` (default) or `parallel`. The other is the automatic fallback.
+- `SEARCH_PARALLEL_MODE` — Parallel tier: `turbo` (fastest/cheapest), `basic` (default), or `advanced` (best quality, 15–60s). *(The legacy `SEARCH_PARALLEL_PROCESSOR=base|pro` still works and maps to `basic|advanced`.)*
+- **Hard-fail latch:** if a provider hits an unrecoverable failure mid-run (402/credit exhaustion, 401/403 auth), it's disabled for the rest of the process so later searches fail straight over to the fallback instead of re-hitting a dead account.
 
 An Exa-only setup (only `EXA_API_KEY` set) behaves exactly as before — `auto` resolves to Exa and Parallel is never touched.
 
 ## Cost
-Both providers bill per search call and are kept cheap by returning highlights/excerpts rather than full page text — typically fractions of a cent per query. Parallel `base` is ~$0.005 per 10-result call; Exa `fast` is comparable.
+Both providers bill per search call and are kept cheap by returning highlights/excerpts rather than full page text — typically fractions of a cent per query. Parallel `basic` is ~$0.005 per 10-result call; Exa `fast` is comparable. `num_results` is hard-capped at 40 so a bad caller can't request a huge (billable) result set.
 
 ## Field mapping
 The output shape is identical across providers. For Parallel, `excerpts` become `highlights` (first excerpt seeds `summary`) and `author` is `null` (Parallel does not return it).
@@ -36,7 +37,7 @@ The output shape is identical across providers. For Parallel, `excerpts` become 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `query` | string | Yes | — | Company name, person, or topic |
-| `num_results` | integer | No | `5` | Results to fetch (1–20). Keep at 5 for efficiency. |
+| `num_results` | integer | No | `5` | Results to fetch (1–40, hard-capped at 40). Keep at 5 for efficiency. |
 | `days_back` | integer | No | none | Restrict to last N days |
 | `include_domains` | array | No | none | Only return results from these domains |
 | `exclude_domains` | array | No | none | Skip results from these domains |
