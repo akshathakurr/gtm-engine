@@ -28,7 +28,7 @@ me email them"), this is the full menu of what this workflow fills in — read i
 out up front so they see what's possible. **By default every column below is
 filled; they can ask for a focused subset instead.** One row per company.
 
-- **Company facts** — website, LinkedIn page, one-line description, employee count, estimated revenue, founded year, total funding, HQ, direct competitors
+- **Company facts** — website, LinkedIn page, one-line description, employee count, estimated revenue, founded year, total funding, HQ (direct competitors only with `--with-competitors`)
 - **Fit & priority** — priority tier, ICP segment, reasoning for the score, buyer-persona match
 - **Buyer & contact** — the right buyer at each company and their email (via Apollo)
 - **Personalisation** — recent LinkedIn post links, a small-talk opener, a personalisation hook, and ready-to-send email copy
@@ -83,7 +83,7 @@ Requires the `gws` CLI installed and authed (`gws auth login` once).
 
 | # | Step | Runs on | What it produces |
 |---|---|---|---|
-| **1** | Enrich company | **ALL companies** | Web search → Claude extracts: Company URL, Company LinkedIn URL, one-line Company Description, Employee Count, Est Revenue, Founded Year, Total Funding, HQ city, 2-3 Competitors. Deduped per company. Skips rows where every enrichment column is already filled. |
+| **1** | Enrich company | **ALL companies** | Web search → Claude extracts: Company URL, Company LinkedIn URL, one-line Company Description, Employee Count, Est Revenue, Founded Year, Total Funding, HQ city (+ 2-3 Competitors only with `--with-competitors`). Deduped per company. Skips rows where every enrichment column is already filled. |
 | **2** | Score | ALL companies | ICP Segment + Priority (P0/P1/P2) + 1-line Reasoning. Uses ICP tier definitions from your `context.md`. |
 | **3** | Filter | in-memory | Picks the **outreach batch**. **P0 only by default.** Use `--include-p1` / `--include-p2` to widen. Steps 4-10 only touch the batch. |
 | **4** | Find buyer | outreach batch | Web search → Claude picks the most relevant person per ICP buyer-persona titles. Writes Name / Position / LinkedIn back to the row. Skips rows where Name is already filled (will still backfill LinkedIn URL if missing). |
@@ -134,7 +134,7 @@ not, it creates new columns at the end of the sheet using these defaults:
 | `Founded Year` | `founded_year` | 1 |
 | `Total Funding` | `total_funding` | 1 |
 | `HQ` | `hq` | 1 |
-| `Competitors` | `competitors` | 1 |
+| `Competitors` *(opt-in)* | `competitors` | 1 |
 | `ICP Segment` | `icp_segment` | 2 |
 | `Priority` | `priority` | 2 |
 | `Reasoning` | `reasoning` | 2 |
@@ -200,6 +200,7 @@ python -m workflows.email_outreach.workflow [options]
 | `--enrich-fields KEYS` | Comma-separated subset of enrichment fields, by snake_case key. |
 | `--include-p1` | Also include P1 leads in the outreach batch. |
 | `--include-p2` | Also include P2 leads in the outreach batch. |
+| `--with-competitors` | **Opt in** to the Competitors enrichment field/column. Skipped by default. |
 | `--skip-enrich` | Skip Step 1. |
 | `--skip-emails` | Skip Step 6 (Apollo). |
 | `--skip-small-talk` | Skip Step 7. |

@@ -6,7 +6,7 @@ Steps:
   2  — Enrich Decision Maker companies with firmographic data via Web Search
   3  — Score all leads P0 / P1 / P2 with 1-2 line reasoning
   4  — Select outreach batch: P0 only by default (--include-p1 / --include-p2 widen it)
-  5  — Find 3-4 direct competitors for each filtered lead's company (Web Search)
+  5  — (opt-in, --with-competitors) Find 3-4 direct competitors for each filtered lead's company (Web Search)
   6  — Scrape LinkedIn posts for each filtered lead; filter by ICP criteria; write post URLs
   7  — Gather small talk details for each filtered lead (Small Talk Scraper)
   8  — Generate personalisation talking points (Personalisation Hook Skill)
@@ -107,8 +107,9 @@ def main() -> None:
     parser.add_argument("--enrich-all", action="store_true",
                         help="Enrich every lead's company in Step 2, not just Decision Makers "
                              "(use when the sheet is all Champion-level contacts)")
-    parser.add_argument("--skip-competitors", action="store_true",
-                        help="Skip competitor lookup step (Step 5) — no Competitors column is added")
+    parser.add_argument("--with-competitors", action="store_true",
+                        help="Opt in to the competitor lookup step (Step 5) — one extra web search "
+                             "per company. Skipped by default; only run when competitor analysis is wanted.")
     parser.add_argument("--skip-posts", action="store_true",
                         help="Skip LinkedIn post scraping step (Step 6)")
     parser.add_argument("--skip-small-talk", action="store_true",
@@ -396,8 +397,8 @@ def main() -> None:
     # ------------------------------------------------------------------
     # Step 5: Find competitors for each filtered lead's company
     # ------------------------------------------------------------------
-    if args.skip_competitors:
-        print("\n--- Step 5: Skipping competitor lookup (--skip-competitors) ---")
+    if not args.with_competitors:
+        print("\n--- Step 5: Skipping competitor lookup (default — pass --with-competitors to enable) ---")
     else:
         print(f"\n--- Step 5: Finding competitors for {len(outreach_indices)} leads ---")
 

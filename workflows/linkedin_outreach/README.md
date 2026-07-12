@@ -3,13 +3,14 @@
 End-to-end lead qualification and outreach prep — from a list of leads in either
 **a Google Sheet** or **a CSV file**, the workflow classifies each person by
 buying role, enriches the decision-makers' companies with firmographic data,
-prioritises them by ICP fit, finds competitors, scrapes LinkedIn posts, and
-(once the relevant skills are wired in) drafts personalised LinkedIn copy.
+prioritises them by ICP fit, scrapes LinkedIn posts, optionally finds
+competitors, and (once the relevant skills are wired in) drafts personalised
+LinkedIn copy.
 
 ```
 input  →  classify  →  enrich DMs  →  score P0/P1/P2  →  filter outreach batch
                                                           ↓
-                                         scrape posts  ←  find competitors  →  small talk
+                            scrape posts  ←  (competitors, opt-in)  →  small talk
                                                           ↓
                                                   personalisation hooks  →  LinkedIn copy
 ```
@@ -24,7 +25,7 @@ up front so they see what's possible. **By default every column below is filled;
 they can ask for a focused subset instead.** One row per lead.
 
 - **Company facts** — website, LinkedIn page, one-line description, employee count, estimated revenue, founded year, total funding, HQ
-- **Fit & priority** — P0/P1/P2 priority, ICP segment, reasoning for the score, buyer-persona match, likely competitors
+- **Fit & priority** — P0/P1/P2 priority, ICP segment, reasoning for the score, buyer-persona match, likely competitors *(competitors opt-in via `--with-competitors`)*
 - **Personalisation** — recent LinkedIn post links, a small-talk opener, a personalisation hook, and a ready-to-send LinkedIn message
 
 ---
@@ -36,7 +37,7 @@ they can ask for a focused subset instead.** One row per lead.
 | Python 3.9+ | always |
 | `pip install -r requirements.txt` (run at repo root) | always |
 | `ANTHROPIC_API_KEY` in `.env` | every step (LLM reasoning) |
-| `EXA_API_KEY` in `.env` | enrichment + competitor lookup (Exa-backed web search) |
+| `EXA_API_KEY` (or `PARALLEL_API_KEY`) in `.env` | enrichment (+ competitor lookup with `--with-competitors`) — web search |
 | `APIFY_API_TOKEN` in `.env` | post scraping (Step 6) |
 | `gws` CLI installed and authed | only if you use `--sheet-id` |
 | `context/context.md` filled in | every run — see "Context" section below |
@@ -82,7 +83,7 @@ authed against a Google account that can read/write the sheet
 | **2** | Enrich | **Decision Makers only** | Web search → Claude extracts: Company URL, Company LinkedIn URL, Company Description (one-liner), Employee Count, Est Revenue, Founded Year, Total Funding, HQ. **Deduped per company** so two DMs from the same firm only cost one search. **Skips rows whose enrichment columns are already filled.** |
 | **3** | Score | every lead | `P0` / `P1` / `P2` + ICP Segment + 1-2 sentence reasoning. Uses ICP tier definitions from your `context.md` if present; otherwise general fit signals. |
 | **4** | Filter | in-memory | Picks the **outreach batch**. **P0 only by default.** Use `--include-p1` and/or `--include-p2` to widen. Steps 5-9 only touch the batch — not the full sheet. |
-| **5** | Competitors | outreach batch | 2-3 immediate direct competitors per lead's company. Cached per company. |
+| **5** | Competitors *(opt-in)* | outreach batch | **Skipped by default** — pass `--with-competitors` to enable. When on: 2-3 immediate direct competitors per lead's company (one extra web search each), cached per company. |
 | **6** | Scrape posts | outreach batch | Apify pulls each lead's recent LinkedIn posts (default: 15 posts, last 90 days). Claude filters by ICP relevance criteria from `context.md`. Writes the matching post URLs (newline-separated). |
 | **7** | Small Talk | outreach batch | Humanizing/conversational signals (hobbies, fandoms, quirks) — top 2-3 as 1-line bullets with source. Identity-verified per evidence; returns empty rather than wrong-person. |
 | **8** | Personalisation hooks | outreach batch | Talking points an SDR can hang a message on. Surfaces 2-3 one-line angles from small talk, matching posts, and company signals. See `skills/personalisation_hook`. |
@@ -130,7 +131,7 @@ not, it creates new columns at the end of the sheet using these default names:
 | `Priority` | `priority` | 3 |
 | `ICP Segment` | `icp_segment` | 3 |
 | `Reasoning` | `reasoning` | 3 |
-| `Competitors` | `competitors` | 5 |
+| `Competitors` *(opt-in)* | `competitors` | 5 |
 | `LinkedIn Post Links` | `post_links` | 6 |
 | `Small Talk` | `small_talk` | 7 |
 | `Personalisation Hook` | `hooks` | 8 |
@@ -193,6 +194,7 @@ python -m workflows.linkedin_outreach.workflow [options]
 | `--include-p1` | Also include P1 leads in the outreach batch. |
 | `--include-p2` | Also include P2 leads in the outreach batch. |
 | `--skip-enrich` | Skip Step 2. |
+| `--with-competitors` | **Opt in** to competitor lookup (Step 5). Skipped by default — one extra web search per company. |
 | `--skip-posts` | Skip Step 6. |
 | `--skip-small-talk` | Skip Step 7. |
 | `--skip-copy` | Skip Step 9. |
@@ -228,8 +230,8 @@ python -m workflows.linkedin_outreach.workflow \
 
 For a 100-lead run with all default steps enabled and ~30% Decision Makers:
 
-- Anthropic: ~150-250 LLM calls (1 column-detection + 1 classify + 30 enrichment + 1 score + ~30 competitor + ~30 post-filter + per-lead hooks/copy when wired). Roughly **$1-3 with Sonnet 4.6**.
-- Exa search: ~60-90 calls (enrichment + competitors). Per Exa free-tier limits.
+- Anthropic: ~120-220 LLM calls (1 column-detection + 1 classify + 30 enrichment + 1 score + ~30 post-filter + per-lead hooks/copy when wired; +~30 competitor calls only with `--with-competitors`). Roughly **$1-3 with Sonnet 4.6**.
+- Exa search: ~30-60 calls (enrichment; +competitors only with `--with-competitors`). Per Exa free-tier limits.
 - Apify: ~30 LinkedIn-post-scraping calls × actor cost ($2 per 1,000 posts via HarvestAPI — ~$0.03 per lead at 15 posts).
 - Google Sheets API: ~500-1500 cell writes — usually fine on quotas.
 

@@ -7,7 +7,8 @@ default), since finding buyers, scraping posts, and writing copy is expensive.
 
 Flow:
   1  — Enrich every company: URL, LinkedIn, one-liner description, employees,
-       est revenue, founded year, total funding, HQ, 2-3 competitors
+       est revenue, founded year, total funding, HQ (+ 2-3 competitors only
+       with --with-competitors)
   2  — Score every company: ICP Segment + Priority (P0/P1/P2) + 1-line reasoning
   3  — Filter to outreach batch (P0 only by default; --include-p1 / --include-p2)
   4  — Find the buyer at each P0 company (name, position, LinkedIn) via web search
@@ -104,6 +105,9 @@ def main() -> None:
     parser.add_argument("--skip-posts",      action="store_true")
     parser.add_argument("--skip-hooks",      action="store_true")
     parser.add_argument("--skip-copy",       action="store_true")
+    parser.add_argument("--with-competitors", action="store_true",
+                        help="Include the 'competitors' enrichment field / Competitors column. "
+                             "Skipped by default; only produced when competitor analysis is wanted.")
     args = parser.parse_args()
 
     client = anthropic.Anthropic()
@@ -115,6 +119,11 @@ def main() -> None:
         enrich_fields = [f for f in ENRICH_FIELDS if f["key"] in wanted]
     else:
         enrich_fields = list(ENRICH_FIELDS)
+        # Competitors is opt-in: drop it from the default field set (and its
+        # column) unless explicitly requested. Costs nothing extra either way
+        # (it rides the enrichment call), but we don't produce it unasked.
+        if not args.with_competitors:
+            enrich_fields = [f for f in enrich_fields if f["key"] != "competitors"]
 
     print("\nLoading ICP context from context/...")
     icp_context = load_icp()
