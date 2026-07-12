@@ -1,40 +1,38 @@
 {
-  "small_talk": "- Painter / art nerd — \"I painted for years before programming\" [interview: https://example.com/pg-interview]\n- Big into espresso & tea ritual mornings — \"My morning is sacred: tea, then thinking\" [twitter: https://twitter.com/paulg/status/123]\n- Dad-life tweets about kids and chickens — \"Our chickens have personalities you would not believe\" [twitter: https://twitter.com/paulg/status/456]",
+  "small_talk": "- Painter / art background — \"I painted for years before programming\" [interview: https://example.com/pg-interview]\n- Keeps chickens, writes about them — \"Our chickens have personalities you would not believe\" [blog: https://paulgraham.com/chickens.html]\n- Espresso & tea ritual mornings — \"My morning is sacred: tea, then thinking\" [podcast: https://example.com/pg-podcast]",
   "signals": [
     {
       "topic": "Painter / art background",
       "evidence_quote": "I painted for years before I got serious about programming.",
       "source_url": "https://example.com/pg-interview",
       "source_type": "interview",
-      "timestamp": "2024-09-12",
+      "identity_anchor": "interview names Y Combinator + matches LinkedIn role",
       "confidence": 0.95,
       "small_talk_score": 9.2
     },
     {
-      "topic": "Espresso & tea ritual mornings",
-      "evidence_quote": "My morning is sacred: tea, then thinking.",
-      "source_url": "https://twitter.com/paulg/status/123",
-      "source_type": "twitter",
-      "timestamp": "2026-03-04",
-      "confidence": 0.9,
-      "small_talk_score": 8.6
-    },
-    {
       "topic": "Keeps chickens, posts about them",
       "evidence_quote": "Our chickens have personalities you would not believe.",
-      "source_url": "https://twitter.com/paulg/status/456",
-      "source_type": "twitter",
-      "timestamp": "2026-04-21",
+      "source_url": "https://paulgraham.com/chickens.html",
+      "source_type": "blog",
+      "identity_anchor": "personal domain paulgraham.com",
       "confidence": 0.92,
       "small_talk_score": 8.4
+    },
+    {
+      "topic": "Espresso & tea ritual mornings",
+      "evidence_quote": "My morning is sacred: tea, then thinking.",
+      "source_url": "https://example.com/pg-podcast",
+      "source_type": "podcast",
+      "identity_anchor": "podcast episode about Y Combinator",
+      "confidence": 0.9,
+      "small_talk_score": 8.6
     }
   ],
   "identity": {
     "name": "Paul Graham",
     "company": "Y Combinator",
-    "linkedin_url": "",
-    "twitter_url": "https://twitter.com/paulg",
-    "website": "https://paulgraham.com",
-    "twitter_confidence": 1.0
+    "linkedin_url": "https://www.linkedin.com/in/paulgraham",
+    "website": "https://paulgraham.com"
   }
 }

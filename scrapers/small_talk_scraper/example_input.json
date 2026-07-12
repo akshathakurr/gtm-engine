@@ -1,12 +1,8 @@
 {
   "name": "Paul Graham",
   "company": "Y Combinator",
-  "profile_url": "",
-  "twitter_url": "https://twitter.com/paulg",
+  "profile_url": "https://www.linkedin.com/in/paulgraham",
   "website": "https://paulgraham.com",
   "max_signals": 3,
-  "max_tweets": 60,
-  "days_back": 180,
-  "num_queries": 5,
-  "skip_twitter": false
+  "num_queries": 3
 }

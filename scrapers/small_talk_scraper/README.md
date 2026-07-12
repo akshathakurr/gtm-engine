@@ -9,6 +9,12 @@ Optimizes for:
 NOT:
 > "Would this help enrich a CRM?"
 
+**Web search only.** Twitter/X scraping was removed on purpose — it added a paid
+Apify pull plus an identity-resolution search per lead for a source that's often
+empty or the wrong person. The prospect's LinkedIn activity already reaches the
+copy step via the LinkedIn posts scraper, so this scraper leans on precise,
+source-targeted web search instead.
+
 ## Good vs bad output
 
 | Good (keep) | Bad (reject) |
@@ -17,27 +23,29 @@ NOT:
 | Marathon runner | CEO at company |
 | Plays Valorant | Hiring engineers |
 | Coffee nerd | Passionate about AI |
-| Tweets through F1 races | Building the future |
+| Talks F1 constantly | Building the future |
 | DJed in high school | Startup operator |
 
 ## Pipeline
 
 ```
-1. Identity resolution
-   - Use given LinkedIn / Twitter URLs.
-   - If no Twitter URL: 1 Exa search + Claude verification (cross-references company).
+1. Query generation
+   - Claude writes N precise, source-targeted queries across human-signal
+     categories (hobbies, gaming, fandoms, lifestyle, quirks), explicitly
+     aimed at podcasts / interviews / personal blogs / Reddit / YouTube.
+   - Falls back to templated precise queries if the LLM call fails.
 
 2. Signal harvest
-   - Pull recent tweets (replies > posts for authenticity).
-   - Claude generates 5 targeted Exa queries across human-signal categories
-     (hobbies, gaming, fandoms, lifestyle, quirks). Run in parallel.
+   - Run those web searches (via search_web_batch — Exa or Parallel).
 
 3. Extraction (with strict identity verification)
-   - Claude pulls humanizing signals from tweets + web results.
+   - Claude pulls humanizing signals from the web results.
    - Hard-excludes business / funding / job content.
+   - The static instruction prefix is prompt-cached, so a run over many leads
+     pays for it once; only the per-lead target + corpus are uncached.
    - **Identity gate**: every signal must anchor to one of —
        (a) source explicitly mentions the target company, OR
-       (b) source references the LinkedIn handle, OR
+       (b) source references the LinkedIn URL, OR
        (c) source has a unique biographical detail consistent with the LinkedIn.
      Anything weaker is rejected. A wrong-person signal is worse than no signal.
    - Emits {topic, evidence_quote, source_url, source_type, identity_anchor,
@@ -45,18 +53,14 @@ NOT:
 
 4. Scoring & dedup & selection
    - Claude scores small-talk-worthiness 0-10.
-   - **Fact-level dedup** (not just topic-label dedup): if signal A's quote
-     already contains signal B's fact, they collapse into one richer signal.
-     E.g. "I wrestled for Penn State and did cage fighting" is ONE signal
-     ("Combat sports — Penn State wrestler + cage fighter"), not two.
-   - Unique source URL per signal. Quotes capped at 100 chars.
+   - Fact-level dedup + unique source URL per signal. Quotes capped at 100 chars.
    - Top 2-3 win. If nothing genuinely humanizing exists, returns empty.
 
 5. Output
    - small_talk: 2-3 line string with source — directly consumable by the
                  email_outreach / linkedin_outreach workflows.
    - signals:    structured list (for downstream skills like personalisation_hook).
-   - identity:   the resolved identity graph.
+   - identity:   the identity anchors used (name, company, LinkedIn, website).
 ```
 
 ## Inputs
@@ -64,23 +68,19 @@ NOT:
 | Field | Required | Notes |
 |---|---|---|
 | `name` | yes | Full name |
-| `company` | recommended | Disambiguates Twitter handle |
-| `profile_url` | optional | LinkedIn URL (workflow's primary handle) |
-| `twitter_url` | optional | Skip identity resolution if provided |
-| `website` | optional | Personal site |
+| `company` | recommended | Disambiguates same-name people during verification |
+| `profile_url` | optional | LinkedIn URL — used only as an identity anchor, not scraped |
+| `website` | optional | Personal site (identity anchor) |
 | `max_signals` | default 3 | Cap on signals returned |
-| `max_tweets` | default 60 | Tweet pull size |
-| `days_back` | default 180 | Twitter time window |
-| `num_queries` | default 5 | Targeted web searches Claude generates |
-| `skip_twitter` | default false | Skip Apify cost — uses web search only |
+| `num_queries` | default 3 | Targeted web searches Claude generates |
 
 ## Output
 
 ```json
 {
-  "small_talk": "- F1 fan, Ferrari camp — \"Strategy disasterclass again 😭\" [twitter: ...]\n- Coffee nerd ...\n- Anime watcher ...",
+  "small_talk": "- F1 fan — \"...\" [podcast: ...]\n- Coffee nerd ...\n- Anime watcher ...",
   "signals":  [{"topic": "...", "evidence_quote": "...", "source_url": "...", ...}, ...],
-  "identity": {"name": "...", "twitter_url": "...", "twitter_confidence": 0.92, ...}
+  "identity": {"name": "...", "company": "...", "linkedin_url": "...", "website": "..."}
 }
 ```
 
@@ -109,22 +109,20 @@ python -m scrapers.small_talk_scraper.scraper example_input.json
 
 ## Dependencies
 
-- `EXA_API_KEY` — Exa-backed web search
-- `APIFY_API_TOKEN` — Twitter scraping (set `skip_twitter=true` to avoid)
-- `ANTHROPIC_API_KEY` — query generation, identity verification, signal extraction & scoring
+- `EXA_API_KEY` and/or `PARALLEL_API_KEY` — web search (either works; Exa primary, Parallel fallback)
+- `ANTHROPIC_API_KEY` — query generation + signal extraction & scoring
 
 ## Cost (rough, per prospect)
 
-- Anthropic: ~3-4 calls (queries + identity + extract). ~$0.01-0.03 with Sonnet 4.6.
-- Exa: ~5 search calls (~$0.025).
-- Apify (Twitter): ~$0.005 per profile (20-tweet minimum), **only if a Twitter handle is found**.
+- Anthropic: 2 calls (queries + extract). ~$0.01-0.02 with Sonnet-class models.
+- Web search: `num_queries` (default 3) calls × a few results each (~$0.015).
 
-Total: **~$0.04-0.06 per prospect** with Twitter, **~$0.04 without**.
+Total: **~$0.02-0.04 per prospect** — no Apify cost (Twitter removed).
 
 ## Design principles
 
 1. Optimize for HUMANITY, not enrichment.
 2. Specificity > broadness. Weird quirks are gold.
-3. Replies/comments > posts.
+3. Verify identity hard — a wrong-person signal is worse than none.
 4. Multiple weak signals can combine into a strong inference (Claude does this).
 5. If nothing genuinely humanizing exists, return empty — never pad with business stuff.

@@ -17,8 +17,8 @@
           "topic":            {"type": "string"},
           "evidence_quote":   {"type": "string"},
           "source_url":       {"type": "string"},
-          "source_type":      {"type": "string", "enum": ["twitter", "podcast", "interview", "blog", "reddit", "youtube", "other"]},
-          "timestamp":        {"type": "string"},
+          "source_type":      {"type": "string", "enum": ["podcast", "interview", "blog", "reddit", "youtube", "other"]},
+          "identity_anchor":  {"type": "string"},
           "confidence":       {"type": "number", "minimum": 0, "maximum": 1},
           "small_talk_score": {"type": "number", "minimum": 0, "maximum": 10}
         }
@@ -27,13 +27,10 @@
     "identity": {
       "type": "object",
       "properties": {
-        "name":               {"type": "string"},
-        "company":            {"type": "string"},
-        "linkedin_url":       {"type": "string"},
-        "twitter_url":        {"type": "string"},
-        "website":            {"type": "string"},
-        "twitter_confidence": {"type": "number"},
-        "twitter_match_reason": {"type": "string"}
+        "name":         {"type": "string"},
+        "company":      {"type": "string"},
+        "linkedin_url": {"type": "string"},
+        "website":      {"type": "string"}
       }
     }
   }
