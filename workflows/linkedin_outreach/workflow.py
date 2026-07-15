@@ -32,6 +32,7 @@ import argparse
 from typing import List, Dict, Optional
 
 import anthropic
+from config import make_brain_client
 
 from workflows._common import (
     col_letter, cell, load_icp,
@@ -119,7 +120,7 @@ def main() -> None:
                         help="Skip LinkedIn copy writing step (Step 9)")
     args = parser.parse_args()
 
-    client = anthropic.Anthropic()
+    client = make_brain_client()
 
     if args.skip_enrich:
         enrich_fields: List[Dict[str, str]] = []
@@ -332,7 +333,14 @@ def main() -> None:
             """Main-thread callback: checkpoint one company's firmographics to
             local disk the instant it finishes, then flush the Sheet on milestones."""
             if err:
-                print(f"    ! {company} enrichment failed: {err}")
+                # Do NOT cache/checkpoint a failed company: a transient error
+                # (search timeout, throttle) would otherwise be recorded as
+                # "done" with empty data and skipped forever on resume. Leaving
+                # it out means the next resume retries it. Still tick so
+                # milestone flushing tracks completions.
+                print(f"    ! {company} enrichment failed (will retry on resume): {err}")
+                flusher.tick()
+                return
             enriched = enriched or {}
             company_cache[company] = enriched
             checkpoint_append(ck_path, company, enriched)

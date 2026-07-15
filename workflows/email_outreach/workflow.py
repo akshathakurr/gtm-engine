@@ -31,6 +31,7 @@ import argparse
 from typing import List, Dict, Optional
 
 import anthropic
+from config import make_brain_client
 
 from workflows._common import (
     cell, load_icp,
@@ -111,7 +112,7 @@ def main() -> None:
                              "Skipped by default; only produced when competitor analysis is wanted.")
     args = parser.parse_args()
 
-    client = anthropic.Anthropic()
+    client = make_brain_client()
 
     if args.skip_enrich:
         enrich_fields: List[Dict[str, str]] = []

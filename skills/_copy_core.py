@@ -13,11 +13,9 @@ import json
 import re
 from typing import Any, Dict, List, Optional
 
-from anthropic import Anthropic
+from config import CLAUDE_MODEL, cached_system, make_brain_client
 
-from config import ANTHROPIC_API_KEY, CLAUDE_MODEL, cached_system
-
-client = Anthropic(api_key=ANTHROPIC_API_KEY)
+client = make_brain_client()
 
 MAX_POSTS_IN_PROMPT = 5
 MAX_POST_CHARS = 500

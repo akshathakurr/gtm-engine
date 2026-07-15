@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import time
+import socket
 import threading
 from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor
@@ -10,6 +11,10 @@ from urllib.parse import urlparse
 
 DEFAULT_NUM_RESULTS = 5
 DEFAULT_SUMMARY_QUESTION = "What is most important or notable about this?"
+
+# Hard cap on any single Exa socket op (connect/read). The SDK offers no timeout
+# knob, so without this a hung connection wedges the calling thread indefinitely.
+EXA_SOCKET_TIMEOUT = float(os.environ.get("EXA_SOCKET_TIMEOUT") or 45)
 
 # ---------------------------------------------------------------------------
 # Provider selection
@@ -195,7 +200,17 @@ def _search_exa(
         kwargs["exclude_domains"] = exclude_domains
 
     _exa_throttle()
-    response = exa.search(query, **kwargs)
+    # The exa_py SDK exposes no request timeout, so a stalled socket would hang
+    # the worker thread (and, via the on_result callback, the whole run) forever.
+    # Bound it with a socket-level read timeout for the duration of this call
+    # only — Parallel sets its own explicit timeout, so leave the global default
+    # untouched everywhere else.
+    _prev_timeout = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(EXA_SOCKET_TIMEOUT)
+    try:
+        response = exa.search(query, **kwargs)
+    finally:
+        socket.setdefaulttimeout(_prev_timeout)
 
     return [
         {

@@ -40,7 +40,7 @@ from typing import List, Dict
 
 import anthropic
 
-from config import CLAUDE_MODEL, CONTEXT_DIR
+from config import CLAUDE_MODEL, CONTEXT_DIR, make_brain_client
 from workflows._common import (
     strip_json_fence as _strip_json_fence, CONTEXT_FILE,
     read_context_file as _read_context_file,
@@ -749,7 +749,7 @@ def main() -> None:
     store = TabularStore(sheet_id=args.sheet_id, sheet_name=args.sheet_name,
                          csv_path=args.output_csv)
 
-    client   = anthropic.Anthropic()
+    client   = make_brain_client()
     run_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     # Pre-step: resolve genres / creators / trend queries / HN queries from

@@ -174,7 +174,14 @@ Only return valid JSON, no explanation."""
     # One call per chunk keeps each response small (no truncation) and each
     # lead judged against only its chunk. Chunks are independent → run in parallel.
     chunks = [leads[i:i + LLM_BATCH_SIZE] for i in range(0, len(leads), LLM_BATCH_SIZE)]
-    chunk_results, chunk_errors = map_rate_limited(_classify_chunk, chunks, max_workers=ENRICH_CONCURRENCY)
+    _n = len(chunks)
+    _prog = {"done": 0}
+    def _tick(_idx, _chunk, _res, err):
+        _prog["done"] += 1
+        print(f"  classified chunk {_prog['done']}/{_n}"
+              + (f" (ERR {err})" if err else ""), flush=True)
+    chunk_results, chunk_errors = map_rate_limited(
+        _classify_chunk, chunks, max_workers=ENRICH_CONCURRENCY, on_result=_tick)
     return collect_chunk_results(
         chunks, chunk_results, chunk_errors, label="persona classification",
         blank=lambda chunk: [""] * len(chunk),
@@ -325,7 +332,14 @@ Return only valid JSON, no explanation."""
     # lead scored against only its chunk. Chunks are independent → run in parallel.
     all_pairs = list(zip(leads, classifications))
     chunks = [all_pairs[i:i + LLM_BATCH_SIZE] for i in range(0, len(all_pairs), LLM_BATCH_SIZE)]
-    chunk_results, chunk_errors = map_rate_limited(_score_chunk, chunks, max_workers=ENRICH_CONCURRENCY)
+    _n = len(chunks)
+    _prog = {"done": 0}
+    def _tick(_idx, _chunk, _res, err):
+        _prog["done"] += 1
+        tag = "ok" if not err else f"ERR {err}"
+        print(f"  scored chunk {_prog['done']}/{_n} ({tag})", flush=True)
+    chunk_results, chunk_errors = map_rate_limited(
+        _score_chunk, chunks, max_workers=ENRICH_CONCURRENCY, on_result=_tick)
     return collect_chunk_results(
         chunks, chunk_results, chunk_errors, label="lead scoring",
         blank=lambda chunk: [{"priority": "", "icp_segment": "", "reasoning": ""} for _ in chunk],

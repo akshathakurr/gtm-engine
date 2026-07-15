@@ -36,7 +36,7 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from config import CLAUDE_MODEL, cached_system  # noqa: E402
+from config import CLAUDE_MODEL, cached_system, make_brain_client  # noqa: E402
 from scrapers.web_search.scraper import search_web_batch  # noqa: E402
 
 
@@ -377,7 +377,7 @@ def scrape_small_talk(
     if not name:
         return {"small_talk": "", "signals": [], "identity": {}}
 
-    client = anthropic.Anthropic()
+    client = make_brain_client()
 
     identity = build_identity(
         name=name, company=company, linkedin_url=profile_url, website=website,

@@ -26,7 +26,7 @@ from typing import Optional, List, Dict
 
 import anthropic
 
-from config import CLAUDE_MODEL, CONTEXT_DIR
+from config import CLAUDE_MODEL, CONTEXT_DIR, make_brain_client
 from workflows._common import (
     strip_json_fence as _strip_json_fence,
     find_col, cell, load_icp,
@@ -926,7 +926,7 @@ def main():
     # ---- Score relevance
     print(f"\n[SCORE] Scoring {len(all_posts)} posts via Claude...")
     project_context = _load_project_context()
-    client = anthropic.Anthropic()
+    client = make_brain_client()
     scores = score_relevance(all_posts, project_context, client, intent=intent, ck_path=score_ck)
     surfaced = sum(1 for s in scores
                    if s and s.get("worth_commenting") and _author_ok(s))

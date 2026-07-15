@@ -42,7 +42,7 @@ from typing import Optional, List, Dict
 
 import anthropic
 
-from config import CLAUDE_MODEL, CONTEXT_DIR
+from config import CLAUDE_MODEL, CONTEXT_DIR, make_brain_client
 from workflows._common import (
     strip_json_fence as _strip_json_fence,
     TabularStore, find_col, ensure_col,
@@ -975,7 +975,7 @@ def main() -> None:
     store = TabularStore(sheet_id=args.sheet_id, sheet_name=args.sheet_name,
                          csv_path=args.output_csv)
 
-    client = anthropic.Anthropic()
+    client = make_brain_client()
 
     # Web search is only used to research ideas (daily/idea); write mode drafts
     # an existing row and needs no research, so don't require a key for it.

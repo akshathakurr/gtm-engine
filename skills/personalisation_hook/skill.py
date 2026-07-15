@@ -38,12 +38,16 @@ import json
 import time
 from typing import Any, Dict, List, Optional
 
-from anthropic import Anthropic, APIConnectionError, InternalServerError, RateLimitError
+from anthropic import APIConnectionError, InternalServerError, RateLimitError
 
-from config import ANTHROPIC_API_KEY, CLAUDE_MODEL
+from config import CLAUDE_MODEL, make_brain_client
 from skills._copy_core import extract_json
 
-_client = Anthropic(api_key=ANTHROPIC_API_KEY)
+# Route through the shared brain factory so GTM_BRAIN=claude|codex works here
+# too. On the CLI backends the anthropic-specific exceptions below simply never
+# fire (the CLI raises RuntimeError, caught by the generic handler); on the API
+# backend the retry path is unchanged.
+_client = make_brain_client()
 
 MAX_HOOKS = 3
 MAX_POSTS_IN_PROMPT = 8

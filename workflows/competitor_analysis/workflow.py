@@ -36,7 +36,7 @@ from typing import Dict, List, Optional
 
 import anthropic
 
-from config import CONTEXT_DIR
+from config import CONTEXT_DIR, make_brain_client
 from workflows._common import (
     GoogleSheetsBackend, CsvBackend, find_col, ensure_col, cell, load_icp,
     RateLimiter, checkpoint_path, checkpoint_load, checkpoint_append,
@@ -446,7 +446,7 @@ def main() -> None:
     # Pre-step: warn (or abort under --auto) if context.md is too sparse for the analysis to be meaningful.
     check_context_complete(auto=args.auto)
 
-    client = anthropic.Anthropic()
+    client = make_brain_client()
 
     print("\nLoading ICP context from context/...")
     icp_context = load_icp()
