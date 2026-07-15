@@ -1,7 +1,8 @@
 "$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
 
-# Shared Conductor config (committed — fresh workspaces branch from origin and
-# read this). Local-only overrides go in settings.local.toml (gitignored).
+# Shared Conductor config. This file (.conductor/settings.toml) is committed, so
+# fresh workspaces branch from origin and read it. Per-machine overrides go in
+# .conductor/settings.local.toml (gitignored).
 
 # Parse the copied .env so agents see the same keys as the main checkout.
 environment_variable_files = [".env"]
@@ -26,15 +27,13 @@ python3 -m venv .venv
 .venv/bin/pip install -q -r requirements.txt
 
 # 2) Copy the gitignored secrets + business context from the main checkout.
-#    `git worktree list` puts the main working tree first; fall back to the known
-#    path if that can't be resolved.
-SRC="$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')"
-if [ -z "$SRC" ] || [ "$SRC" = "$PWD" ] || [ ! -e "$SRC/.env" ]; then
-  SRC="/Users/akshatthakur/Code/gtm-engine"
-fi
+#    Conductor exports $CONDUCTOR_ROOT_PATH = the source repo root; fall back to
+#    the main git worktree if it's ever unset.
+SRC="${CONDUCTOR_ROOT_PATH:-$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')}"
 [ -f "$SRC/.env" ] && cp "$SRC/.env" .env || echo "warn: no .env found at $SRC"
 mkdir -p context
 cp "$SRC"/context/*.md context/ 2>/dev/null || echo "warn: no context/*.md at $SRC"
 
 echo "setup complete — venv ready, .env + context copied from $SRC"
+echo "note: run workflows with .venv/bin/python (venv activation does not persist past setup)"
 """
