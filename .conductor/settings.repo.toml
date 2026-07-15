@@ -1,0 +1,40 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+# Shared Conductor config (committed — fresh workspaces branch from origin and
+# read this). Local-only overrides go in settings.local.toml (gitignored).
+
+# Parse the copied .env so agents see the same keys as the main checkout.
+environment_variable_files = [".env"]
+
+# Default every Conductor run to the keyless ChatGPT/Codex brain. .env (copied in
+# setup) already sets this and wins via load_dotenv(override=True); this is a
+# belt-and-suspenders default in case the .env copy is ever skipped.
+[environment_variables]
+GTM_BRAIN = "codex"
+
+[scripts]
+run_mode = "concurrent"
+
+# Runs once when a new workspace is created. A fresh git worktree has the tracked
+# code but NOT the gitignored .env or context/*.md, and no installed deps — so we
+# provision all three here.
+setup = """
+set -e
+
+# 1) Isolated Python env + dependencies.
+python3 -m venv .venv
+.venv/bin/pip install -q -r requirements.txt
+
+# 2) Copy the gitignored secrets + business context from the main checkout.
+#    `git worktree list` puts the main working tree first; fall back to the known
+#    path if that can't be resolved.
+SRC="$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')"
+if [ -z "$SRC" ] || [ "$SRC" = "$PWD" ] || [ ! -e "$SRC/.env" ]; then
+  SRC="/Users/akshatthakur/Code/gtm-engine"
+fi
+[ -f "$SRC/.env" ] && cp "$SRC/.env" .env || echo "warn: no .env found at $SRC"
+mkdir -p context
+cp "$SRC"/context/*.md context/ 2>/dev/null || echo "warn: no context/*.md at $SRC"
+
+echo "setup complete — venv ready, .env + context copied from $SRC"
+"""
