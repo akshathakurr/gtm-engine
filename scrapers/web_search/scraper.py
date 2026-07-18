@@ -166,8 +166,15 @@ def _search_exa(
     include_domains: Optional[list],
     exclude_domains: Optional[list],
     question: str,
+    include_summary: bool = True,
 ) -> List[dict]:
-    """Run one Exa search and return a list of normalized result dicts."""
+    """Run one Exa search and return a list of normalized result dicts.
+
+    ``include_summary=False`` drops the per-result LLM ``summary`` from the
+    content request. Exa bills that summary per result on top of the search, so
+    callers that only need the result URLs/titles (URL lookups, etc.) should turn
+    it off — highlights alone still carry text at a fraction of the cost.
+    """
     api_key = os.environ.get("EXA_API_KEY")
     if not api_key:
         raise EnvironmentError("EXA_API_KEY environment variable is not set.")
@@ -176,17 +183,18 @@ def _search_exa(
 
     exa = Exa(api_key)
 
+    # search() takes content options under `contents` (highlights/summary/text);
+    # the old top-level kwargs were the deprecated search_and_contents() style.
+    contents = {"highlights": {"num_sentences": 3, "highlights_per_url": 2}}
+    if include_summary:
+        contents["summary"] = {"query": question}
+
     kwargs = {
         "num_results": num_results,
         # Exa "fast" search type — same content index, p50 latency <425ms.
         # Available on the free plan; full param compatibility with contents.
         "type": "fast",
-        # search() takes content options under `contents` (highlights/summary/text);
-        # the old top-level kwargs were the deprecated search_and_contents() style.
-        "contents": {
-            "highlights": {"num_sentences": 3, "highlights_per_url": 2},
-            "summary": {"query": question},
-        },
+        "contents": contents,
     }
 
     if days_back is not None:
@@ -218,7 +226,7 @@ def _search_exa(
             "url": r.url,
             "published_date": r.published_date,
             "author": r.author,
-            "summary": r.summary,
+            "summary": getattr(r, "summary", None),
             "highlights": r.highlights or [],
         }
         for r in response.results
@@ -262,6 +270,8 @@ def _search_parallel(
     include_domains: Optional[list],
     exclude_domains: Optional[list],
     question: str,
+    include_summary: bool = True,  # accepted for a uniform dispatch signature;
+                                   # Parallel has no separately-billed summary.
 ) -> List[dict]:
     """Run one Parallel search and return a list of normalized result dicts.
 
@@ -375,9 +385,11 @@ def _dispatch(
     include_domains: Optional[list],
     exclude_domains: Optional[list],
     question: str,
+    include_summary: bool = True,
 ) -> List[dict]:
     fn = _search_exa if provider == "exa" else _search_parallel
-    return fn(query, num_results, days_back, include_domains, exclude_domains, question)
+    return fn(query, num_results, days_back, include_domains, exclude_domains,
+              question, include_summary)
 
 
 # ---------------------------------------------------------------------------
@@ -390,6 +402,7 @@ def search_web(
     include_domains: Optional[list] = None,
     exclude_domains: Optional[list] = None,
     summary_question: Optional[str] = None,
+    include_summary: bool = True,
 ) -> dict:
     """
     Fetches web results and structured insights for a query.
@@ -404,6 +417,9 @@ def search_web(
         include_domains:  Restrict to these domains
         exclude_domains:  Exclude these domains
         summary_question: Question answered per result from its content
+        include_summary:  When False, skip Exa's per-result LLM summary (billed
+                          per result). Use for URL/title-only lookups where the
+                          result URLs and highlights already carry the answer.
 
     Returns:
         dict with keys: query, total, results, errors
@@ -420,7 +436,8 @@ def search_web(
         for prov in providers:
             try:
                 merged.extend(_dispatch(prov, query, num_results, days_back,
-                                        include_domains, exclude_domains, question))
+                                        include_domains, exclude_domains, question,
+                                        include_summary))
             except Exception as e:  # one backend failing must not lose the other's hits
                 errors.append(f"{prov}: {e}")
                 if _is_hard_fail(e):
@@ -433,7 +450,8 @@ def search_web(
     for i, prov in enumerate(providers):
         try:
             results = _dedup(_dispatch(prov, query, num_results, days_back,
-                                       include_domains, exclude_domains, question))
+                                       include_domains, exclude_domains, question,
+                                       include_summary))
             return {"query": query, "total": len(results), "results": results, "errors": []}
         except Exception as e:
             last_err = e

@@ -167,6 +167,7 @@ def find_official_site(company_name: str, client: anthropic.Anthropic) -> str:
             query=f"{company_name} official website",
             num_results=6,
             summary_question=f"What is the official company homepage URL for {company_name}?",
+            include_summary=False,  # we only read result URLs here
         )
     except Exception as e:
         print(f"    Official-site lookup failed: {e}")
@@ -254,6 +255,7 @@ def find_linkedin_url(company_name: str, website: str,
             query=f'{anchor} linkedin.com/company',
             num_results=3,
             summary_question=f"What is the LinkedIn company page URL for {company_name} ({domain})?",
+            include_summary=False,  # we only read result URLs here
         )
         li_urls = [
             u for u in (
@@ -829,6 +831,7 @@ def get_customer_reviews(
             query=f"{company_name} reviews site:g2.com",
             num_results=3,
             summary_question=f"What is the G2 review page URL for {company_name}?",
+            include_summary=False,  # we only read result URLs here
         )
         for r in result.get("results", []):
             url = r.get("url", "")
