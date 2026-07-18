@@ -611,7 +611,19 @@ def collect_chunk_results(chunks, results, errors, blank, *, label):
 # the next run loads it, skips those items, and only pays for what's missing.
 # Keyed by a stable id (e.g. company name) so re-runs dedup.
 
-CHECKPOINT_DIR = os.path.join(os.getcwd(), ".cache", "checkpoints")
+# By default checkpoints live under the current workspace's .cache/. That is fine
+# for a single machine, but breaks when a run happens in a *fresh* workspace each
+# time (e.g. Conductor spins up a new git worktree/container per run): the new
+# workspace starts with an empty .cache/, so every re-run re-pays for searches the
+# previous run already completed. Point GTM_CHECKPOINT_DIR at a stable path that
+# outlives the workspace (a shared/mounted dir, or an absolute path in $HOME) and
+# checkpoints then persist across runs regardless of where the workspace lives.
+_CHECKPOINT_DIR_ENV = os.environ.get("GTM_CHECKPOINT_DIR")
+CHECKPOINT_DIR = (
+    os.path.abspath(os.path.expanduser(_CHECKPOINT_DIR_ENV))
+    if _CHECKPOINT_DIR_ENV
+    else os.path.join(os.getcwd(), ".cache", "checkpoints")
+)
 
 
 def checkpoint_path(name: str) -> str:

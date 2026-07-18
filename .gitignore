@@ -43,3 +43,6 @@ Thumbs.db
 
 # local API-result checkpoints (crash-safety)
 .cache/
+
+# ad-hoc run scratch (per-run scripts + paid search/enrichment dumps)
+.ops_run/
