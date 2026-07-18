@@ -31,8 +31,16 @@ python3 -m venv .venv
 #    the main git worktree if it's ever unset.
 SRC="${CONDUCTOR_ROOT_PATH:-$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')}"
 [ -f "$SRC/.env" ] && cp "$SRC/.env" .env || echo "warn: no .env found at $SRC"
-mkdir -p context
-cp "$SRC"/context/*.md context/ 2>/dev/null || echo "warn: no context/*.md at $SRC"
+# Copy the ENTIRE context/ tree, not just the top-level *.md — multi-project
+# setups keep per-project context in subfolders (e.g. context/luffy/context.md)
+# selected via GTM_CONTEXT_DIR. A flat `cp context/*.md` skipped those subfolders,
+# so a fresh workspace fell back to the default context even when a project was
+# requested. `cp -r` brings the subfolders along.
+if [ -d "$SRC/context" ]; then
+  cp -r "$SRC/context" .
+else
+  echo "warn: no context/ dir at $SRC"
+fi
 
 echo "setup complete — venv ready, .env + context copied from $SRC"
 echo "note: run workflows with .venv/bin/python (venv activation does not persist past setup)"
