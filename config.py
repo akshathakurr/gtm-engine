@@ -21,6 +21,12 @@ from dotenv import load_dotenv
 
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 
+# Load .env BEFORE reading any env-var below. GTM_CONTEXT_DIR in particular must
+# be resolved after this: reading it first (the old order) meant a value set in
+# .env was silently ignored, so multi-project runs fell back to the default
+# context/ folder even when a subfolder was requested.
+load_dotenv(os.path.join(REPO_ROOT, ".env"), override=True)
+
 # Which context folder workflows read. Defaults to the top-level context/ folder.
 # For multiple projects, keep each project's context.md in its own subfolder
 # (e.g. context/luffy/) and point workflows at it by setting GTM_CONTEXT_DIR —
@@ -34,7 +40,11 @@ else:
 SCRAPERS_DIR = os.path.join(REPO_ROOT, "scrapers")
 WORKFLOWS_DIR = os.path.join(REPO_ROOT, "workflows")
 
-load_dotenv(os.path.join(REPO_ROOT, ".env"), override=True)
+# Surface which context is in use so a wrong/fallback context is visible instead
+# of silently personalising against the wrong project.
+print(f"[context] using {os.path.relpath(CONTEXT_DIR, REPO_ROOT)}"
+      f"{' (default; set GTM_CONTEXT_DIR to override)' if not _context_override else ''}",
+      file=sys.stderr)
 
 CLAUDE_MODEL = os.environ.get("GTM_MODEL") or "claude-sonnet-4-6"
 
