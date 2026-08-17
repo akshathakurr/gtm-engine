@@ -88,9 +88,17 @@ def cached_system(*blocks: str):
 # ANTHROPIC_API_KEY. Set GTM_BRAIN to route those calls through a subscription
 # instead — no API key spent:
 #
-#     GTM_BRAIN=api     (default) → Anthropic API via anthropic.Anthropic()
-#     GTM_BRAIN=claude            → `claude -p` CLI, billed to your Claude plan
-#     GTM_BRAIN=codex             → `codex exec` CLI, billed to your ChatGPT plan
+#     GTM_BRAIN=api     → Anthropic API via anthropic.Anthropic()
+#     GTM_BRAIN=claude  → `claude -p` CLI, billed to your Claude plan
+#     GTM_BRAIN=codex   → `codex exec` CLI, billed to your ChatGPT plan
+#
+# When GTM_BRAIN is unset the default is HOST-AWARE (_detect_default_brain):
+# opened inside a Codex session → codex; inside Claude Code / the Claude
+# desktop app → claude; anywhere else → api. If an auto-detected CLI isn't
+# usable: a Codex host never falls back — it stops and tells the user to switch
+# the session to full-access mode (keeping the run on their ChatGPT plan); a
+# Claude host falls back (codex CLI → API key → error). An explicit GTM_BRAIN
+# never falls back — it hard-stops with the preflight's fix instructions.
 #
 # The CLI backends return a tiny object that quacks exactly like an Anthropic
 # SDK response (`resp.content[0].text`), so the ~35 existing call sites don't
@@ -110,7 +118,29 @@ def cached_system(*blocks: str):
 #   - each call spawns a full CLI process → slower than an API call, and draws
 #     down the plan's usage window. Fine for consulting-batch scale.
 
-BRAIN_MODE = os.getenv("GTM_BRAIN", "api").strip().lower() or "api"
+def _detect_default_brain() -> str:
+    """Host-aware default when GTM_BRAIN is unset.
+
+    Opened inside a Codex session (Codex app / codex exec) → `codex`; inside
+    Claude Code (CLI or Claude desktop app) → `claude`; otherwise, or when an
+    ANTHROPIC_API_KEY is configured and no known host is detected → `api`.
+    Codex is checked first: a codex shell spawned from Claude Code inherits the
+    outer CLAUDE* vars too, and the innermost host is the one the user is in.
+    An explicit GTM_BRAIN always wins over detection.
+    """
+    if os.getenv("CODEX_THREAD_ID") or os.getenv("CODEX_SANDBOX") or os.getenv("CODEX_CI"):
+        return "codex"
+    if os.getenv("CLAUDECODE") or os.getenv("CLAUDE_CODE_ENTRYPOINT"):
+        return "claude"
+    return "api"
+
+
+_EXPLICIT_BRAIN = (os.getenv("GTM_BRAIN") or "").strip().lower()
+BRAIN_MODE = _EXPLICIT_BRAIN or _detect_default_brain()
+# True when BRAIN_MODE came from host detection rather than an explicit
+# GTM_BRAIN — only auto-detected modes are allowed to fall back on preflight
+# failure (see make_brain_client; Codex hosts still never fall back).
+BRAIN_MODE_AUTODETECTED = not _EXPLICIT_BRAIN
 
 
 class _TextBlock:
@@ -215,6 +245,28 @@ def _claude_preflight() -> None:
             "profile (e.g. ~/.zshrc). Re-run once `claude auth status` shows an "
             "oauth/subscription method."
         )
+    # An org/Console login (`/login` with a work account) reports
+    # authMethod "claude.ai" but bills the ORG's API credits through a managed
+    # key — the subscriptionType field is null in that case. A setup-token in
+    # CLAUDE_CODE_OAUTH_TOKEN overrides it (authMethod becomes "oauth_token"),
+    # so only stop when there's no token AND the login is confirmed org-billed.
+    if (
+        isinstance(info, dict)
+        and info.get("authMethod") == "claude.ai"
+        and "subscriptionType" in info
+        and info.get("subscriptionType") is None
+        and not env.get("CLAUDE_CODE_OAUTH_TOKEN")
+    ):
+        org = info.get("orgName") or "your organization"
+        raise RuntimeError(
+            f"GTM_BRAIN=claude, but the Claude CLI is logged in with a Console/"
+            f"org account ({org}) that has no subscription attached — running "
+            "would bill that org's API credits through its managed key, not a "
+            "Claude plan. Fix: run `claude setup-token` with the account that "
+            "holds the Pro/Max plan and put the token in .env as "
+            "CLAUDE_CODE_OAUTH_TOKEN=<token>. Re-run once `claude auth status` "
+            "shows authMethod \"oauth_token\" (with the token in the env)."
+        )
 
 
 def _run_claude_cli(system: str, prompt: str, model: str, timeout: int = 300) -> str:
@@ -261,6 +313,17 @@ def _codex_preflight() -> None:
     nested process is killed with SIGKILL (-9) before it does any work. Detect
     that once, up front, so a run stops with an actionable message instead of
     crashing mid-column-mapping with an opaque `exit -9`."""
+    # Inside a SANDBOXED codex session (CODEX_SANDBOX=seatbelt) a nested codex
+    # can't initialize its app-server ("Operation not permitted") even though
+    # `codex --version` succeeds — so check the env marker, not just the binary.
+    # In full-access mode the var is unset and nesting works (verified).
+    if os.getenv("CODEX_SANDBOX"):
+        raise RuntimeError(
+            "GTM_BRAIN=codex inside a sandboxed Codex session: a nested codex "
+            "can't start under the sandbox. Fixes: switch this Codex session to "
+            "full-access mode, or use GTM_BRAIN=claude, or run from a plain "
+            "terminal / Claude Code / Conductor."
+        )
     try:
         proc = subprocess.run(
             [_codex_binary(), "--version"], capture_output=True, text=True,
@@ -317,12 +380,25 @@ def _run_codex_cli(system: str, prompt: str, model: str, timeout: int = 300) -> 
         )
         if proc.returncode != 0:
             rc = proc.returncode
-            detail = (
-                f"killed by signal {-rc} — codex is SIGKILLed when nested inside "
-                "another Codex/agent session; run from a plain terminal or use "
-                "GTM_BRAIN=claude"
-                if rc < 0 else f"exit {rc}: {proc.stderr[:400]}"
-            )
+            if rc < 0:
+                detail = (
+                    f"killed by signal {-rc} — codex is SIGKILLed when nested inside "
+                    "another Codex/agent session; run from a plain terminal or use "
+                    "GTM_BRAIN=claude"
+                )
+            elif "failed to initialize in-process app-server" in proc.stderr or \
+                    "Operation not permitted" in proc.stderr:
+                # Newer codex versions fail this way (instead of SIGKILL) when
+                # nested inside another Codex session's sandbox (e.g. the Codex app).
+                detail = (
+                    f"exit {rc} — codex cannot start inside another Codex session's "
+                    "sandbox (Codex app / nested codex). Fixes: switch the Codex "
+                    "session to full-access mode (nested codex works unsandboxed, "
+                    "verified), use GTM_BRAIN=claude here, or run from a plain "
+                    f"terminal / Claude Code / Conductor. (stderr: {proc.stderr[:200]})"
+                )
+            else:
+                detail = f"exit {rc}: {proc.stderr[:400]}"
             raise RuntimeError(f"codex CLI failed ({detail})")
         with open(out_file.name, encoding="utf-8") as f:
             text = f.read().strip()
@@ -356,6 +432,51 @@ class _CliBrainClient:
         self.messages = _CliMessages(backend)
 
 
+def _api_client():
+    """The real Anthropic SDK client, with bounded per-request timeouts.
+
+    The SDK default is a 600s timeout, so a single hung connection stalls a
+    worker thread for up to 10 minutes before recovering — across a concurrent
+    per-company fan-out that reads as the whole run wedging. A tight timeout
+    plus a few retries (the SDK backs off between them) turns a hung socket
+    into a fast retry."""
+    import anthropic
+    return anthropic.Anthropic(
+        timeout=float(os.environ.get("ANTHROPIC_TIMEOUT") or 60),
+        max_retries=int(os.environ.get("ANTHROPIC_MAX_RETRIES") or 4),
+    )
+
+
+def _autodetect_fallback(mode: str, preflight_error: RuntimeError):
+    """Fallback ladder when an AUTO-DETECTED CLI backend fails preflight.
+
+    Auto-detected mode is a convenience, not a demand — but each host falls
+    back differently:
+      - Codex host → NO fallback: re-raise so the user sees the preflight's
+        "switch this session to full-access mode" fix and the run stays on
+        their ChatGPT plan, instead of silently billing another brain.
+      - Claude host → try the codex CLI (still a subscription), then the API
+        if a key is configured, then re-raise.
+    Explicit GTM_BRAIN never reaches here (make_brain_client re-raises first).
+    """
+    if mode == "codex":
+        raise preflight_error
+    try:
+        _codex_preflight()
+        print(f"[GTM_BRAIN] auto-detected {mode} backend isn't usable here — "
+              "falling back to the codex CLI (subscription). Set GTM_BRAIN "
+              "explicitly to override.", file=sys.stderr)
+        return _CliBrainClient("codex")
+    except RuntimeError:
+        pass
+    if os.getenv("ANTHROPIC_API_KEY"):
+        print(f"[GTM_BRAIN] auto-detected {mode} backend isn't usable here — "
+              "falling back to the Anthropic API (key found). Set GTM_BRAIN "
+              "explicitly to override.", file=sys.stderr)
+        return _api_client()
+    raise preflight_error
+
+
 def make_brain_client():
     """Return the LLM client for the active GTM_BRAIN backend.
 
@@ -364,24 +485,20 @@ def make_brain_client():
     the same `.messages.create(...)` → `resp.content[0].text` interface."""
     mode = BRAIN_MODE
     if mode == "api":
-        import anthropic
-        # Bound each request: the SDK default is a 600s timeout, so a single
-        # hung connection stalls a worker thread for up to 10 minutes before
-        # recovering — across a concurrent per-company fan-out that reads as the
-        # whole run wedging. A tight per-request timeout plus a few retries
-        # (SDK backs off between them) turns a hung socket into a fast retry.
-        return anthropic.Anthropic(
-            timeout=float(os.environ.get("ANTHROPIC_TIMEOUT") or 60),
-            max_retries=int(os.environ.get("ANTHROPIC_MAX_RETRIES") or 4),
-        )
+        return _api_client()
     if mode in ("claude", "codex"):
         # Fail fast with an actionable cause instead of crashing mid-run: codex
         # gets SIGKILLed when nested; claude silently falls back to the API key.
-        if mode == "claude":
-            _claude_preflight()
-        else:
-            _codex_preflight()
-        print(f"[GTM_BRAIN={mode}] routing Claude calls through the "
+        try:
+            _claude_preflight() if mode == "claude" else _codex_preflight()
+        except RuntimeError as err:
+            # An EXPLICIT GTM_BRAIN keeps the hard stop — the user asked for
+            # subscription billing, so failing beats surprise API spend.
+            if not BRAIN_MODE_AUTODETECTED:
+                raise
+            return _autodetect_fallback(mode, err)
+        auto = " (auto-detected from host)" if BRAIN_MODE_AUTODETECTED else ""
+        print(f"[GTM_BRAIN={mode}]{auto} routing Claude calls through the "
               f"{'Claude' if mode == 'claude' else 'Codex'} CLI (no API key spent)",
               file=sys.stderr)
         return _CliBrainClient(mode)
