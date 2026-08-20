@@ -153,10 +153,13 @@ not, it creates new columns at the end of the sheet using these defaults:
 - **Company URL:** canonical homepage (`https://acme.com`)
 - **Company LinkedIn URL:** full LinkedIn page (`https://www.linkedin.com/company/...`)
 - **Company Description:** one short, to-the-point line
-- **Total Funding / Est Revenue:** absolute number, capital `M` / `B`, **no `~`, no `$`**.
-  Examples: `110M`, `4M`, `164.12M`, `1.2B`. Revenue uses `Not available` when unknowable; other fields use empty string.
+- **Total Funding / Est Revenue:** absolute number, capital `M` / `B`, **one decimal place
+  maximum, no `~`, no `$`, no comma-separated raw dollar amounts**.
+  Examples: `110.0M`, `4.0M`, `164.1M`, `1.2B`. Amounts under $1M still use `M`
+  (`$342,222` → `0.3M`).
 - **HQ:** city name only (`Oakland`, `Boston`). No state, no country, no street.
 - **Founded Year:** 4-digit year (`2014`)
+- **Not found:** every enrichment field uses `NA` (not blank, not `Not available`, not `N/A`) when the value can't be found.
 - **Employee Count:** integer or range as stated (`215`, `5,500+`)
 - **Competitors:** 2-3 immediate direct competitor names, comma-separated (`Acme, Globex, Initech`)
 - **Reasoning:** ONE plain sentence — to the point, no bullets, no filler
@@ -200,7 +203,8 @@ python -m workflows.email_outreach.workflow [options]
 | `--enrich-fields KEYS` | Comma-separated subset of enrichment fields, by snake_case key. |
 | `--include-p1` | Also include P1 leads in the outreach batch. |
 | `--include-p2` | Also include P2 leads in the outreach batch. |
-| `--with-competitors` | **Opt in** to the Competitors enrichment field/column. Skipped by default. |
+| `--with-competitors` | **Opt in** to the Competitors enrichment field/column. Skipped by default. Not needed if the sheet already has a "Competitors" column; it's auto-detected and filled either way. |
+| `--with-icp-segment` | **Opt in** to the ICP Segment column. Skipped by default. Not needed if the sheet already has an "ICP Segment" column; it's auto-detected and filled either way. |
 | `--skip-enrich` | Skip Step 1. |
 | `--skip-emails` | Skip Step 6 (Apollo). |
 | `--skip-small-talk` | Skip Step 7. |

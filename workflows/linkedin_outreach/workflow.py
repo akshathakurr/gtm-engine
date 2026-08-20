@@ -112,6 +112,9 @@ def main() -> None:
     parser.add_argument("--with-competitors", action="store_true",
                         help="Opt in to the competitor lookup step (Step 5) — one extra web search "
                              "per company. Skipped by default; only run when competitor analysis is wanted.")
+    parser.add_argument("--with-icp-segment", action="store_true",
+                        help="Include the 'ICP Segment' column. Skipped by default; only produced "
+                             "when the sheet already has the column or the user explicitly wants it.")
     parser.add_argument("--skip-posts", action="store_true",
                         help="Skip LinkedIn post scraping step (Step 6)")
     parser.add_argument("--skip-small-talk", action="store_true",
@@ -374,15 +377,25 @@ def main() -> None:
     print("\n--- Step 3: Scoring all leads P0 / P1 / P2 ---")
     scores = score_leads(leads, classifications, icp_context, client)
 
+    # ICP Segment is opt-in — only create/write the column if the sheet already
+    # has it (kept there on purpose) or --with-icp-segment was passed. Otherwise
+    # a column the user deliberately deleted keeps getting silently re-added.
+    include_icp_segment = args.with_icp_segment or bool(mapping.get("icp_segment"))
+
     priority_col_idx  = get_or_create_col(headers, mapping, "priority",    "Priority")
-    icp_col_idx       = get_or_create_col(headers, mapping, "icp_segment", "ICP Segment")
+    icp_col_idx = (
+        get_or_create_col(headers, mapping, "icp_segment", "ICP Segment")
+        if include_icp_segment else None
+    )
     reasoning_col_idx = get_or_create_col(headers, mapping, "reasoning",   "Reasoning")
 
     backend.write_header(priority_col_idx,  headers[priority_col_idx])
-    backend.write_header(icp_col_idx,       headers[icp_col_idx])
+    if include_icp_segment:
+        backend.write_header(icp_col_idx, headers[icp_col_idx])
     backend.write_header(reasoning_col_idx, headers[reasoning_col_idx])
     backend.write_column(priority_col_idx,  [s["priority"] for s in scores])
-    backend.write_column(icp_col_idx,       [s.get("icp_segment", "") for s in scores])
+    if include_icp_segment:
+        backend.write_column(icp_col_idx, [s.get("icp_segment", "") for s in scores])
     backend.write_column(reasoning_col_idx, [s["reasoning"] for s in scores])
 
     p0 = sum(1 for s in scores if s["priority"] == "P0")
@@ -419,7 +432,8 @@ def main() -> None:
     # ------------------------------------------------------------------
     # Step 5: Find competitors for each filtered lead's company
     # ------------------------------------------------------------------
-    if not args.with_competitors:
+    include_competitors = args.with_competitors or bool(mapping.get("competitors"))
+    if not include_competitors:
         print("\n--- Step 5: Skipping competitor lookup (default — pass --with-competitors to enable) ---")
     else:
         print(f"\n--- Step 5: Finding competitors for {len(outreach_indices)} leads ---")

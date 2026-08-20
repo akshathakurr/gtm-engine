@@ -99,6 +99,11 @@ def find_missing_lead_data(
 
 Use empty string for fields you can't confidently determine.
 
+Title formatting: use standard abbreviations for C-suite / common titles instead of
+spelling them out — "CEO" not "Chief Executive Officer", "CTO" not "Chief Technical
+Officer", "COO" not "Chief Operating Officer", "CFO" not "Chief Financial Officer",
+"VP Sales" not "Vice President of Sales". Spell out only genuinely uncommon titles.
+
 Snippets:
 {chr(10).join(snippets[:10])}
 
@@ -197,7 +202,7 @@ def enrich_company(
     Enrich a company by web-searching and extracting the requested fields.
     `fields` is a list of {"key", "label", "desc"} dicts. Returns dict keyed by snake_case `key`.
     """
-    empty = {f["key"]: "" for f in fields}
+    empty = {f["key"]: "NA" for f in fields}
     try:
         # Cost control: 3 results is plenty for firmographics (homepage +
         # LinkedIn + a Crunchbase/Wikipedia-style page) and keeps the Claude
@@ -232,7 +237,7 @@ def enrich_company(
 Research:
 {chr(10).join(snippets[:6])}
 
-Required fields (use empty string if not found):
+Required fields (use "NA" if not found):
 {field_block}
 
 Return a JSON object with exactly these keys: {list(empty.keys())}.
@@ -243,12 +248,15 @@ Formatting rules — apply strictly:
 - company_description: one short, to-the-point line about what the company does
 - employee_count: integer or range as stated (e.g. "215", "5,500+")
 - founded_year: 4-digit year only (e.g. "2014")
-- total_funding: absolute number with capital M for millions or B for billions, no "~", no "$".
-  Examples: "110M", "4M", "164.12M", "1.2B". If not found use "".
-- est_revenue: same format ("15M", "1.4M"). All values are USD — never include "$".
-  If you cannot find a credible figure, return "Not available".
+- total_funding: absolute number with capital M for millions or B for billions, ONE decimal
+  place maximum, no "~", no "$", no comma-separated raw dollar amounts.
+  Examples: "110.0M", "4.0M", "164.1M", "1.2B". Amounts under $1M still use M
+  (e.g. $342,222 -> "0.3M"). If not found, use "NA".
+- est_revenue: same format and same one-decimal rule ("15.0M", "1.4M", "0.3M"). All values
+  are USD — never include "$". If you cannot find a credible figure, return "NA".
 - hq: city name only — no state, no country, no street.
   Examples: "Oakland", "Boston", "San Francisco". If only the country is known, return that.
+  If truly unknown, return "NA".
 
 Return only valid JSON, no explanation."""
 

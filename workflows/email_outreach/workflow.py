@@ -110,6 +110,9 @@ def main() -> None:
     parser.add_argument("--with-competitors", action="store_true",
                         help="Include the 'competitors' enrichment field / Competitors column. "
                              "Skipped by default; only produced when competitor analysis is wanted.")
+    parser.add_argument("--with-icp-segment", action="store_true",
+                        help="Include the 'ICP Segment' column. Skipped by default; only produced "
+                             "when the sheet already has the column or the user explicitly wants it.")
     args = parser.parse_args()
 
     client = make_brain_client()
@@ -121,11 +124,9 @@ def main() -> None:
         enrich_fields = [f for f in ENRICH_FIELDS if f["key"] in wanted]
     else:
         enrich_fields = list(ENRICH_FIELDS)
-        # Competitors is opt-in: drop it from the default field set (and its
-        # column) unless explicitly requested. Costs nothing extra either way
-        # (it rides the enrichment call), but we don't produce it unasked.
-        if not args.with_competitors:
-            enrich_fields = [f for f in enrich_fields if f["key"] != "competitors"]
+        # Competitors opt-out (unless the sheet already has the column — see
+        # the mapping-aware check right after columns are detected below) is
+        # applied further down, once `mapping` exists.
 
     print("\nLoading ICP context from context/...")
     icp_context = load_icp()
@@ -189,6 +190,18 @@ def main() -> None:
         print("ERROR: Could not detect a Company column. Company is the only required input.")
         print(f"Headers: {headers}")
         return
+
+    # Competitors is opt-in: drop it from the default field set (and its
+    # column) unless explicitly requested (--with-competitors, or named in
+    # --enrich-fields), or the sheet already has the column (kept there on
+    # purpose). Costs nothing extra either way (it rides the enrichment call),
+    # but we don't produce a column the user never asked for or deleted.
+    if (
+        not args.skip_enrich
+        and not args.enrich_fields
+        and not (args.with_competitors or mapping.get("competitors"))
+    ):
+        enrich_fields = [f for f in enrich_fields if f["key"] != "competitors"]
 
     leads: List[Dict] = []
     for row in data_rows:
@@ -314,10 +327,19 @@ def main() -> None:
     # Step 2: Score (ICP Segment + Priority + Reasoning)
     # ------------------------------------------------------------------
     print("\n--- Step 2: Scoring companies (ICP Segment + Priority) ---")
-    icp_col_idx       = get_or_create_col(headers, mapping, "icp_segment", "ICP Segment")
+    # ICP Segment is opt-in — only create/write the column if the sheet already
+    # has it (the user kept it there on purpose) or --with-icp-segment was
+    # passed. Otherwise a column the user deliberately deleted keeps getting
+    # silently re-added every run.
+    include_icp_segment = args.with_icp_segment or bool(mapping.get("icp_segment"))
+    icp_col_idx = (
+        get_or_create_col(headers, mapping, "icp_segment", "ICP Segment")
+        if include_icp_segment else None
+    )
     priority_col_idx  = get_or_create_col(headers, mapping, "priority",    "Priority")
     reasoning_col_idx = get_or_create_col(headers, mapping, "reasoning",   "Reasoning")
-    backend.write_header(icp_col_idx,       headers[icp_col_idx])
+    if include_icp_segment:
+        backend.write_header(icp_col_idx, headers[icp_col_idx])
     backend.write_header(priority_col_idx,  headers[priority_col_idx])
     backend.write_header(reasoning_col_idx, headers[reasoning_col_idx])
 
@@ -331,7 +353,7 @@ def main() -> None:
         if existing.strip():
             scores[i] = {
                 "priority":    existing,
-                "icp_segment": cell(data_rows[i], icp_col_idx),
+                "icp_segment": cell(data_rows[i], icp_col_idx) if icp_col_idx is not None else "",
                 "reasoning":   cell(data_rows[i], reasoning_col_idx),
             }
         else:
@@ -344,7 +366,8 @@ def main() -> None:
         for i, s in zip(to_score_idx, fresh):
             scores[i] = s
 
-    backend.write_column(icp_col_idx,       [s.get("icp_segment", "") for s in scores])
+    if include_icp_segment:
+        backend.write_column(icp_col_idx, [s.get("icp_segment", "") for s in scores])
     backend.write_column(priority_col_idx,  [s["priority"] for s in scores])
     backend.write_column(reasoning_col_idx, [s["reasoning"] for s in scores])
 

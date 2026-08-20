@@ -41,13 +41,23 @@ if you'd rather run things directly, every workflow has its own README with the 
 
 ## what you'll need
 
-- **anthropic api key** — claude does the thinking. ~$1–5 per workflow run depending on which one. [console.anthropic.com](https://console.anthropic.com)
+- **an AI brain — a claude subscription, a chatgpt plan, or an anthropic api key.** the thinking (scoring, classifying, copywriting) runs on whichever you have; no api key required if you're on a subscription. gtm-engine picks the right one for where you opened it: inside claude code / the claude desktop app it uses your claude plan, inside the codex app (full-access mode) it uses your chatgpt plan, and from a plain terminal it uses your api key. override anytime with `GTM_BRAIN=claude|codex|api`.
+- **anthropic api key** *(only if not using a subscription)* — ~$1–5 per workflow run depending on which one. [console.anthropic.com](https://console.anthropic.com)
 - **apify token** — for LinkedIn / Twitter / review scraping. pay-per-run, usually $0.50–$3 per workflow. [apify.com](https://apify.com)
 - **web-search key — exa *or* parallel** *(optional)* — for web research. needed by competitor analysis, blog builder, and both outreach workflows. either one works; set both and exa is primary with parallel as automatic backup. [exa.ai](https://exa.ai) / [platform.parallel.ai](https://platform.parallel.ai)
 - **firecrawl key** *(optional)* — for competitor analysis only. reads JS-heavy pages (pricing, case studies) the basic scraper can't. free tier (1,000 pages/mo) is plenty; without it, those pages just fall back to the basic scraper. [firecrawl.dev](https://firecrawl.dev)
 - **google account** *(optional)* — most workflows can write to a google sheet. csv mode works if you'd rather not.
 
 cost-per-run is in each workflow's README.
+
+## run it on your subscription instead of api credits
+
+the whole engine can think on the plan you already pay for:
+
+- **claude pro/max** — one-time: run `claude setup-token`, sign in with the account that holds the plan, and paste the printed token into `.env` as `CLAUDE_CODE_OAUTH_TOKEN=…`. workflows launched with `GTM_BRAIN=claude` (or from inside claude code, where it's the default) bill your plan, not the api.
+- **chatgpt plus/pro** — one-time: run `codex login` and sign in with your chatgpt account. workflows launched with `GTM_BRAIN=codex` (or from inside the codex app in full-access mode, where it's the default) bill your chatgpt plan.
+
+scrapers (apify / exa / parallel / apollo) still use their own keys — subscriptions only replace the anthropic api spend. guardrails are built in: if a run would silently bill the wrong thing (a stray api key, an org login with no subscription, a sandboxed codex session), it stops and tells you the exact fix.
 
 ## why this exists
 

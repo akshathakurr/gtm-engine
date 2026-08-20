@@ -142,13 +142,15 @@ not, it creates new columns at the end of the sheet using these default names:
 - **Company URL:** canonical homepage (e.g. `https://acme.com`)
 - **Company LinkedIn URL:** full LinkedIn page (`https://www.linkedin.com/company/...`)
 - **Company Description:** one short, to-the-point line about what the company does
-- **Total Funding:** absolute number, capital `M` for millions or `B` for billions, **no `~`, no `$`**.
-  Examples: `110M`, `4M`, `164.12M`, `1.2B`
-- **Est Revenue:** same format. All values USD — never include `$`.
-  If not credibly knowable: `Not available`
+- **Total Funding:** absolute number, capital `M` for millions or `B` for billions, **one
+  decimal place maximum, no `~`, no `$`, no comma-separated raw dollar amounts**.
+  Examples: `110.0M`, `4.0M`, `164.1M`, `1.2B`. Amounts under $1M still use `M`
+  (`$342,222` → `0.3M`).
+- **Est Revenue:** same format and same one-decimal rule. All values USD — never include `$`.
 - **HQ:** city name only (`Oakland`, `Boston`, `San Francisco`). No state, no country, no street.
 - **Founded Year:** 4-digit year (`2014`)
 - **Employee Count:** integer or range as stated (`215`, `5,500+`)
+- **Not found:** every enrichment field uses `NA` (not blank, not `Not available`, not `N/A`) when the value can't be found.
 
 ---
 
@@ -194,7 +196,8 @@ python -m workflows.linkedin_outreach.workflow [options]
 | `--include-p1` | Also include P1 leads in the outreach batch. |
 | `--include-p2` | Also include P2 leads in the outreach batch. |
 | `--skip-enrich` | Skip Step 2. |
-| `--with-competitors` | **Opt in** to competitor lookup (Step 5). Skipped by default — one extra web search per company. |
+| `--with-competitors` | **Opt in** to competitor lookup (Step 5). Skipped by default — one extra web search per company. Not needed if the sheet already has a "Competitors" column; it's auto-detected and filled either way. |
+| `--with-icp-segment` | **Opt in** to the ICP Segment column. Skipped by default. Not needed if the sheet already has an "ICP Segment" column; it's auto-detected and filled either way. |
 | `--skip-posts` | Skip Step 6. |
 | `--skip-small-talk` | Skip Step 7. |
 | `--skip-copy` | Skip Step 9. |
