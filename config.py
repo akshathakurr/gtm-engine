@@ -46,7 +46,13 @@ print(f"[context] using {os.path.relpath(CONTEXT_DIR, REPO_ROOT)}"
       f"{' (default; set GTM_CONTEXT_DIR to override)' if not _context_override else ''}",
       file=sys.stderr)
 
-CLAUDE_MODEL = os.environ.get("GTM_MODEL") or "claude-sonnet-4-6"
+CLAUDE_MODEL = os.environ.get("GTM_MODEL") or "claude-sonnet-5"
+
+# Default reasoning effort for each subscription CLI backend. Both are
+# overridable per-run without touching code.
+GTM_CLAUDE_EFFORT = os.environ.get("GTM_CLAUDE_EFFORT") or "high"
+GTM_CODEX_MODEL_DEFAULT = os.environ.get("GTM_CODEX_MODEL") or "gpt-5.6-luna"
+GTM_CODEX_EFFORT = os.environ.get("GTM_CODEX_EFFORT") or "xhigh"
 
 APIFY_TOKEN = os.getenv("APIFY_API_TOKEN")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
@@ -273,6 +279,9 @@ def _run_claude_cli(system: str, prompt: str, model: str, timeout: int = 300) ->
     cmd = ["claude", "-p", "--output-format", "json"]
     if model:
         cmd += ["--model", model]
+    # Default to high reasoning effort on the subscription — override with
+    # GTM_CLAUDE_EFFORT (low/medium/high/xhigh/max) if a run needs less.
+    cmd += ["--effort", GTM_CLAUDE_EFFORT]
     # Force subscription/OAuth auth: never let an env API key be the source.
     env = dict(os.environ)
     env.pop("ANTHROPIC_API_KEY", None)
@@ -359,8 +368,11 @@ def _run_codex_cli(system: str, prompt: str, model: str, timeout: int = 300) -> 
 
     The incoming `model` is an Anthropic id (CLAUDE_MODEL) meaningless to codex —
     passing it as `-m` makes codex exit 1 ("model metadata not found"). So we
-    IGNORE it and let codex use your ChatGPT plan's default model, unless you
-    explicitly pin an OpenAI model via GTM_CODEX_MODEL."""
+    IGNORE it and default to GTM_CODEX_MODEL_DEFAULT (gpt-5.6-luna unless
+    overridden via GTM_CODEX_MODEL) at GTM_CODEX_EFFORT reasoning effort (xhigh
+    unless overridden via GTM_CODEX_EFFORT), rather than whatever this machine's
+    global ~/.codex/config.toml happens to default to — so gtm-engine's model
+    choice doesn't silently drift with unrelated Codex config changes."""
     full = f"{system}\n\n{prompt}" if system else prompt
     base = os.getenv("GTM_CODEX_CMD", "codex exec").split()
     out_file = tempfile.NamedTemporaryFile("r", suffix=".txt", delete=False, encoding="utf-8")
@@ -369,10 +381,9 @@ def _run_codex_cli(system: str, prompt: str, model: str, timeout: int = 300) -> 
         "--skip-git-repo-check",
         "--sandbox", "read-only",
         "--output-last-message", out_file.name,
+        "-m", GTM_CODEX_MODEL_DEFAULT,
+        "-c", f"model_reasoning_effort={GTM_CODEX_EFFORT}",
     ]
-    codex_model = os.getenv("GTM_CODEX_MODEL")
-    if codex_model:
-        cmd += ["-m", codex_model]
     cmd += [full]
     try:
         proc = subprocess.run(
