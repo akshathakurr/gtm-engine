@@ -131,7 +131,11 @@ Return only valid JSON, no explanation."""
             model=CLAUDE_MODEL, temperature=0, max_tokens=600,
             messages=[{"role": "user", "content": prompt}],
         )
-        return json.loads(_strip_json_fence(resp.content[0].text))
+        parsed = json.loads(_strip_json_fence(resp.content[0].text))
+        # Claude sometimes returns a bare JSON number (e.g. employee_count: 215)
+        # instead of a quoted string. Sheet/CSV cells are always strings
+        # downstream (e.g. `.strip()` in _all_filled) — coerce here once.
+        return {k: ("" if v is None else str(v)) for k, v in parsed.items()}
     except Exception as e:
         print(f"    LLM extraction failed for {company_name}: {e}")
         return empty
