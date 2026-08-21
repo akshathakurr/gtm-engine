@@ -47,7 +47,8 @@ except Exception:
 # backend is written sequentially on the main thread afterwards, so it is never
 # touched concurrently. Throttled services use a rate limiter that spaces call
 # *starts* by the same intervals the old serial sleeps used.
-ENRICH_CONCURRENCY = 6        # Claude/Exa per-lead steps
+import os as _os
+ENRICH_CONCURRENCY = int(_os.environ.get("GTM_ENRICH_CONCURRENCY") or 6)  # Claude/Exa per-lead steps; lower it (e.g. 3) to ease search-provider throttling
 APOLLO_MIN_INTERVAL = 1       # seconds between Apollo email lookups (step 6)
 APOLLO_CONCURRENCY = 3
 POSTS_MIN_INTERVAL = 5        # seconds between profile-posts runs (step 8)
@@ -71,13 +72,13 @@ def enrich_company(
     empty = {f["key"]: "NA" for f in fields}
     try:
         search_result = search_web(
-            query=(f"{company_name} company official website linkedin employees revenue funding "
-                   f"headquarters founded year competitors"),
+            query=(f"{company_name} company official website linkedin industry sector employees "
+                   f"revenue funding headquarters founded year competitors"),
             num_results=3,
             summary_question=(
                 f"What is {company_name}'s official website URL, LinkedIn company page URL, "
-                f"employee count, estimated annual revenue, year founded, total funding raised, "
-                f"headquarters location, and 2-3 immediate direct competitors?"
+                f"industry / sector, employee count, estimated annual revenue, year founded, "
+                f"total funding raised, headquarters location, and 2-3 immediate direct competitors?"
             ),
         )
     except Exception as e:
@@ -109,6 +110,9 @@ Formatting rules — apply strictly:
 - company_url: canonical homepage URL (e.g. https://acme.com)
 - company_linkedin: full LinkedIn company page URL (https://www.linkedin.com/company/...)
 - company_description: one short, to-the-point line about what the company does
+- industry: ONE word for the company's sector (e.g. Healthcare, Fintech, SaaS,
+  Manufacturing, Construction, Logistics, Ecommerce, Education, Insurance, Legal).
+  Exactly one word, no slashes or commas. If truly unclear, use "NA".
 - employee_count: integer or range as stated (e.g. "215", "5,500+")
 - founded_year: 4-digit year only (e.g. "2014")
 - total_funding: absolute number with capital M for millions or B for billions, ONE decimal

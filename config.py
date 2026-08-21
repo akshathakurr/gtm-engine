@@ -278,6 +278,13 @@ def _claude_preflight() -> None:
 
 def _run_claude_cli(system: str, prompt: str, model: str, timeout: int = 300) -> str:
     cmd = ["claude", "-p", "--output-format", "json"]
+    # The brain only does text scoring/classification/copywriting — it needs no
+    # MCP tools. Without this, every `claude -p` call boots up ALL globally
+    # configured MCP servers (e.g. exa-mcp-server via `npm exec`); a fan-out
+    # enrichment run then spawns hundreds of them, which never get cleaned up and
+    # can grind the machine to a halt. --strict-mcp-config with no --mcp-config
+    # loads zero MCP servers, keeping each call to a single lightweight process.
+    cmd += ["--strict-mcp-config"]
     if model:
         cmd += ["--model", model]
     # Default to high reasoning effort on the subscription — override with
@@ -452,6 +459,86 @@ class _CliBrainClient:
         self.messages = _CliMessages(backend)
 
 
+def _text_block_first(resp):
+    """Ensure ``resp.content[0].text`` works on reasoning models.
+
+    Sonnet 5 (and other thinking models) can return a ThinkingBlock as the FIRST
+    content block, so the ~35 call sites doing ``resp.content[0].text`` crash with
+    "'ThinkingBlock' object has no attribute 'text'" and the caller falls back to
+    all-"NA". Reorder in place so a real text block leads; harmless when the first
+    block is already text."""
+    try:
+        blocks = list(resp.content)
+        if blocks and getattr(blocks[0], "type", None) != "text":
+            texts = [b for b in blocks if getattr(b, "type", None) == "text"]
+            if texts:
+                resp.content = texts + [b for b in blocks if getattr(b, "type", None) != "text"]
+    except Exception:
+        pass
+    return resp
+
+
+class _ApiMessages:
+    """Wrap the SDK's ``messages`` so calls survive params a model has dropped.
+
+    Newer models reject params older ones required — e.g. Sonnet 5 returns a 400
+    "`temperature` is deprecated for this model." The ~35 call sites all pass
+    ``temperature=0`` (for determinism on older models), so without this a single
+    unsupported param would fail EVERY call and every enrichment would come back
+    "NA". We learn the offending param from the 400, retry the call without it,
+    and drop it proactively for the rest of the run — so it costs at most one
+    failed round-trip per (model, param), not one per call. Legacy models that
+    still accept ``temperature`` are untouched."""
+
+    def __init__(self, real):
+        import threading
+        self._real = real
+        self._drop: dict = {}          # model -> set(param names to strip)
+        self._lock = threading.Lock()
+
+    def create(self, **kwargs):
+        import re
+        import anthropic
+        model = kwargs.get("model", "")
+        # Sonnet 5 (and other reasoning models) run ADAPTIVE thinking by default on
+        # the API. Every workflow call wants deterministic structured JSON (the old
+        # code passed temperature=0), not reasoning — and with a modest max_tokens
+        # the thinking budget starves the actual answer, so responses come back as a
+        # lone ThinkingBlock or truncated JSON and the caller falls back to all-"NA".
+        # Disable thinking unless a caller explicitly asked for it. If a model
+        # rejects the param, the unsupported-param retry below strips it.
+        kwargs.setdefault("thinking", {"type": "disabled"})
+        with self._lock:
+            for p in list(self._drop.get(model, ())):
+                kwargs.pop(p, None)
+        try:
+            return _text_block_first(self._real.create(**kwargs))
+        except anthropic.BadRequestError as e:
+            msg = str(getattr(e, "message", "") or e).lower()
+            m = re.search(r"`([a-zA-Z_]+)`", str(getattr(e, "message", "") or e))
+            bad = m.group(1) if m else None
+            unsupported = any(w in msg for w in ("deprecat", "unsupported", "not supported", "unexpected"))
+            if bad and bad in kwargs and unsupported:
+                with self._lock:
+                    self._drop.setdefault(model, set()).add(bad)
+                kwargs.pop(bad, None)
+                print(f"[GTM_BRAIN=api] '{bad}' not accepted by {model}; retrying "
+                      f"without it (dropped for the rest of this run).", file=sys.stderr)
+                return _text_block_first(self._real.create(**kwargs))
+            raise
+
+
+class _ApiBrainClient:
+    """anthropic.Anthropic() wrapped so deprecated params don't fail every call."""
+
+    def __init__(self, real):
+        self._real = real
+        self.messages = _ApiMessages(real.messages)
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+
 def _api_client():
     """The real Anthropic SDK client, with bounded per-request timeouts.
 
@@ -459,12 +546,15 @@ def _api_client():
     worker thread for up to 10 minutes before recovering — across a concurrent
     per-company fan-out that reads as the whole run wedging. A tight timeout
     plus a few retries (the SDK backs off between them) turns a hung socket
-    into a fast retry."""
+    into a fast retry. Wrapped in _ApiBrainClient so a param a newer model has
+    deprecated (e.g. Sonnet 5 + temperature) degrades gracefully instead of
+    failing every call."""
     import anthropic
-    return anthropic.Anthropic(
+    real = anthropic.Anthropic(
         timeout=float(os.environ.get("ANTHROPIC_TIMEOUT") or 60),
         max_retries=int(os.environ.get("ANTHROPIC_MAX_RETRIES") or 4),
     )
+    return _ApiBrainClient(real)
 
 
 def _autodetect_fallback(mode: str, preflight_error: RuntimeError):

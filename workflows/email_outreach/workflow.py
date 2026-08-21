@@ -56,6 +56,7 @@ ENRICH_FIELDS: List[Dict[str, str]] = [
     {"key": "company_url",         "label": "Company URL",          "desc": "Company website URL (homepage)"},
     {"key": "company_linkedin",    "label": "Company LinkedIn URL", "desc": "Company LinkedIn page URL"},
     {"key": "company_description", "label": "Company Description",  "desc": "One-line description of what the company does"},
+    {"key": "industry",            "label": "Industry",             "desc": "ONE-word industry / sector (e.g. Healthcare, Fintech, SaaS, Manufacturing, Construction)"},
     {"key": "employee_count",      "label": "Employee Count",       "desc": "Headcount / number of employees"},
     {"key": "est_revenue",         "label": "Est Revenue",          "desc": "Estimated annual revenue"},
     {"key": "founded_year",        "label": "Founded Year",         "desc": "Year company was founded"},
@@ -101,6 +102,8 @@ def main() -> None:
     parser.add_argument("--include-p2", action="store_true",
                         help="Also include P2 leads in outreach batch")
     parser.add_argument("--skip-enrich",     action="store_true")
+    parser.add_argument("--skip-persona",    action="store_true",
+                        help="Skip buyer-persona classification (Step 5) — no persona column written")
     parser.add_argument("--skip-emails",     action="store_true",
                         help="Skip Apollo email lookup (Step 6)")
     parser.add_argument("--skip-small-talk", action="store_true")
@@ -167,6 +170,7 @@ def main() -> None:
             "company_url":         "Company website URL (homepage)",
             "company_linkedin":    "Company LinkedIn page URL",
             "company_description": "One-line description of what the company does",
+            "industry":            "One-word industry / sector the company operates in",
             "employee_count":      "Headcount / number of employees",
             "est_revenue":         "Estimated annual revenue",
             "founded_year":        "Year company was founded",
@@ -505,47 +509,51 @@ def main() -> None:
     # ------------------------------------------------------------------
     # Step 5: Classify buyer persona — only for P0 with a buyer
     # ------------------------------------------------------------------
-    print("\n--- Step 5: Classifying buyer personas ---")
-    if args.add_persona:
-        print(f"  + Adding for this run: {args.add_persona}")
-    if args.remove_persona:
-        print(f"  - Removing for this run: {args.remove_persona}")
-
-    buyer_col_idx = get_or_create_col(headers, mapping, "buyer_persona", "Buyer Persona Match")
-    backend.write_header(buyer_col_idx, headers[buyer_col_idx])
-
-    # Skip-if-already-filled: reuse any persona cell that's already populated so a
-    # restart never re-pays to re-classify. Only leads with a name and a blank
-    # persona cell go to Claude.
-    persona_inputs = []
-    for i in outreach_indices:
-        if not (leads[i].get("name") or "").strip():
-            continue
-        existing = cell(data_rows[i], buyer_col_idx) if buyer_col_idx < len(data_rows[i]) else ""
-        if existing.strip():
-            classifications[i] = existing
-        else:
-            persona_inputs.append((i, leads[i]))
-
-    if persona_inputs:
-        if classifications:
-            print(f"  {len(classifications)} already classified; classifying {len(persona_inputs)} remaining.")
-        sub_leads = [l for _, l in persona_inputs]
-        sub_cls   = classify_personas(
-            sub_leads, icp_context, args.add_persona, args.remove_persona, client,
-        )
-        for (i, _), c in zip(persona_inputs, sub_cls):
-            classifications[i] = c
-            backend.write_cell(i + 2, buyer_col_idx, c)
-
-    if classifications:
-        dm_count    = sum(1 for c in classifications.values() if c == "Decision Maker")
-        champ_count = sum(1 for c in classifications.values() if c == "Champion")
-        ndm_count   = sum(1 for c in classifications.values() if c == "Non Decision Maker")
-        print(f"  DMs: {dm_count} | Champions: {champ_count} | Non DMs: {ndm_count}")
-    else:
-        print("  No P0 leads with a buyer to classify — skipping.")
+    if args.skip_persona:
+        print("\n--- Step 5: Skipping buyer persona classification (--skip-persona) ---")
         dm_count = champ_count = ndm_count = 0
+    else:
+        print("\n--- Step 5: Classifying buyer personas ---")
+        if args.add_persona:
+            print(f"  + Adding for this run: {args.add_persona}")
+        if args.remove_persona:
+            print(f"  - Removing for this run: {args.remove_persona}")
+
+        buyer_col_idx = get_or_create_col(headers, mapping, "buyer_persona", "Buyer Persona Match")
+        backend.write_header(buyer_col_idx, headers[buyer_col_idx])
+
+        # Skip-if-already-filled: reuse any persona cell that's already populated so a
+        # restart never re-pays to re-classify. Only leads with a name and a blank
+        # persona cell go to Claude.
+        persona_inputs = []
+        for i in outreach_indices:
+            if not (leads[i].get("name") or "").strip():
+                continue
+            existing = cell(data_rows[i], buyer_col_idx) if buyer_col_idx < len(data_rows[i]) else ""
+            if existing.strip():
+                classifications[i] = existing
+            else:
+                persona_inputs.append((i, leads[i]))
+
+        if persona_inputs:
+            if classifications:
+                print(f"  {len(classifications)} already classified; classifying {len(persona_inputs)} remaining.")
+            sub_leads = [l for _, l in persona_inputs]
+            sub_cls   = classify_personas(
+                sub_leads, icp_context, args.add_persona, args.remove_persona, client,
+            )
+            for (i, _), c in zip(persona_inputs, sub_cls):
+                classifications[i] = c
+                backend.write_cell(i + 2, buyer_col_idx, c)
+
+        if classifications:
+            dm_count    = sum(1 for c in classifications.values() if c == "Decision Maker")
+            champ_count = sum(1 for c in classifications.values() if c == "Champion")
+            ndm_count   = sum(1 for c in classifications.values() if c == "Non Decision Maker")
+            print(f"  DMs: {dm_count} | Champions: {champ_count} | Non DMs: {ndm_count}")
+        else:
+            print("  No P0 leads with a buyer to classify — skipping.")
+            dm_count = champ_count = ndm_count = 0
 
     # ------------------------------------------------------------------
     # Step 6: Find emails via Apollo
