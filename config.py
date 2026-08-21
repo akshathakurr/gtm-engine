@@ -14,6 +14,7 @@ Repo layout:
 
 import os
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -377,9 +378,16 @@ def _run_codex_cli(system: str, prompt: str, model: str, timeout: int = 300) -> 
     base = os.getenv("GTM_CODEX_CMD", "codex exec").split()
     out_file = tempfile.NamedTemporaryFile("r", suffix=".txt", delete=False, encoding="utf-8")
     out_file.close()
+    # Run in an empty scratch dir, not the repo root: with no -C, codex's
+    # read-only sandbox still has read access to everything in the repo (git
+    # config, CLAUDE.md, README, .env), which it can and will pull unprompted
+    # facts from to fill any gap the prompt leaves blank. An empty tempdir
+    # leaves nothing in reach beyond the prompt itself.
+    scratch_dir = tempfile.mkdtemp(prefix="gtm-codex-brain-")
     cmd = base + [
         "--skip-git-repo-check",
         "--sandbox", "read-only",
+        "-C", scratch_dir,
         "--output-last-message", out_file.name,
         "-m", GTM_CODEX_MODEL_DEFAULT,
         "-c", f"model_reasoning_effort={GTM_CODEX_EFFORT}",
@@ -419,6 +427,7 @@ def _run_codex_cli(system: str, prompt: str, model: str, timeout: int = 300) -> 
             os.unlink(out_file.name)
         except OSError:
             pass
+        shutil.rmtree(scratch_dir, ignore_errors=True)
 
 
 class _CliMessages:

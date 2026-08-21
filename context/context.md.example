@@ -44,6 +44,22 @@ gitignored so your real positioning never gets committed.
 
 ---
 
+## Sender Identity
+
+**Question:** Who's the copy signed as, if anyone? Give a name and role, say
+you want it signed generically (e.g. "The Acme team"), or say you want no
+personal sign-off at all.
+
+**Used by:** email_outreach, linkedin_outreach
+
+**Example answer:**
+> No personal sign-off, just end the message naturally without a name.
+
+### Answer
+<!-- agent writes here -->
+
+---
+
 ## Who it's for
 
 **Question:** In one or two sentences, who is this product for?

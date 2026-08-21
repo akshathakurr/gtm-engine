@@ -21,8 +21,21 @@ MAX_POSTS_IN_PROMPT = 5
 MAX_POST_CHARS = 500
 
 
+_ANTI_INVENTION_CLAUSE = (
+    "## Ground rules\n"
+    "Use ONLY the sender/lead information explicitly provided below and in the "
+    "lead data. Never invent, assume, or infer a name, fact, title, or detail "
+    "that isn't given, including your own sender identity. If a sender name "
+    "isn't provided, do not sign off with an invented name, role, or company "
+    "signature, just end the message naturally without a personal signature."
+)
+
+
 def _sender_block(icp_context: str) -> str:
-    return f"## Sender Context\n{icp_context.strip() or '(none provided)'}"
+    return (
+        f"{_ANTI_INVENTION_CLAUSE}\n\n"
+        f"## Sender Context\n{icp_context.strip() or '(none provided)'}"
+    )
 
 
 def build_system(channel_system: str, icp_context: str):
