@@ -53,6 +53,8 @@ APOLLO_MIN_INTERVAL = 1       # seconds between Apollo email lookups (step 6)
 APOLLO_CONCURRENCY = 3
 POSTS_MIN_INTERVAL = 5        # seconds between profile-posts runs (step 8)
 POSTS_CONCURRENCY = 3
+MAX_RELEVANT_POSTS = 4        # keep only the top N most-relevant posts per lead (step 8) — a
+                             # cold email references one, so a wall of links is noise
 # Score/classify run one LLM call per chunk of companies (not one call for the
 # whole sheet). Chunking prevents (a) JSON truncation on large sheets — 1000
 # rows overrun max_tokens and later rows come back blank — and (b) batch-context
@@ -439,7 +441,9 @@ def scrape_and_filter_posts(
     days_back: int,
     client: anthropic.Anthropic,
 ) -> Dict:
-    empty = {"urls": [], "posts_data": []}
+    # raw_count = how many posts existed in the window BEFORE relevance filtering,
+    # so callers can tell "no activity" (0) from "posted but nothing relevant" (>0).
+    empty = {"urls": [], "posts_data": [], "raw_count": 0}
 
     if not profile_url:
         return empty
@@ -471,13 +475,14 @@ ICP Context (pay attention to the 'LinkedIn Post Relevance Filter' section if pr
 Posts (newest first):
 {posts_block}
 
-Task: Return the 1-based indices of posts that match the relevance criteria in the ICP.
-- If the ICP has no post criteria defined, return all post indices (assume all are relevant).
-- Prefer posts where the person shares opinions, challenges, or experiences related to our product area.
-- Exclude purely promotional reposts, congratulations posts, or generic announcements.
+Task: Return the 1-based indices of the {MAX_RELEVANT_POSTS} MOST relevant posts for outreach, ranked best-first (most relevant index first).
+- Return AT MOST {MAX_RELEVANT_POSTS} indices — pick only the strongest; fewer is fine, never more.
+- Strongly prefer posts where the person shares their own opinion, challenge, experience, or point of view related to our product area (something a cold email could naturally open on). Recency is a tie-breaker.
+- Exclude purely promotional reposts, congratulations posts, generic announcements, and reshared content with no personal take.
+- If the ICP defines a 'LinkedIn Post Relevance Filter', apply it; otherwise use the judgement above.
 
-Return a JSON array of integers: [1, 3, 4]
-If none match, return: []
+Return a JSON array of up to {MAX_RELEVANT_POSTS} integers, best-first: [3, 1, 7]
+If none are a good fit, return: []
 Return only valid JSON, no explanation."""
 
     try:
@@ -490,7 +495,12 @@ Return only valid JSON, no explanation."""
         print(f"    Post filtering failed: {e}")
         matching = list(range(1, len(posts) + 1))
 
-    valid = [i for i in matching if isinstance(i, int) and 1 <= i <= len(posts)]
+    # Preserve the model's best-first order, drop dupes, and keep only the top N —
+    # a cold email references one post, so more than a handful is just noise.
+    seen: set = set()
+    valid = [i for i in matching
+             if isinstance(i, int) and 1 <= i <= len(posts) and not (i in seen or seen.add(i))]
+    valid = valid[:MAX_RELEVANT_POSTS]
     matched_posts = [posts[i - 1] for i in valid]
     return {
         "urls": [p["url"] for p in matched_posts if p.get("url")],
@@ -498,6 +508,7 @@ Return only valid JSON, no explanation."""
             {"url": p.get("url", ""), "text": p.get("text", ""), "posted_at": p.get("posted_at", "")}
             for p in matched_posts
         ],
+        "raw_count": len(posts),
     }
 
 

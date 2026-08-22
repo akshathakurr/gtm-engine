@@ -62,7 +62,11 @@ _GWS_NON_RETRIABLE = ("exceeds grid limits", "Unable to parse range", "PERMISSIO
                       "invalid_grant", "not found")
 
 
-def _gws_run_with_retry(cmd: List[str], attempts: int = 4) -> "subprocess.CompletedProcess":
+def _gws_run_with_retry(cmd: List[str], attempts: int = 6) -> "subprocess.CompletedProcess":
+    # Sheets rate limits are per-minute, so a transient 429/5xx window can last
+    # ~30-60s. Ride it out: 2,4,8,16,32s (~62s total) before giving up, so one
+    # blip during a long per-cell write loop doesn't kill a run that has already
+    # done all its paid compute.
     for attempt in range(1, attempts + 1):
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0:
@@ -71,7 +75,7 @@ def _gws_run_with_retry(cmd: List[str], attempts: int = 4) -> "subprocess.Comple
         if attempt == attempts or any(s.lower() in err.lower() for s in _GWS_NON_RETRIABLE):
             raise subprocess.CalledProcessError(result.returncode, cmd,
                                                 output=result.stdout, stderr=result.stderr)
-        time.sleep(2 ** attempt)  # 2s, 4s, 8s
+        time.sleep(2 ** attempt)  # 2s, 4s, 8s, 16s, 32s
     raise RuntimeError("unreachable")
 
 

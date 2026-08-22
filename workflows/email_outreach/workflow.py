@@ -42,7 +42,7 @@ from workflows._common import (
 )
 from workflows.email_outreach.steps import (
     ENRICH_CONCURRENCY, APOLLO_MIN_INTERVAL, APOLLO_CONCURRENCY,
-    POSTS_MIN_INTERVAL, POSTS_CONCURRENCY,
+    POSTS_MIN_INTERVAL, POSTS_CONCURRENCY, MAX_RELEVANT_POSTS,
     _SMALL_TALK_AVAILABLE, _PERSONALISATION_AVAILABLE, _EMAIL_COPY_AVAILABLE,
     enrich_company, score_companies, find_buyer_at_company, find_linkedin_url,
     classify_personas, find_email, scrape_small_talk, scrape_and_filter_posts,
@@ -64,6 +64,11 @@ ENRICH_FIELDS: List[Dict[str, str]] = [
     {"key": "hq",                  "label": "HQ",                   "desc": "HQ city"},
     {"key": "competitors",         "label": "Competitors",          "desc": "2-3 immediate direct competitors, comma-separated"},
 ]
+
+# Only the LinkedIn Posts column gets an explicit placeholder when empty (so a
+# blank there isn't mistaken for a skipped step). Small talk and talking points
+# are left blank when there's nothing relevant, per the user's preference.
+POST_NONE = "No LinkedIn post"
 
 # ---------------------------------------------------------------------------
 # Main
@@ -617,9 +622,11 @@ def main() -> None:
         for i in all_st:
             key = _lead_key(i)
             if key in st_done:
-                detail = st_done[key] or ""
-                small_talk_by_lead[i] = detail
-                backend.write_cell(i + 2, small_talk_col_idx, detail)
+                # Already written to the sheet by the run that computed it — just
+                # reload it into memory (Step 9 needs it) and skip the re-write.
+                # Re-writing all checkpointed cells on every resume floods the
+                # Sheets write quota and stalls the run before it makes progress.
+                small_talk_by_lead[i] = st_done[key] or ""
             else:
                 st_indices.append(i)
         if st_done:
@@ -654,6 +661,12 @@ def main() -> None:
         post_links_col_idx = get_or_create_col(headers, mapping, "post_links", "LinkedIn Post Links")
         backend.write_header(post_links_col_idx, headers[post_links_col_idx])
 
+        # Leads with no LinkedIn URL can't be scraped — mark them explicitly so
+        # the cell reads "no post" instead of a blank that looks like a skip.
+        for i in outreach_indices:
+            if not (leads[i].get("linkedin") or "").strip():
+                backend.write_cell(i + 2, post_links_col_idx, POST_NONE)
+
         # Checkpoint Apify post results per LinkedIn URL — a crash mid-scrape
         # keeps everything already pulled; a re-run skips those profiles.
         posts_ck = checkpoint_path(f"email_outreach_posts_{ck_id}")
@@ -663,8 +676,10 @@ def main() -> None:
             url = leads[i]["linkedin"]
             if url in posts_done and isinstance(posts_done[url], dict):
                 r = posts_done[url]
-                post_data_by_lead[i] = r.get("posts_data", [])
-                backend.write_cell(i + 2, post_links_col_idx, "\n".join(r.get("urls", [])))
+                # Reload into memory (Step 9 needs it), capped to top-N. Already
+                # written to the sheet when scraped — skip the re-write so a
+                # resume doesn't re-flood the Sheets write quota.
+                post_data_by_lead[i] = r.get("posts_data", [])[:MAX_RELEVANT_POSTS]
             else:
                 pending_posts.append(i)
         if posts_done:
@@ -675,10 +690,11 @@ def main() -> None:
                 if e:
                     print(f"  {leads[i]['name']} — post scraping failed: {e}")
                 post_data_by_lead[i] = []
+                backend.write_cell(i + 2, post_links_col_idx, POST_NONE)
                 return
             post_data_by_lead[i] = r["posts_data"]
             checkpoint_append(posts_ck, leads[i]["linkedin"], {"urls": r["urls"], "posts_data": r["posts_data"]})
-            backend.write_cell(i + 2, post_links_col_idx, "\n".join(r["urls"]) if r["urls"] else "")
+            backend.write_cell(i + 2, post_links_col_idx, "\n".join(r["urls"]) if r["urls"] else POST_NONE)
             print(f"  {leads[i]['name']} ({leads[i]['company']}) → {len(r['urls'])} post(s) matched")
 
         # profile-posts actor throttles on bursts — space starts POSTS_MIN_INTERVAL
@@ -714,9 +730,9 @@ def main() -> None:
         for i in all_hooks:
             key = _lead_key(i)
             if key in hooks_done:
-                hooks = hooks_done[key] or ""
-                hooks_by_lead[i] = hooks
-                backend.write_cell(i + 2, hooks_col_idx, hooks)
+                # Already on the sheet from the run that generated it — reload
+                # into memory only; skip the re-write so resumes stay quota-light.
+                hooks_by_lead[i] = hooks_done[key] or ""
             else:
                 hook_indices.append(i)
         if hooks_done:
